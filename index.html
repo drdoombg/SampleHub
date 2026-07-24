@@ -6587,6 +6587,11 @@ async function syncInit(){
     if(existingWeekly) weeklySyncApplyRemote(existingWeekly);
   }catch(e){}
   weeklySyncStartListening(syncCircleId);
+  try{
+    const existingEntry = await window.__fb.getEntrySnapshot(syncCircleId);
+    if(existingEntry) entrySyncApplyRemote(existingEntry);
+  }catch(e){}
+  entrySyncStartListening(syncCircleId);
   syncRenderMenu();
 }
 
@@ -6653,6 +6658,11 @@ async function syncPairWithCode(rawCode){
       if(existingWeekly) weeklySyncApplyRemote(existingWeekly);
     }catch(e){}
     weeklySyncStartListening(syncCircleId);
+    try{
+      const existingEntry = await window.__fb.getEntrySnapshot(syncCircleId);
+      if(existingEntry) entrySyncApplyRemote(existingEntry);
+    }catch(e){}
+    entrySyncStartListening(syncCircleId);
     hint.textContent = 'Synced! This device now shares data with your other device(s).';
     syncShownCode = null;
     syncRenderMenu();
@@ -7705,10 +7715,8 @@ function entrySyncStartListening(circleId){
   if(!window.__fb || !window.__fb.listenEntrySnapshot) return;
   entrySyncUnsubscribe=window.__fb.listenEntrySnapshot(circleId, entrySyncApplyRemote);
 }
-window.addEventListener('firebase-ready', ()=>{
-  const tryStart=()=>{ if(syncCircleId) entrySyncStartListening(syncCircleId); else setTimeout(tryStart,400); };
-  setTimeout(tryStart, 600);
-});
+// Entry's sync listening is started from syncInit()/syncPairWithCode() above,
+// same as Line Timeline and Weekly — no separate bootstrap needed here.
 
 document.getElementById('entrySamplerName').addEventListener('change', e=>{
   localStorage.setItem('unified.samplerName', e.target.value.trim());
