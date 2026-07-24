@@ -509,9 +509,9 @@
   .card-like label { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-dim); margin:0 0 4px; }
   .card-like input { width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:8px;
     padding:10px; color:var(--ink); font-size:14px; }
-  .entry-catgrid { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:6px; }
-  .entry-catbtn { padding:10px 4px; font-size:12px; text-align:center; border-radius:8px; background:var(--panel-2);
-    border:1px solid var(--line); color:var(--ink); cursor:pointer; }
+  .entry-catgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:6px; }
+  .entry-catbtn { padding:14px 6px; font-size:13.5px; line-height:1.3; text-align:center; border-radius:10px;
+    background:var(--panel-2); border:1px solid var(--line); color:var(--ink); cursor:pointer; min-height:48px; }
   .entry-catbtn.sel { background:var(--done); color:#06231a; border-color:var(--done); font-weight:700; }
   .entry-hint { font-size:11.5px; color:var(--ink-dim); line-height:1.4; margin-bottom:4px; }
   .entry-row-two { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
@@ -519,6 +519,13 @@
     font-size:13px; font-weight:700; letter-spacing:.02em; }
   .entry-table { width:100%; border-collapse:collapse; font-size:12px; table-layout:fixed; background:var(--panel);
     border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  #entrySimplifiedWrap table th:nth-child(1), #entrySimplifiedWrap table td:nth-child(1) { width:8%; }
+  #entrySimplifiedWrap table th:nth-child(2), #entrySimplifiedWrap table td:nth-child(2) { width:15%; }
+  #entrySimplifiedWrap table th:nth-child(3), #entrySimplifiedWrap table td:nth-child(3) { width:37%; }
+  #entrySimplifiedWrap table th:nth-child(4), #entrySimplifiedWrap table td:nth-child(4) { width:10%; }
+  #entrySimplifiedWrap table th:nth-child(5), #entrySimplifiedWrap table td:nth-child(5) { width:11%; }
+  #entrySimplifiedWrap table th:nth-child(6), #entrySimplifiedWrap table td:nth-child(6) { width:11%; }
+  #entrySimplifiedWrap table th:nth-child(7), #entrySimplifiedWrap table td:nth-child(7) { width:8%; text-align:center; }
   .entry-table th { background:var(--panel-2); text-align:left; padding:8px 6px; font-size:9.5px; text-transform:uppercase;
     color:var(--ink-dim); border-bottom:1px solid var(--line); }
   .entry-table td { padding:7px 6px; border-bottom:1px solid var(--line); font-size:11.5px; overflow:hidden;
@@ -533,8 +540,8 @@
   /* Entry's own sub-nav (Scan / Records / Reference) */
   .entry-subtabs { display:flex; gap:6px; margin-bottom:14px; background:var(--panel-2); padding:4px;
     border-radius:12px; border:1px solid var(--line); }
-  .entry-subtabs button { flex:1; padding:9px 4px; font-size:12.5px; font-weight:600; color:var(--ink-dim);
-    border:none; background:transparent; border-radius:9px; cursor:pointer; }
+  .entry-subtabs button { flex:1; padding:12px 4px; font-size:12.5px; font-weight:600; color:var(--ink-dim);
+    border:none; background:transparent; border-radius:9px; cursor:pointer; min-height:44px; }
   .entry-subtabs button.on { background:var(--bg); color:var(--ink); }
 
   .entry-viewtoggle { display:flex; gap:6px; margin-bottom:10px; }
@@ -554,6 +561,8 @@
   .entry-or-divider { display:flex; align-items:center; gap:10px; margin:14px 0 10px;
     color:var(--ink-dim); font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; }
   .entry-or-divider::before, .entry-or-divider::after { content:''; flex:1; height:1px; background:var(--line); }
+  .entry-qf-preview { text-align:center; font-size:16px; font-weight:700; font-family:monospace;
+    color:var(--monthly); margin:10px 0 4px; }
 </style>
 </head>
 <body>
@@ -800,7 +809,7 @@
       <div class="entry-row-two">
         <div>
           <label>Entries</label>
-          <input id="entryFEntries" type="number" min="1" value="1" readonly>
+          <input id="entryFEntries" type="number" min="1" value="1">
         </div>
         <div>
           <label>Barcode (if any)</label>
@@ -810,6 +819,25 @@
       <div class="sheet-actions">
         <button class="btn ghost" id="entryBtnCancel">Cancel</button>
         <button class="btn primary" id="entryBtnCommit">Add to sequence</button>
+      </div>
+    </div>
+
+    <!-- Time/Line quick-fill: shown after committing a multi-entry non-barcode
+         batch (e.g. 5 Caeca samples). Walks through each just-added record one
+         at a time — type digits, they live-split into Time (HH:MM) and Line,
+         Enter/Next advances to the following record automatically. -->
+    <div class="card-like hidden" id="entryQuickFillCard">
+      <div class="entry-section-head" style="margin:0 0 10px;">
+        <span>Fill time &amp; line</span>
+        <span class="entry-result-tag" id="entryQfProgress">1 of 5</span>
+      </div>
+      <p class="hint">Type digits — first 4 are the time, the rest is the line number. e.g. <b>08402</b> → 08:40, line 2.</p>
+      <label>Sample #<span id="entryQfNum">—</span> — <span id="entryQfDesc">—</span></label>
+      <input id="entryQfDigits" class="entry-search mono" inputmode="numeric" placeholder="e.g. 08402" style="font-size:20px; text-align:center; letter-spacing:2px;">
+      <div class="entry-qf-preview" id="entryQfPreview">Time: —:— &nbsp;·&nbsp; Line: —</div>
+      <div class="sheet-actions">
+        <button class="btn ghost" id="entryQfSkip">Skip</button>
+        <button class="btn primary" id="entryQfNext">Next</button>
       </div>
     </div>
   </div>
@@ -6567,6 +6595,7 @@ function syncStartListening(circleId){
 async function syncInit(){
   if(!window.__fb) return; // Firebase script hasn't loaded yet — syncInit is
                             // re-run once it does, see the firebase-ready listener below
+  try{
   if(!syncCircleId){
     // First-ever use on this device with no paired circle yet: create one
     // silently in the background, seeded with whatever's already in localStorage.
@@ -6593,6 +6622,10 @@ async function syncInit(){
   }catch(e){}
   entrySyncStartListening(syncCircleId);
   syncRenderMenu();
+  }catch(e){
+    const statusEl = document.getElementById('syncStatus');
+    if(statusEl) statusEl.textContent = "Sync error: " + (e && e.message ? e.message : String(e));
+  }
 }
 
 // Renders the Sync devices section inside the menu sheet — current status, this
@@ -6667,7 +6700,7 @@ async function syncPairWithCode(rawCode){
     syncShownCode = null;
     syncRenderMenu();
   }catch(e){
-    hint.textContent = "Couldn't sync — check your connection and try again.";
+    hint.textContent = "Couldn't sync: " + (e && e.message ? e.message : String(e));
   }
 }
 
@@ -7336,9 +7369,16 @@ function entryShowConfirm(sug){
 function entrySetCat(cat){
   entryPending.cat=cat;
   document.querySelectorAll('.entry-catbtn').forEach(b=>b.classList.toggle('sel', b.dataset.cat===cat));
+  // Category 4/5 default to 5 entries (the common case), but this is just a
+  // starting value — the field itself is editable for any category, since
+  // non-barcode types like Neck/Caeca commonly need a custom count too.
   entryPending.entries = (cat==='Category 4'||cat==='Category 5') ? 5 : 1;
   document.getElementById('entryFEntries').value=entryPending.entries;
 }
+document.getElementById('entryFEntries').addEventListener('input', e=>{
+  const v = parseInt(e.target.value,10);
+  if(entryPending) entryPending.entries = (v && v>0) ? v : 1;
+});
 document.querySelectorAll('.entry-catbtn').forEach(b=>{
   b.addEventListener('click', ()=>entrySetCat(b.dataset.cat));
 });
@@ -7360,14 +7400,16 @@ function entryCommit(){
   const now=new Date();
   const lookupEntry = entryPending.lookupEntry;
   const mimsRow = entryMimsRowFor(entryPending.barcode);
+  const committedNums = [];
   for(let k=0;k<entryPending.entries;k++){
     entryRecords.push({
       num:n+k, desc:entryPending.desc, barcode:entryPending.barcode, cat:entryPending.cat,
-      time:now.toISOString(),
+      time:now.toISOString(), line:'',
       source: mimsRow ? 'mims' : (lookupEntry && lookupEntry.tmpl ? 'template' : 'lookup'),
       tmpl: (lookupEntry && lookupEntry.tmpl) || null,
       mimsRow: mimsRow || null
     });
+    committedNums.push(n+k);
   }
   if(entryPending.barcode){
     if(entryPending.cat==='Category 2') entryTicks[entryPending.barcode]={freq:'weekly', period:weekKey()};
@@ -7382,13 +7424,97 @@ function entryCommit(){
   }
   entrySaveLocal();
   renderEntryAll();
+  const wasBarcode = !!entryPending.barcode;
+  const enteredCount = entryPending.entries;
   entryPending=null;
   document.getElementById('entryConfirmCard').classList.add('hidden');
   document.getElementById('entrySearchAll').value='';
   document.getElementById('entryResultsAll').innerHTML='';
-  document.getElementById('entrySearchAll').focus();
+
+  // Non-barcode types (Neck, Caeca, etc.) commonly need a per-sample time and
+  // line number after the batch is added — offer the quick-fill walkthrough
+  // rather than resetting straight back to search.
+  if(!wasBarcode && enteredCount>1){
+    entryStartQuickFill(committedNums);
+  } else {
+    document.getElementById('entrySearchAll').focus();
+  }
 }
 document.getElementById('entryBtnCommit').addEventListener('click', entryCommit);
+
+/* ============================================================
+   TIME/LINE QUICK-FILL — walks through a just-committed batch of
+   non-barcode records (e.g. 5 Caeca samples) one at a time. A digit
+   string like "08402" splits into Time (first 4 digits, HH:MM) and
+   Line (remaining digits). Time overwrites the record's actual
+   timestamp (so MANUFTIME reflects it on export); Line is stored
+   separately and exported into the BARCODE column, matching the
+   paste-into-toolkit workflow — Manufacturing Time + Line-as-Barcode.
+   ============================================================ */
+let entryQfQueue=[], entryQfIndex=0;
+
+function entryStartQuickFill(nums){
+  entryQfQueue = nums.slice();
+  entryQfIndex = 0;
+  document.getElementById('entryQuickFillCard').classList.remove('hidden');
+  entryRenderQfStep();
+  document.getElementById('entryQfDigits').focus();
+}
+function entryRenderQfStep(){
+  const num = entryQfQueue[entryQfIndex];
+  const rec = entryRecords.find(r=>r.num===num);
+  document.getElementById('entryQfProgress').textContent = (entryQfIndex+1)+' of '+entryQfQueue.length;
+  document.getElementById('entryQfNum').textContent = num;
+  document.getElementById('entryQfDesc').textContent = rec ? rec.desc : '';
+  document.getElementById('entryQfDigits').value='';
+  document.getElementById('entryQfPreview').textContent = 'Time: —:— · Line: —';
+}
+function entryQfParse(digits){
+  digits = (digits||'').replace(/\D/g,'');
+  if(digits.length<4) return null;
+  const time = digits.slice(0,4);
+  const line = digits.slice(4);
+  const hh = time.slice(0,2), mm = time.slice(2,4);
+  if(+hh>23 || +mm>59) return null;
+  return { hh, mm, line };
+}
+document.getElementById('entryQfDigits').addEventListener('input', e=>{
+  const p = entryQfParse(e.target.value);
+  document.getElementById('entryQfPreview').textContent = p
+    ? `Time: ${p.hh}:${p.mm} · Line: ${p.line||'—'}`
+    : 'Time: —:— · Line: —';
+});
+document.getElementById('entryQfDigits').addEventListener('keydown', e=>{
+  if(e.key==='Enter') entryQfCommitStep();
+});
+function entryQfCommitStep(){
+  const p = entryQfParse(document.getElementById('entryQfDigits').value);
+  if(p){
+    const num = entryQfQueue[entryQfIndex];
+    const rec = entryRecords.find(r=>r.num===num);
+    if(rec){
+      const d = new Date(rec.time);
+      d.setHours(+p.hh, +p.mm, 0, 0);
+      rec.time = d.toISOString();
+      rec.line = p.line || '';
+    }
+  }
+  entryQfAdvance();
+}
+function entryQfAdvance(){
+  entryQfIndex++;
+  if(entryQfIndex >= entryQfQueue.length){
+    entrySaveLocal();
+    renderEntryAll();
+    document.getElementById('entryQuickFillCard').classList.add('hidden');
+    document.getElementById('entrySearchAll').focus();
+    return;
+  }
+  entryRenderQfStep();
+}
+document.getElementById('entryQfNext').addEventListener('click', entryQfCommitStep);
+document.getElementById('entryQfSkip').addEventListener('click', entryQfAdvance);
+
 document.getElementById('entryNextNumEdit').addEventListener('change', e=>{
   const v=parseInt(e.target.value,10);
   if(!v||v<1) return;
@@ -7451,7 +7577,7 @@ function renderEntrySimplified(){
     const i=entryRecords.indexOf(r);
     return `<tr>
       <td class="mono">${r.num}</td>
-      <td class="mono">${esc(r.barcode||'—')}</td>
+      <td class="mono">${esc(r.barcode || (r.line?'L'+r.line:'—'))}</td>
       <td>${esc(r.desc)}</td>
       <td>${(r.cat||'').replace('Category ','C')}</td>
       <td class="mono">${entryFmtDateShort(r.time)}</td>
@@ -7642,6 +7768,10 @@ function entryBuildSisRow(r){
   row.ORDER=r.cat; row.SAMPCOUNT=String(r.num); row.SAMDATE=entryFmtDateUK(new Date());
   row.SAMBY = localStorage.getItem('unified.samplerName') || 'Sampler';
   row.CLIENT='SIS'; row.MANUFDATE=kdpd;
+  // Time/Line quick-fill (Neck, Caeca, etc.): the line number goes into the
+  // BARCODE column so the whole row pastes straight into the line-lookup
+  // toolkit — Manufacturing Time + Line-as-Barcode, exactly as it's used there.
+  if(r.line) row.BARCODE = r.line;
   return row;
 }
 function entryExportSis(){
