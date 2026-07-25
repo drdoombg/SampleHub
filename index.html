@@ -7972,7 +7972,7 @@ function renderEntry(){ renderEntryAll(); }  // kept as the app's init hook name
 function entryFmtDateUK(d){ const x=new Date(d); const p=n=>String(n).padStart(2,'0');
   return `${p(x.getDate())}/${p(x.getMonth()+1)}/${x.getFullYear()}`; }
 function entryFmtHHMM(d){ const x=new Date(d); const p=n=>String(n).padStart(2,'0');
-  return `${p(x.getHours())}${p(x.getMinutes())}`; }
+  return `${p(x.getHours())}:${p(x.getMinutes())}`; }
 const ENTRY_SIS_HEADERS = ['PRODUCT','MATERIAL','RISE','UNIT','DESCRIPTN','SIZE','RETAILER','SHIFT',
   'LINE','OTHER_ID','SUITE','PRICE','BARCODE','KILLDATE','PACKDATE','MANUFTIME','USE_BY','EOL',
   'BATCH','SUPPLIER','COMMS','ORDER','SAMPCOUNT','SAMDATE','SAMBY','FARM_NO','PEN_NO','SHED_NO',
