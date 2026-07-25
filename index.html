@@ -105,6 +105,34 @@
       return onSnapshot(doc(db,'circles',circleId,'line','entry'), (snap)=>{
         callback(snap.exists() ? snap.data().data : null);
       });
+    },
+    // Entry lookup table (product database used by the scanner to match barcodes)
+    // — same subdocument pattern so additions/removals sync across paired devices.
+    async writeEntryLookup(circleId, entryLookup){
+      await setDoc(doc(db,'circles',circleId,'line','lookup'), { data: entryLookup, updatedAt: serverTimestamp() });
+    },
+    async getEntryLookup(circleId){
+      const snap = await getDoc(doc(db,'circles',circleId,'line','lookup'));
+      return snap.exists() ? snap.data().data : null;
+    },
+    listenEntryLookup(circleId, callback){
+      return onSnapshot(doc(db,'circles',circleId,'line','lookup'), (snap)=>{
+        callback(snap.exists() ? snap.data().data : null);
+      });
+    },
+    // Entry MIMS data (the imported MIMS SAVE FILE used for export cross-reference)
+    // — same subdocument pattern, so a MIMS import on one device is available everywhere.
+    async writeEntryMims(circleId, entryMims){
+      await setDoc(doc(db,'circles',circleId,'line','mims'), { data: entryMims, updatedAt: serverTimestamp() });
+    },
+    async getEntryMims(circleId){
+      const snap = await getDoc(doc(db,'circles',circleId,'line','mims'));
+      return snap.exists() ? snap.data().data : null;
+    },
+    listenEntryMims(circleId, callback){
+      return onSnapshot(doc(db,'circles',circleId,'line','mims'), (snap)=>{
+        callback(snap.exists() ? snap.data().data : null);
+      });
     }
   };
   window.dispatchEvent(new Event('firebase-ready'));
@@ -298,6 +326,12 @@
   .mtab { flex:1 1 30%; min-width:72px; text-align:center; padding:10px 4px; border-radius:9px; font-size:12.5px;
     font-weight:600; color:var(--ink-dim); cursor:pointer; border:none; background:transparent; }
   .mtab.active { background:var(--panel-2); color:var(--ink); }
+  /* Entry sits on its own row underneath the four schedule tabs, yellow-tinted
+     so it's visually distinct as a different workflow (barcode capture + records). */
+  .entry-tab-row { margin-top:6px; }
+  .mtab.mtab-entry { color:var(--weekly); font-weight:700; }
+  .mtab.mtab-entry.active { background:rgba(242,160,61,.14); color:var(--weekly);
+    box-shadow:inset 0 0 0 1px rgba(242,160,61,.4); }
 
   #remainingToggle.on, #testRemainingToggle.on { background:var(--panel-2); color:var(--done); border-color:transparent; }
   #monthLabel { font-weight:700; color:var(--ink); }
@@ -509,9 +543,9 @@
   .card-like label { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-dim); margin:0 0 4px; }
   .card-like input { width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:8px;
     padding:10px; color:var(--ink); font-size:14px; }
-  .entry-catgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:6px; }
-  .entry-catbtn { padding:14px 6px; font-size:13.5px; line-height:1.3; text-align:center; border-radius:10px;
-    background:var(--panel-2); border:1px solid var(--line); color:var(--ink); cursor:pointer; min-height:48px; }
+  .entry-catgrid { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:6px; }
+  .entry-catbtn { padding:10px 4px; font-size:12px; text-align:center; border-radius:8px; background:var(--panel-2);
+    border:1px solid var(--line); color:var(--ink); cursor:pointer; }
   .entry-catbtn.sel { background:var(--done); color:#06231a; border-color:var(--done); font-weight:700; }
   .entry-hint { font-size:11.5px; color:var(--ink-dim); line-height:1.4; margin-bottom:4px; }
   .entry-row-two { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
@@ -519,13 +553,6 @@
     font-size:13px; font-weight:700; letter-spacing:.02em; }
   .entry-table { width:100%; border-collapse:collapse; font-size:12px; table-layout:fixed; background:var(--panel);
     border:1px solid var(--line); border-radius:12px; overflow:hidden; }
-  #entrySimplifiedWrap table th:nth-child(1), #entrySimplifiedWrap table td:nth-child(1) { width:8%; }
-  #entrySimplifiedWrap table th:nth-child(2), #entrySimplifiedWrap table td:nth-child(2) { width:15%; }
-  #entrySimplifiedWrap table th:nth-child(3), #entrySimplifiedWrap table td:nth-child(3) { width:37%; }
-  #entrySimplifiedWrap table th:nth-child(4), #entrySimplifiedWrap table td:nth-child(4) { width:10%; }
-  #entrySimplifiedWrap table th:nth-child(5), #entrySimplifiedWrap table td:nth-child(5) { width:11%; }
-  #entrySimplifiedWrap table th:nth-child(6), #entrySimplifiedWrap table td:nth-child(6) { width:11%; }
-  #entrySimplifiedWrap table th:nth-child(7), #entrySimplifiedWrap table td:nth-child(7) { width:8%; text-align:center; }
   .entry-table th { background:var(--panel-2); text-align:left; padding:8px 6px; font-size:9.5px; text-transform:uppercase;
     color:var(--ink-dim); border-bottom:1px solid var(--line); }
   .entry-table td { padding:7px 6px; border-bottom:1px solid var(--line); font-size:11.5px; overflow:hidden;
@@ -536,12 +563,39 @@
   .entry-suggest-badge.mo { color:var(--monthly); border-color:#1e3a5f; background:#0e1b2e; }
   .entry-filelabel { display:block; background:var(--panel-2); border:1px dashed var(--line); border-radius:10px;
     padding:16px; text-align:center; cursor:pointer; font-size:13px; color:var(--ink); margin-top:8px; }
+  /* Green / blue button variants for the two file uploads in the Reference tab. */
+  .entry-filelabel.entry-filelabel-primary { background:var(--done); color:#06231a; border:none;
+    font-weight:700; padding:14px; }
+  .entry-filelabel.entry-filelabel-primary:active { filter:brightness(.92); }
+  .entry-filelabel.entry-filelabel-secondary { background:#2b5aa8; color:#eef3f8; border:none;
+    font-weight:700; padding:14px; }
+  .entry-filelabel.entry-filelabel-secondary:active { filter:brightness(.92); }
+  /* Compact top bar that replaces the old big "Next sample number" hero. */
+  .entry-topbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:10px; }
+  .entry-mini-num { font-size:15px; font-weight:700; color:var(--ink); letter-spacing:.02em;
+    cursor:pointer; display:flex; align-items:center; gap:8px; user-select:none; }
+  .entry-mini-num small { font-size:10.5px; color:var(--ink-dim); text-transform:uppercase;
+    letter-spacing:.09em; font-weight:600; }
+  .entry-mini-num span#entryNextNum { font-size:18px; font-variant-numeric:tabular-nums; }
+  .entry-manual-btn { background:var(--panel-2); color:var(--ink-dim); border:1px solid var(--line);
+    border-radius:8px; padding:7px 14px; font-size:12.5px; font-weight:600; cursor:pointer;
+    font-family:inherit; }
+  .entry-manual-btn:active { background:var(--panel); color:var(--ink); }
+  /* Jump-to input inlined into the number bar, revealed on long-press of the Entry tab
+     or a tap on the number label. */
+  .entry-jump { width:90px; text-align:center; background:var(--panel-2); border:1px solid var(--line);
+    border-radius:8px; padding:6px 8px; color:var(--ink); font-size:14px; font-family:inherit; }
+  .entry-jump.hidden { display:none; }
+  /* Count pill next to the # header in the Records simplified table. */
+  .entry-count-inline { display:inline-block; margin-left:4px; padding:1px 7px; border-radius:99px;
+    background:var(--panel); color:var(--ink-dim); font-size:9.5px; font-weight:700;
+    border:1px solid var(--line); vertical-align:middle; }
 
   /* Entry's own sub-nav (Scan / Records / Reference) */
   .entry-subtabs { display:flex; gap:6px; margin-bottom:14px; background:var(--panel-2); padding:4px;
     border-radius:12px; border:1px solid var(--line); }
-  .entry-subtabs button { flex:1; padding:12px 4px; font-size:12.5px; font-weight:600; color:var(--ink-dim);
-    border:none; background:transparent; border-radius:9px; cursor:pointer; min-height:44px; }
+  .entry-subtabs button { flex:1; padding:9px 4px; font-size:12.5px; font-weight:600; color:var(--ink-dim);
+    border:none; background:transparent; border-radius:9px; cursor:pointer; }
   .entry-subtabs button.on { background:var(--bg); color:var(--ink); }
 
   .entry-viewtoggle { display:flex; gap:6px; margin-bottom:10px; }
@@ -561,13 +615,6 @@
   .entry-or-divider { display:flex; align-items:center; gap:10px; margin:14px 0 10px;
     color:var(--ink-dim); font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; }
   .entry-or-divider::before, .entry-or-divider::after { content:''; flex:1; height:1px; background:var(--line); }
-  .entry-qf-preview { text-align:center; font-size:16px; font-weight:700; font-family:monospace;
-    color:var(--monthly); margin:10px 0 4px; }
-
-  .entry-multisel-bar { display:flex; align-items:center; gap:8px; margin-bottom:10px; min-height:36px; }
-  .entry-table tr.selected td { background:rgba(124,140,248,0.14); }
-  .entry-table td.selcol, .entry-table th.selcol { text-align:center; }
-  .entry-selbox { width:20px; height:20px; }
 </style>
 </head>
 <body>
@@ -585,7 +632,11 @@
     <button class="mtab" data-tab="nutri">Nutritional</button>
     <button class="mtab" data-tab="shelf">Shelf-Life</button>
     <button class="mtab" data-tab="line">Line Timeline</button>
-    <button class="mtab" data-tab="entry">Entry</button>
+  </div>
+  <!-- Entry sits on its own row at the bottom, yellow-tinted so it's visually
+       distinct from the four schedule tabs above. -->
+  <div class="main-tabs entry-tab-row">
+    <button class="mtab mtab-entry" data-tab="entry">Entry</button>
   </div>
   <div class="toolbar" id="routineToolbar">
     <button id="expandAll">Expand all</button>
@@ -773,10 +824,14 @@
      collide with the app's existing product/tick/schedule data.
      ============================================================ -->
 <div id="entryRoot" class="hidden">
-  <div class="entry-hero">
-    <div class="entry-hero-label">Next sample number</div>
-    <div class="entry-hero-num" id="entryNextNum">1</div>
-    <input type="number" id="entryNextNumEdit" placeholder="jump to #" class="entry-jump">
+  <!-- Compact top bar: current sample number on the left, Manual shortcut on the right.
+       The number is tappable to reveal a jump-to input inline (the old big hero is gone). -->
+  <div class="entry-topbar">
+    <div class="entry-mini-num" id="entryNumHeader">
+      <small>Entry</small><span id="entryNextNum">1</span>
+      <input type="number" id="entryNextNumEdit" placeholder="jump to #" class="entry-jump hidden">
+    </div>
+    <button type="button" class="entry-manual-btn" id="entryBtnManual">Manual</button>
   </div>
 
   <!-- Entry's own sub-navigation: Scan / Records / Reference -->
@@ -788,16 +843,19 @@
 
   <!-- ===== SCAN sub-tab ===== -->
   <div id="entryPaneScan">
-    <div id="entryScanIdleCard" class="card-like" style="text-align:center;">
+    <!-- Just the green bar button — no card, no explanatory hint -->
+    <div id="entryScanIdleCard">
       <button class="btn primary" id="entryBtnCam" style="width:100%;">Start camera</button>
-      <small class="hint" style="display:block; margin-top:8px;">Point the camera at a barcode. It captures automatically once confirmed.</small>
     </div>
     <div id="entryReader" class="entry-reader hidden"></div>
 
-    <div class="entry-or-divider"><span>or search by name / type barcode</span></div>
-    <input id="entrySearchAll" class="entry-search" placeholder="Search barcode or name — Swab, Amber, Aldi, Tesco…" autocomplete="off">
+    <!-- Manual search (typing a barcode or a name).
+         Placeholder trimmed of the swab/amber/aldi/tesco examples. -->
+    <input id="entrySearchAll" class="entry-search" placeholder="Search Barcode or Name" autocomplete="off" style="margin-top:12px;">
     <div class="entry-results" id="entryResultsAll"></div>
 
+    <!-- Confirm card. Hidden by default; only appears once a scan or a search
+         has produced a candidate, exactly like Sample Scanner. -->
     <div class="card-like hidden" id="entryConfirmCard">
       <div id="entrySuggestBadge"></div>
       <label>Description</label>
@@ -810,11 +868,10 @@
         <button class="entry-catbtn manual" data-cat="Category 4">4<br>EOL</button>
         <button class="entry-catbtn manual" data-cat="Category 5">5<br>SOL</button>
       </div>
-      <div class="entry-hint" id="entryCatHint">Category 4/5 are manual — selecting either automatically adds 5 entries.</div>
       <div class="entry-row-two">
         <div>
           <label>Entries</label>
-          <input id="entryFEntries" type="number" min="1" value="1">
+          <input id="entryFEntries" type="number" min="1" value="1" readonly>
         </div>
         <div>
           <label>Barcode (if any)</label>
@@ -826,25 +883,6 @@
         <button class="btn primary" id="entryBtnCommit">Add to sequence</button>
       </div>
     </div>
-
-    <!-- Time/Line quick-fill: shown after committing a multi-entry non-barcode
-         batch (e.g. 5 Caeca samples). Walks through each just-added record one
-         at a time — type digits, they live-split into Time (HH:MM) and Line,
-         Enter/Next advances to the following record automatically. -->
-    <div class="card-like hidden" id="entryQuickFillCard">
-      <div class="entry-section-head" style="margin:0 0 10px;">
-        <span>Fill time &amp; line</span>
-        <span class="entry-result-tag" id="entryQfProgress">1 of 5</span>
-      </div>
-      <p class="hint">Type digits — first 4 are the time, the rest is the line number. e.g. <b>08402</b> → 08:40, line 2.</p>
-      <label>Sample #<span id="entryQfNum">—</span> — <span id="entryQfDesc">—</span></label>
-      <input id="entryQfDigits" class="entry-search mono" inputmode="numeric" placeholder="e.g. 08402" style="font-size:20px; text-align:center; letter-spacing:2px;">
-      <div class="entry-qf-preview" id="entryQfPreview">Time: —:— &nbsp;·&nbsp; Line: —</div>
-      <div class="sheet-actions">
-        <button class="btn ghost" id="entryQfSkip">Skip</button>
-        <button class="btn primary" id="entryQfNext">Next</button>
-      </div>
-    </div>
   </div>
 
   <!-- ===== RECORDS sub-tab — Simplified / Export toggle ===== -->
@@ -854,137 +892,66 @@
       <button id="entryViewExport">Export view</button>
     </div>
 
-    <div class="entry-section-head">
-      <span>Today's sequence (<span id="entryCount">0</span>)</span>
-      <button class="btn ghost" id="entryBtnExport" style="padding:8px 14px; font-size:12.5px;">Export SIS_Micro_Sub</button>
-    </div>
-
-    <!-- Simplified: Scanner's familiar shape, with # added -->
+    <!-- Simplified: today's count is now the little pill on the # column header,
+         instead of the removed "Today's sequence" line above the table. -->
     <div id="entrySimplifiedWrap">
-      <div class="entry-multisel-bar">
-        <button class="btn ghost" id="entryBtnMultiToggle" style="padding:8px 14px; font-size:12.5px;">Select</button>
-        <div id="entryMultiActions" class="hidden" style="display:flex; gap:8px; flex-wrap:wrap;">
-          <span class="entry-result-tag" id="entryMultiCount">0 selected</span>
-          <button class="btn ghost" id="entryBtnBulkEdit" style="padding:8px 12px; font-size:12px;">Edit dates/times</button>
-          <button class="btn ghost" id="entryBtnMultiCancel" style="padding:8px 12px; font-size:12px;">Cancel</button>
-        </div>
-      </div>
       <div id="entryRecordsWrap">
         <table class="entry-table">
-          <thead><tr>
-            <th id="entryThSel" class="hidden" style="width:8%"></th>
-            <th>#</th><th>Barcode</th><th>Description</th><th>Cat</th><th>Date</th><th>Time</th><th></th></tr></thead>
+          <thead><tr><th># <span id="entryCount" class="entry-count-inline">0</span></th><th>Barcode</th><th>Description</th><th>Cat</th><th>Date</th><th>Time</th><th></th></tr></thead>
           <tbody id="entryTbody"></tbody>
         </table>
         <div class="empty" id="entryEmpty">No records yet.</div>
       </div>
     </div>
 
-    <!-- Bulk edit sheet: appears once records are selected. Kill Date and Pack
-         Date each apply as ONE value to every selected record at once. Time
-         is edited per-record, one at a time, reusing the same digit-entry UI
-         as the Caeca quick-fill (minus the line field). -->
-    <div class="card-like hidden" id="entryBulkEditCard">
-      <div class="entry-section-head" style="margin:0 0 10px;">
-        <span>Edit <span id="entryBulkCount">0</span> selected</span>
-      </div>
-
-      <label>Kill date (applies to all selected)</label>
-      <input type="date" id="entryBulkKillDate">
-      <div class="sheet-actions" style="margin-top:8px;">
-        <button class="btn ghost" id="entryBtnApplyKillDate" style="width:100%;">Apply kill date to all selected</button>
-      </div>
-
-      <label style="margin-top:14px;">Pack date (applies to all selected)</label>
-      <input type="date" id="entryBulkPackDate">
-      <div class="sheet-actions" style="margin-top:8px;">
-        <button class="btn ghost" id="entryBtnApplyPackDate" style="width:100%;">Apply pack date to all selected</button>
-      </div>
-
-      <div class="divider"></div>
-      <div class="sheet-actions">
-        <button class="btn primary" id="entryBtnEditTimesIndividually" style="width:100%;">Edit time for each, one at a time</button>
-      </div>
-      <div class="sheet-actions" style="margin-top:8px;">
-        <button class="btn ghost" id="entryBtnBulkDone" style="width:100%;">Done</button>
-      </div>
-    </div>
-
-    <!-- Individual time editor: same digit-entry pattern as the Caeca
-         quick-fill, minus the line field — walks the selection one record
-         at a time. -->
-    <div class="card-like hidden" id="entryTimeEditCard">
-      <div class="entry-section-head" style="margin:0 0 10px;">
-        <span>Edit time</span>
-        <span class="entry-result-tag" id="entryTeProgress">1 of 5</span>
-      </div>
-      <p class="hint">Type 4 digits for the time. e.g. <b>0840</b> → 08:40.</p>
-      <label>Sample #<span id="entryTeNum">—</span> — <span id="entryTeDesc">—</span></label>
-      <input id="entryTeDigits" class="entry-search mono" inputmode="numeric" placeholder="e.g. 0840" style="font-size:20px; text-align:center; letter-spacing:2px;">
-      <div class="entry-qf-preview" id="entryTePreview">Time: —:—</div>
-      <div class="sheet-actions">
-        <button class="btn ghost" id="entryTeSkip">Skip</button>
-        <button class="btn primary" id="entryTeNext">Next</button>
-      </div>
-    </div>
-
-    <!-- Export view: exact SIS_Micro_Sub shape, post-MIMS correlation -->
+    <!-- Export view — the descriptive hint above the table is removed, since the
+         table itself is what matters and the label is already "Export view". -->
     <div id="entryExportWrap" class="hidden">
-      <p class="hint" style="margin-bottom:8px;">This is exactly what the exported file will contain, correlated against the current MIMS SAVE FILE.</p>
       <div class="entry-export-scroll">
         <table class="entry-table entry-export-table" id="entryExportTable"></table>
       </div>
     </div>
 
-    <div class="sheet-actions" style="margin-top:14px;">
-      <button class="btn ghost" id="entryBtnWipe">Delete all &amp; reset ticks</button>
+    <!-- Export button moved below the table as a green bar. Delete/reset lives underneath. -->
+    <button class="btn primary" id="entryBtnExport" style="width:100%; margin-top:14px;">Export SIS_Micro_Sub</button>
+    <div class="sheet-actions" style="margin-top:10px;">
+      <button class="btn ghost" id="entryBtnWipe" style="width:100%;">Delete all &amp; reset ticks</button>
     </div>
   </div>
 
-  <!-- ===== REFERENCE sub-tab — lookup table + MIMS, unified ===== -->
+  <!-- ===== REFERENCE sub-tab — two file actions + sampler name only.
+       The lookup search / list / add-card have been removed from the UI, since
+       adding is handled inline on the Scan tab when an unknown barcode arrives.
+       Their elements are kept in the DOM (hidden) so existing JS references
+       (entryLookupSearch etc.) continue to work without any code changes. ===== -->
   <div id="entryPaneReference" class="hidden">
-    <div class="entry-section-head"><span>Product lookup table</span></div>
-    <p class="hint">Search first. If a product isn't here, add it — MIMS correlation happens automatically in the background for export.</p>
-    <input id="entryLookupSearch" class="entry-search" placeholder="Search the lookup table…" autocomplete="off">
-    <div class="entry-results" id="entryLookupResults"></div>
-
-    <label class="entry-filelabel">
-      Import products from a file (adds to the lookup table — doesn't replace it)
-      <input type="file" id="entryFileLookupImport" accept=".xlsx,.xls,.csv" class="hidden">
-    </label>
-    <small class="hint" id="entryLookupImportStatus" style="display:block; margin:6px 0 14px;">
-      Expects columns: Barcode, Name, Category (or Description/Cat) — extra columns are ignored.
-    </small>
-
-    <div class="card-like" id="entryAddLookupCard">
-      <label>Not found — add it</label>
-      <input id="entryNewLookupName" placeholder="Product / sample name">
-      <div class="entry-row-two" style="margin-top:8px;">
-        <div>
-          <label>Barcode (optional)</label>
-          <input id="entryNewLookupBarcode" class="mono">
-        </div>
-        <div>
-          <label>Default category</label>
-          <select id="entryNewLookupCat" style="width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:10px; color:var(--ink);">
-            <option value="Category 1">1 · Daily</option>
-            <option value="Category 2">2 · Weekly</option>
-            <option value="Category 3">3 · Monthly</option>
-          </select>
-        </div>
-      </div>
-      <div class="sheet-actions">
-        <button class="btn primary" id="entryBtnAddLookup" style="width:100%;">Add to lookup table</button>
+    <!-- Hidden — preserved for JS references -->
+    <div style="display:none;">
+      <input id="entryLookupSearch" autocomplete="off">
+      <div id="entryLookupResults"></div>
+      <div id="entryAddLookupCard">
+        <input id="entryNewLookupName">
+        <input id="entryNewLookupBarcode" class="mono">
+        <select id="entryNewLookupCat">
+          <option value="Category 1">1 · Daily</option>
+          <option value="Category 2">2 · Weekly</option>
+          <option value="Category 3">3 · Monthly</option>
+        </select>
+        <button id="entryBtnAddLookup">Add to lookup table</button>
       </div>
     </div>
 
-    <div class="divider"></div>
-    <div class="entry-section-head"><span>MIMS SAVE FILE</span></div>
-    <p class="hint" id="entryMimsStatus">Using the bundled reference copy.</p>
-    <label class="entry-filelabel">
-      Upload a fresh MIMS_SAVE_FILE.xlsx
+    <label class="entry-filelabel entry-filelabel-primary">
+      Import products from file
+      <input type="file" id="entryFileLookupImport" accept=".xlsx,.xls,.csv" class="hidden">
+    </label>
+    <small class="hint" id="entryLookupImportStatus" style="display:block; margin:8px 0 16px;"></small>
+
+    <label class="entry-filelabel entry-filelabel-secondary">
+      Upload MIMS_SAVE_FILE
       <input type="file" id="entryFileMims" accept=".xlsx,.xls" class="hidden">
     </label>
+    <p class="hint" id="entryMimsStatus" style="margin-top:8px;"></p>
 
     <div class="divider"></div>
     <div class="entry-section-head"><span>Sampled by</span></div>
@@ -6658,7 +6625,6 @@ function syncStartListening(circleId){
 async function syncInit(){
   if(!window.__fb) return; // Firebase script hasn't loaded yet — syncInit is
                             // re-run once it does, see the firebase-ready listener below
-  try{
   if(!syncCircleId){
     // First-ever use on this device with no paired circle yet: create one
     // silently in the background, seeded with whatever's already in localStorage.
@@ -6684,11 +6650,19 @@ async function syncInit(){
     if(existingEntry) entrySyncApplyRemote(existingEntry);
   }catch(e){}
   entrySyncStartListening(syncCircleId);
+  // Entry lookup table + MIMS: same pattern as the above snapshots. Kept in
+  // their own documents so a scan doesn't push MIMS and vice versa.
+  try{
+    const existingLookup = await window.__fb.getEntryLookup(syncCircleId);
+    if(existingLookup) entryLookupSyncApplyRemote(existingLookup);
+  }catch(e){}
+  entryLookupSyncStartListening(syncCircleId);
+  try{
+    const existingMims = await window.__fb.getEntryMims(syncCircleId);
+    if(existingMims) entryMimsSyncApplyRemote(existingMims);
+  }catch(e){}
+  entryMimsSyncStartListening(syncCircleId);
   syncRenderMenu();
-  }catch(e){
-    const statusEl = document.getElementById('syncStatus');
-    if(statusEl) statusEl.textContent = "Sync error: " + (e && e.message ? e.message : String(e));
-  }
 }
 
 // Renders the Sync devices section inside the menu sheet — current status, this
@@ -6759,11 +6733,22 @@ async function syncPairWithCode(rawCode){
       if(existingEntry) entrySyncApplyRemote(existingEntry);
     }catch(e){}
     entrySyncStartListening(syncCircleId);
+    // Entry lookup table + MIMS bootstrap (mirrors syncInit above).
+    try{
+      const existingLookup = await window.__fb.getEntryLookup(syncCircleId);
+      if(existingLookup) entryLookupSyncApplyRemote(existingLookup);
+    }catch(e){}
+    entryLookupSyncStartListening(syncCircleId);
+    try{
+      const existingMims = await window.__fb.getEntryMims(syncCircleId);
+      if(existingMims) entryMimsSyncApplyRemote(existingMims);
+    }catch(e){}
+    entryMimsSyncStartListening(syncCircleId);
     hint.textContent = 'Synced! This device now shares data with your other device(s).';
     syncShownCode = null;
     syncRenderMenu();
   }catch(e){
-    hint.textContent = "Couldn't sync: " + (e && e.message ? e.message : String(e));
+    hint.textContent = "Couldn't sync — check your connection and try again.";
   }
 }
 
@@ -7260,8 +7245,8 @@ function entrySaveLocal(){
   localStorage.setItem(LS_ENTRY_TICKS, JSON.stringify(entryTicks));
   entrySyncScheduleWrite();
 }
-function entrySaveMims(){ localStorage.setItem(LS_ENTRY_MIMS, JSON.stringify(entryMims)); }
-function entrySaveLookup(){ localStorage.setItem(LS_ENTRY_LOOKUP, JSON.stringify(entryLookup)); }
+function entrySaveMims(){ localStorage.setItem(LS_ENTRY_MIMS, JSON.stringify(entryMims)); entryMimsSyncScheduleWrite(); }
+function entrySaveLookup(){ localStorage.setItem(LS_ENTRY_LOOKUP, JSON.stringify(entryLookup)); entryLookupSyncScheduleWrite(); }
 
 function entryNextNumber(){
   if(!entryRecords.length) return 1;
@@ -7333,7 +7318,7 @@ function entrySuggestCategory(p){
   if(order==='Category 2' && !doneThisWeek) return {cat:'Category 2', tag:'wk', note:'Suggested: Weekly — first time this cycle'};
   if(order==='Category 3' && !doneThisMonth) return {cat:'Category 3', tag:'mo', note:'Suggested: Monthly — first time this cycle'};
   if(tick) return {cat:'Category 1', tag:'', note:'Already ticked this cycle — defaulting to Daily'};
-  return {cat:'Category 1', tag:'', note: order ? `MIMS category (${order}) not auto-suggested — Daily by default` : 'Daily by default'};
+  return {cat:'Category 1', tag:'', note:''};
 }
 function entryOpenConfirm(p){
   const sug=entrySuggestCategory(p);
@@ -7372,6 +7357,16 @@ async function entryStartCam(){
   const F=Html5QrcodeSupportedFormats;
   const FORMATS=[F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.ITF,F.QR_CODE];
   entryScanner = entryScanner || new Html5Qrcode('entryReader', {formatsToSupport:FORMATS, verbose:false});
+  // Pause live Firestore listeners so remote snapshot updates don't interrupt
+  // the decoder mid-scan (this was the main reason SampleHub felt slower than
+  // the standalone Sample Scanner — the scanner config itself is identical).
+  // Firestore replays the latest state on resubscribe, so nothing is lost.
+  try{ if(syncUnsubscribe){ syncUnsubscribe(); syncUnsubscribe=null; } }catch(_e){}
+  try{ if(lineSyncUnsubscribe){ lineSyncUnsubscribe(); lineSyncUnsubscribe=null; } }catch(_e){}
+  try{ if(weeklySyncUnsubscribe){ weeklySyncUnsubscribe(); weeklySyncUnsubscribe=null; } }catch(_e){}
+  try{ if(entrySyncUnsubscribe){ entrySyncUnsubscribe(); entrySyncUnsubscribe=null; } }catch(_e){}
+  try{ if(entryLookupSyncUnsubscribe){ entryLookupSyncUnsubscribe(); entryLookupSyncUnsubscribe=null; } }catch(_e){}
+  try{ if(entryMimsSyncUnsubscribe){ entryMimsSyncUnsubscribe(); entryMimsSyncUnsubscribe=null; } }catch(_e){}
   try{
     document.getElementById('entryReader').classList.remove('hidden');
     document.getElementById('entryScanIdleCard').classList.add('hidden');
@@ -7390,6 +7385,17 @@ async function entryStopCam(){
   document.getElementById('entryReader').classList.add('hidden');
   document.getElementById('entryScanIdleCard').classList.remove('hidden');
   entryResetPendingScan();
+  // Resume the live Firestore listeners paused in entryStartCam. Firestore
+  // will replay the latest snapshot on each resubscribe so any changes that
+  // happened while the camera was open catch up here.
+  if(syncCircleId && window.__fb){
+    try{ if(!syncUnsubscribe) syncStartListening(syncCircleId); }catch(_e){}
+    try{ if(!lineSyncUnsubscribe) lineSyncStartListening(syncCircleId); }catch(_e){}
+    try{ if(!weeklySyncUnsubscribe) weeklySyncStartListening(syncCircleId); }catch(_e){}
+    try{ if(!entrySyncUnsubscribe) entrySyncStartListening(syncCircleId); }catch(_e){}
+    try{ if(!entryLookupSyncUnsubscribe) entryLookupSyncStartListening(syncCircleId); }catch(_e){}
+    try{ if(!entryMimsSyncUnsubscribe) entryMimsSyncStartListening(syncCircleId); }catch(_e){}
+  }
 }
 async function entryOnScan(code){
   code=(code||'').trim();
@@ -7424,24 +7430,21 @@ function entryShowConfirm(sug){
   document.getElementById('entryFEntries').value=entryPending.entries;
   entrySetCat(entryPending.cat);
   const badge=document.getElementById('entrySuggestBadge');
-  const cls = sug.tag==='wk'?'wk':sug.tag==='mo'?'mo':'';
-  badge.innerHTML=`<span class="entry-suggest-badge ${cls}">${esc(sug.note)}</span>`;
+  if(sug && sug.note){
+    const cls = sug.tag==='wk'?'wk':sug.tag==='mo'?'mo':'';
+    badge.innerHTML=`<span class="entry-suggest-badge ${cls}">${esc(sug.note)}</span>`;
+  } else {
+    badge.innerHTML='';
+  }
   const cardEl = document.getElementById('entryConfirmCard');
   if(cardEl.scrollIntoView) cardEl.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 function entrySetCat(cat){
   entryPending.cat=cat;
   document.querySelectorAll('.entry-catbtn').forEach(b=>b.classList.toggle('sel', b.dataset.cat===cat));
-  // Category 4/5 default to 5 entries (the common case), but this is just a
-  // starting value — the field itself is editable for any category, since
-  // non-barcode types like Neck/Caeca commonly need a custom count too.
   entryPending.entries = (cat==='Category 4'||cat==='Category 5') ? 5 : 1;
   document.getElementById('entryFEntries').value=entryPending.entries;
 }
-document.getElementById('entryFEntries').addEventListener('input', e=>{
-  const v = parseInt(e.target.value,10);
-  if(entryPending) entryPending.entries = (v && v>0) ? v : 1;
-});
 document.querySelectorAll('.entry-catbtn').forEach(b=>{
   b.addEventListener('click', ()=>entrySetCat(b.dataset.cat));
 });
@@ -7463,16 +7466,14 @@ function entryCommit(){
   const now=new Date();
   const lookupEntry = entryPending.lookupEntry;
   const mimsRow = entryMimsRowFor(entryPending.barcode);
-  const committedNums = [];
   for(let k=0;k<entryPending.entries;k++){
     entryRecords.push({
       num:n+k, desc:entryPending.desc, barcode:entryPending.barcode, cat:entryPending.cat,
-      time:now.toISOString(), line:'',
+      time:now.toISOString(),
       source: mimsRow ? 'mims' : (lookupEntry && lookupEntry.tmpl ? 'template' : 'lookup'),
       tmpl: (lookupEntry && lookupEntry.tmpl) || null,
       mimsRow: mimsRow || null
     });
-    committedNums.push(n+k);
   }
   if(entryPending.barcode){
     if(entryPending.cat==='Category 2') entryTicks[entryPending.barcode]={freq:'weekly', period:weekKey()};
@@ -7487,113 +7488,91 @@ function entryCommit(){
   }
   entrySaveLocal();
   renderEntryAll();
-  const wasBarcode = !!entryPending.barcode;
-  const enteredCount = entryPending.entries;
   entryPending=null;
   document.getElementById('entryConfirmCard').classList.add('hidden');
   document.getElementById('entrySearchAll').value='';
   document.getElementById('entryResultsAll').innerHTML='';
-
-  // Non-barcode types (Neck, Caeca, etc.) commonly need a per-sample time and
-  // line number after the batch is added — offer the quick-fill walkthrough
-  // rather than resetting straight back to search.
-  if(!wasBarcode && enteredCount>1){
-    entryStartQuickFill(committedNums);
+  // If we're still on the Scan sub-tab, immediately restart the camera so
+  // the next scan can happen without the person tapping Start again. This
+  // matches the standalone Sample Scanner's flow.
+  if(entrySubTab==='scan' && !entryScanning){
+    entryStartCam();
   } else {
     document.getElementById('entrySearchAll').focus();
   }
 }
 document.getElementById('entryBtnCommit').addEventListener('click', entryCommit);
-
-/* ============================================================
-   TIME/LINE QUICK-FILL — walks through a just-committed batch of
-   non-barcode records (e.g. 5 Caeca samples) one at a time. A digit
-   string like "08402" splits into Time (first 4 digits, HH:MM) and
-   Line (remaining digits). Time overwrites the record's actual
-   timestamp (so MANUFTIME reflects it on export); Line is stored
-   separately and exported into the BARCODE column, matching the
-   paste-into-toolkit workflow — Manufacturing Time + Line-as-Barcode.
-   ============================================================ */
-let entryQfQueue=[], entryQfIndex=0;
-
-function entryStartQuickFill(nums){
-  entryQfQueue = nums.slice();
-  entryQfIndex = 0;
-  document.getElementById('entryQuickFillCard').classList.remove('hidden');
-  entryRenderQfStep();
-  document.getElementById('entryQfDigits').focus();
-}
-function entryRenderQfStep(){
-  const num = entryQfQueue[entryQfIndex];
-  const rec = entryRecords.find(r=>r.num===num);
-  document.getElementById('entryQfProgress').textContent = (entryQfIndex+1)+' of '+entryQfQueue.length;
-  document.getElementById('entryQfNum').textContent = num;
-  document.getElementById('entryQfDesc').textContent = rec ? rec.desc : '';
-  const digitsEl = document.getElementById('entryQfDigits');
-  digitsEl.value='';
-  document.getElementById('entryQfPreview').textContent = 'Time: —:— · Line: —';
-  // Re-focus without scrolling the page (mobile keyboards can jank the
-  // viewport otherwise) so the keyboard stays open between entries and the
-  // cursor is ready in the box for the next digit string immediately.
-  digitsEl.focus({preventScroll:true});
-}
-function entryQfParse(digits){
-  digits = (digits||'').replace(/\D/g,'');
-  if(digits.length<4) return null;
-  const time = digits.slice(0,4);
-  const line = digits.slice(4);
-  const hh = time.slice(0,2), mm = time.slice(2,4);
-  if(+hh>23 || +mm>59) return null;
-  return { hh, mm, line };
-}
-document.getElementById('entryQfDigits').addEventListener('input', e=>{
-  const raw = e.target.value.replace(/\D/g,'');
-  const p = entryQfParse(raw);
-  document.getElementById('entryQfPreview').textContent = p
-    ? `Time: ${p.hh}:${p.mm} · Line: ${p.line||'—'}`
-    : 'Time: —:— · Line: —';
-  // Auto-advance once a full 5-digit string (HHMM + one-digit line) is
-  // typed — the common case doesn't need a button tap or Enter at all.
-  // Longer line numbers still work via the Next button / Enter key.
-  if(raw.length===5 && p) entryQfCommitStep();
-});
-document.getElementById('entryQfDigits').addEventListener('keydown', e=>{
-  if(e.key==='Enter') entryQfCommitStep();
-});
-function entryQfCommitStep(){
-  const p = entryQfParse(document.getElementById('entryQfDigits').value);
-  if(p){
-    const num = entryQfQueue[entryQfIndex];
-    const rec = entryRecords.find(r=>r.num===num);
-    if(rec){
-      const d = new Date(rec.time);
-      d.setHours(+p.hh, +p.mm, 0, 0);
-      rec.time = d.toISOString();
-      rec.line = p.line || '';
-    }
-  }
-  entryQfAdvance();
-}
-function entryQfAdvance(){
-  entryQfIndex++;
-  if(entryQfIndex >= entryQfQueue.length){
-    entrySaveLocal();
-    renderEntryAll();
-    document.getElementById('entryQuickFillCard').classList.add('hidden');
-    document.getElementById('entrySearchAll').focus();
-    return;
-  }
-  entryRenderQfStep();
-}
-document.getElementById('entryQfNext').addEventListener('click', entryQfCommitStep);
-document.getElementById('entryQfSkip').addEventListener('click', entryQfAdvance);
-
 document.getElementById('entryNextNumEdit').addEventListener('change', e=>{
   const v=parseInt(e.target.value,10);
   if(!v||v<1) return;
   entryOverrideNum=v;
   document.getElementById('entryNextNum').textContent=v;
 });
+// Jump-to input hides itself once used or when it loses focus, so the compact
+// header goes back to just showing "Entry N" again.
+document.getElementById('entryNextNumEdit').addEventListener('blur', e=>{
+  e.target.classList.add('hidden');
+});
+
+/* --------- Manual button (top-right) ---------
+   Purpose: give a fast way to bypass the camera and type a barcode or name
+   instead. Closes the camera if it's running and jumps focus to the search bar. */
+document.getElementById('entryBtnManual').addEventListener('click', async ()=>{
+  if(entrySubTab!=='scan') entrySwitchSubTab('scan');
+  if(entryScanning) await entryStopCam();
+  const s = document.getElementById('entrySearchAll');
+  s.focus();
+  if(s.scrollIntoView) s.scrollIntoView({behavior:'smooth', block:'center'});
+});
+
+/* --------- Tapping the "Entry N" label reveals the jump-to input inline ---------
+   The old big hero had a permanent "jump to #" box; that's now hidden by default
+   and only surfaces when the person specifically wants to change the sequence. */
+document.getElementById('entryNumHeader').addEventListener('click', e=>{
+  // Only trigger when tapping the label area itself, not the input inside it.
+  if(e.target.id==='entryNextNumEdit') return;
+  const jump = document.getElementById('entryNextNumEdit');
+  jump.classList.remove('hidden');
+  jump.focus();
+  jump.select();
+});
+
+/* --------- Long-press the bottom-nav Entry tab to jump to # ---------
+   Same target as tapping the label — but reachable from anywhere in the app
+   without first navigating to the Entry tab manually. A ~500 ms hold triggers it. */
+(function(){
+  const entryTabBtn = document.querySelector('.mtab[data-tab="entry"]');
+  if(!entryTabBtn) return;
+  let holdTimer=null, longFired=false;
+  const startHold = ()=>{
+    longFired = false;
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(()=>{
+      longFired = true;
+      // Switch to Entry tab if we're not already there.
+      if(currentTab!=='entry'){
+        currentTab='entry';
+        render();
+      }
+      // Reveal + focus the jump-to input.
+      const jump = document.getElementById('entryNextNumEdit');
+      jump.classList.remove('hidden');
+      jump.focus();
+      jump.select();
+      if(navigator.vibrate) navigator.vibrate(30);
+    }, 500);
+  };
+  const cancelHold = ()=>{ clearTimeout(holdTimer); };
+  entryTabBtn.addEventListener('touchstart', startHold, {passive:true});
+  entryTabBtn.addEventListener('touchend', cancelHold);
+  entryTabBtn.addEventListener('touchmove', cancelHold);
+  entryTabBtn.addEventListener('touchcancel', cancelHold);
+  entryTabBtn.addEventListener('mousedown', startHold);
+  entryTabBtn.addEventListener('mouseup', cancelHold);
+  entryTabBtn.addEventListener('mouseleave', cancelHold);
+  // Swallow the click that follows a long-press so we don't double-fire the tab switch.
+  entryTabBtn.addEventListener('click', e=>{ if(longFired){ e.stopImmediatePropagation(); e.preventDefault(); longFired=false; } }, true);
+})();
 
 /* ============================================================
    ENTRY SUB-TABS — Scan / Records / Reference
@@ -7648,14 +7627,9 @@ function renderEntrySimplified(){
   document.getElementById('entryEmpty').style.display=sorted.length?'none':'block';
   document.getElementById('entryTbody').innerHTML=sorted.map(r=>{
     const i=entryRecords.indexOf(r);
-    const isSel = entryMultiSelected.has(r.num);
-    const selCell = entryMultiMode
-      ? `<td class="selcol" data-selnum="${r.num}"><input type="checkbox" class="entry-selbox" ${isSel?'checked':''} data-selnum="${r.num}"></td>`
-      : '';
-    return `<tr class="${isSel?'selected':''}" data-rownum="${r.num}">
-      ${selCell}
+    return `<tr>
       <td class="mono">${r.num}</td>
-      <td class="mono">${esc(r.barcode || (r.line?'L'+r.line:'—'))}</td>
+      <td class="mono">${esc(r.barcode||'—')}</td>
       <td>${esc(r.desc)}</td>
       <td>${(r.cat||'').replace('Category ','C')}</td>
       <td class="mono">${entryFmtDateShort(r.time)}</td>
@@ -7663,7 +7637,6 @@ function renderEntrySimplified(){
       <td><button class="sched-del" data-entrydel="${i}">✕</button></td>
     </tr>`;
   }).join('');
-  document.getElementById('entryThSel').classList.toggle('hidden', !entryMultiMode);
 }
 document.getElementById('entryTbody').addEventListener('click', e=>{
   const btn=e.target.closest('[data-entrydel]'); if(!btn) return;
@@ -7678,162 +7651,6 @@ document.getElementById('entryBtnWipe').addEventListener('click', ()=>{
     entrySaveLocal(); renderEntryAll();
   }
 });
-
-/* ============================================================
-   MULTISELECT — tap a row to select it; tap a second row to select
-   the whole RANGE between the first tap and the second (by sequence
-   number, matching how the table is sorted). Tapping a third row
-   after that starts a fresh single selection from there, so ranges
-   don't awkwardly accumulate — this mirrors how range-select behaves
-   in most file pickers (shift-click semantics, without needing a
-   modifier key on a touchscreen).
-   ============================================================ */
-let entryMultiMode = false;
-let entryMultiSelected = new Set();   // set of record .num values
-let entryMultiAnchor = null;          // the num tapped first, for range extension
-
-function entryMultiToggleMode(){
-  entryMultiMode = !entryMultiMode;
-  entryMultiSelected.clear();
-  entryMultiAnchor = null;
-  document.getElementById('entryBtnMultiToggle').textContent = entryMultiMode ? 'Cancel' : 'Select';
-  document.getElementById('entryMultiActions').classList.toggle('hidden', !entryMultiMode);
-  document.getElementById('entryBulkEditCard').classList.add('hidden');
-  document.getElementById('entryTimeEditCard').classList.add('hidden');
-  entryUpdateMultiCount();
-  renderEntrySimplified();
-}
-document.getElementById('entryBtnMultiToggle').addEventListener('click', entryMultiToggleMode);
-document.getElementById('entryBtnMultiCancel').addEventListener('click', entryMultiToggleMode);
-
-function entryUpdateMultiCount(){
-  const n = entryMultiSelected.size;
-  document.getElementById('entryMultiCount').textContent = n+' selected';
-  document.getElementById('entryBulkCount').textContent = n;
-  document.getElementById('entryBtnBulkEdit').disabled = n===0;
-}
-
-function entryHandleRowTap(num){
-  if(entryMultiAnchor===null){
-    // first tap: start a fresh single selection
-    entryMultiSelected = new Set([num]);
-    entryMultiAnchor = num;
-  } else {
-    // second tap: select the full range between anchor and this row,
-    // by sequence number (not click order), so it doesn't matter which
-    // one is numerically first
-    const sorted = [...entryRecords].map(r=>r.num).sort((a,b)=>a-b);
-    const lo = Math.min(entryMultiAnchor, num), hi = Math.max(entryMultiAnchor, num);
-    entryMultiSelected = new Set(sorted.filter(n=>n>=lo && n<=hi));
-    entryMultiAnchor = null;   // next tap starts a new selection
-  }
-  entryUpdateMultiCount();
-  renderEntrySimplified();
-}
-document.getElementById('entryTbody').addEventListener('click', e=>{
-  if(!entryMultiMode) return;
-  const cb = e.target.closest('[data-selnum]');
-  const row = e.target.closest('tr[data-rownum]');
-  if(e.target.closest('[data-entrydel]')) return; // let delete still work its own handler
-  if(cb || row){
-    const num = +(cb ? cb.dataset.selnum : row.dataset.rownum);
-    entryHandleRowTap(num);
-  }
-});
-
-document.getElementById('entryBtnBulkEdit').addEventListener('click', ()=>{
-  if(!entryMultiSelected.size) return;
-  document.getElementById('entryBulkEditCard').classList.remove('hidden');
-  const bulkCardEl = document.getElementById('entryBulkEditCard');
-  if(bulkCardEl.scrollIntoView) bulkCardEl.scrollIntoView({behavior:'smooth', block:'nearest'});
-});
-document.getElementById('entryBtnBulkDone').addEventListener('click', ()=>{
-  document.getElementById('entryBulkEditCard').classList.add('hidden');
-});
-
-/* ---------- bulk Kill Date / Pack Date — one value applied to every
-   selected record. Stored as separate kdate/pdate fields distinct from
-   the record's actual scan timestamp, so export uses them when present
-   and falls back to the scan date otherwise. ---------- */
-document.getElementById('entryBtnApplyKillDate').addEventListener('click', ()=>{
-  const v = document.getElementById('entryBulkKillDate').value;
-  if(!v){ alert('Pick a kill date first.'); return; }
-  entryRecords.forEach(r=>{ if(entryMultiSelected.has(r.num)) r.kdate = v; });
-  entrySaveLocal(); renderEntryAll();
-  alert('Kill date applied to '+entryMultiSelected.size+' record(s).');
-});
-document.getElementById('entryBtnApplyPackDate').addEventListener('click', ()=>{
-  const v = document.getElementById('entryBulkPackDate').value;
-  if(!v){ alert('Pick a pack date first.'); return; }
-  entryRecords.forEach(r=>{ if(entryMultiSelected.has(r.num)) r.pdate = v; });
-  entrySaveLocal(); renderEntryAll();
-  alert('Pack date applied to '+entryMultiSelected.size+' record(s).');
-});
-
-/* ---------- individual time editor — same digit pattern as the Caeca
-   quick-fill, minus the line field, walking the current selection. ---------- */
-let entryTeQueue=[], entryTeIndex=0;
-document.getElementById('entryBtnEditTimesIndividually').addEventListener('click', ()=>{
-  if(!entryMultiSelected.size) return;
-  entryTeQueue = [...entryMultiSelected].sort((a,b)=>a-b);
-  entryTeIndex = 0;
-  document.getElementById('entryBulkEditCard').classList.add('hidden');
-  document.getElementById('entryTimeEditCard').classList.remove('hidden');
-  entryRenderTeStep();
-});
-function entryRenderTeStep(){
-  const num = entryTeQueue[entryTeIndex];
-  const rec = entryRecords.find(r=>r.num===num);
-  document.getElementById('entryTeProgress').textContent = (entryTeIndex+1)+' of '+entryTeQueue.length;
-  document.getElementById('entryTeNum').textContent = num;
-  document.getElementById('entryTeDesc').textContent = rec ? rec.desc : '';
-  const digitsEl = document.getElementById('entryTeDigits');
-  digitsEl.value='';
-  document.getElementById('entryTePreview').textContent = 'Time: —:—';
-  digitsEl.focus({preventScroll:true});
-}
-function entryTeParse(digits){
-  digits = (digits||'').replace(/\D/g,'');
-  if(digits.length!==4) return null;
-  const hh=digits.slice(0,2), mm=digits.slice(2,4);
-  if(+hh>23 || +mm>59) return null;
-  return {hh,mm};
-}
-document.getElementById('entryTeDigits').addEventListener('input', e=>{
-  const raw = e.target.value.replace(/\D/g,'');
-  const p = entryTeParse(raw);
-  document.getElementById('entryTePreview').textContent = p ? `Time: ${p.hh}:${p.mm}` : 'Time: —:—';
-  if(raw.length===4 && p) entryTeCommitStep();
-});
-document.getElementById('entryTeDigits').addEventListener('keydown', e=>{
-  if(e.key==='Enter') entryTeCommitStep();
-});
-function entryTeCommitStep(){
-  const p = entryTeParse(document.getElementById('entryTeDigits').value);
-  if(p){
-    const num = entryTeQueue[entryTeIndex];
-    const rec = entryRecords.find(r=>r.num===num);
-    if(rec){
-      const d = new Date(rec.time);
-      d.setHours(+p.hh, +p.mm, 0, 0);
-      rec.time = d.toISOString();
-    }
-  }
-  entryTeAdvance();
-}
-function entryTeAdvance(){
-  entryTeIndex++;
-  if(entryTeIndex >= entryTeQueue.length){
-    entrySaveLocal();
-    renderEntryAll();
-    document.getElementById('entryTimeEditCard').classList.add('hidden');
-    entryMultiToggleMode();  // exit selection mode once the batch is done
-    return;
-  }
-  entryRenderTeStep();
-}
-document.getElementById('entryTeNext').addEventListener('click', entryTeCommitStep);
-document.getElementById('entryTeSkip').addEventListener('click', entryTeAdvance);
 
 /* ---------- Export view: same row-builder the actual export uses,
    rendered as an on-screen table so it's checkable before exporting. ---------- */
@@ -7972,20 +7789,13 @@ function renderEntry(){ renderEntryAll(); }  // kept as the app's init hook name
 function entryFmtDateUK(d){ const x=new Date(d); const p=n=>String(n).padStart(2,'0');
   return `${p(x.getDate())}/${p(x.getMonth()+1)}/${x.getFullYear()}`; }
 function entryFmtHHMM(d){ const x=new Date(d); const p=n=>String(n).padStart(2,'0');
-  return `${p(x.getHours())}:${p(x.getMinutes())}`; }
+  return `${p(x.getHours())}${p(x.getMinutes())}`; }
 const ENTRY_SIS_HEADERS = ['PRODUCT','MATERIAL','RISE','UNIT','DESCRIPTN','SIZE','RETAILER','SHIFT',
   'LINE','OTHER_ID','SUITE','PRICE','BARCODE','KILLDATE','PACKDATE','MANUFTIME','USE_BY','EOL',
   'BATCH','SUPPLIER','COMMS','ORDER','SAMPCOUNT','SAMDATE','SAMBY','FARM_NO','PEN_NO','SHED_NO',
   'LOT_NO','LORRY_NO','FLOCK_NO','LOAD_NO','CLIENT','MANUFDATE','LOCATION','PERIOD','CONDITIONS'];
-function entryIsoToUK(iso){
-  // <input type="date"> gives YYYY-MM-DD; the export uses DD/MM/YYYY everywhere else.
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||'');
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
-}
 function entryBuildSisRow(r){
   const now=new Date(r.time); const kdpd=entryFmtDateUK(now);
-  const killDate = r.kdate ? entryIsoToUK(r.kdate) : kdpd;
-  const packDate = r.pdate ? entryIsoToUK(r.pdate) : kdpd;
   const row={}; ENTRY_SIS_HEADERS.forEach(h=>row[h]='');
   // Correlate against the CURRENT MIMS data at render/export time (not just
   // whatever was resolved at commit time), so uploading a fresher MIMS file
@@ -8006,22 +7816,10 @@ function entryBuildSisRow(r){
     row.DESCRIPTN=r.desc; row.BARCODE=r.barcode||'';
     row.SHIFT = r.cat==='Category 2'?'Weekly': r.cat==='Category 3'?'Monthly':'Daily';
   }
-  row.KILLDATE=killDate; row.PACKDATE=packDate; row.MANUFTIME=entryFmtHHMM(now);
+  row.KILLDATE=kdpd; row.PACKDATE=kdpd; row.MANUFTIME=entryFmtHHMM(now);
   row.ORDER=r.cat; row.SAMPCOUNT=String(r.num); row.SAMDATE=entryFmtDateUK(new Date());
   row.SAMBY = localStorage.getItem('unified.samplerName') || 'Sampler';
-  row.CLIENT='SIS'; row.MANUFDATE=killDate;
-  // Time/Line quick-fill (Neck, Caeca, etc.): the line number goes into the
-  // BARCODE column so the whole row pastes straight into the line-lookup
-  // toolkit — Manufacturing Time + Line-as-Barcode, exactly as it's used there.
-  if(r.line) row.BARCODE = r.line;
-  // Category 4 (End of Life) / Category 5 (Start of Life): MIMS carries the
-  // SAME barcode under both suites for meat-prep EOL/SOL pairs (verified:
-  // every 2SL003E barcode also appears under 2SL003S), so which one applies
-  // is determined by the category the person picked, not by whatever a
-  // single MIMS lookup happens to return. This overrides EOL/SUITE
-  // regardless of what the MIMS correlation set above.
-  if(r.cat==='Category 4'){ row.EOL='Y'; row.SUITE='2SL003E'; }
-  if(r.cat==='Category 5'){ row.EOL='N'; row.SUITE='2SL003S'; }
+  row.CLIENT='SIS'; row.MANUFDATE=kdpd;
   return row;
 }
 function entryExportSis(){
@@ -8097,6 +7895,66 @@ function entrySyncStartListening(circleId){
 }
 // Entry's sync listening is started from syncInit()/syncPairWithCode() above,
 // same as Line Timeline and Weekly — no separate bootstrap needed here.
+
+/* ---------- sync: Entry LOOKUP TABLE, same pattern as Entry snapshot ----------
+   Kept in its own document rather than bundled into the entry snapshot so a
+   scan (which touches records) doesn't have to re-push the whole product
+   database, and a lookup edit doesn't re-push the scan history. */
+let entryLookupSyncWriteTimer=null, entryLookupSyncApplyingRemote=false, entryLookupSyncUnsubscribe=null;
+function entryLookupSyncScheduleWrite(){
+  if(entryLookupSyncApplyingRemote) return;
+  if(!syncCircleId || !window.__fb || !window.__fb.writeEntryLookup) return;
+  clearTimeout(entryLookupSyncWriteTimer);
+  entryLookupSyncWriteTimer=setTimeout(()=>{
+    window.__fb.writeEntryLookup(syncCircleId, entryLookup).catch(()=>{});
+  }, 700);
+}
+function entryLookupSyncApplyRemote(remoteLookup){
+  if(!Array.isArray(remoteLookup)) return;
+  entryLookupSyncApplyingRemote=true;
+  try{
+    entryLookup = remoteLookup;
+    localStorage.setItem(LS_ENTRY_LOOKUP, JSON.stringify(entryLookup));
+    if(currentTab==='entry') renderEntryAll();
+  } finally { entryLookupSyncApplyingRemote=false; }
+}
+function entryLookupSyncStartListening(circleId){
+  if(entryLookupSyncUnsubscribe) entryLookupSyncUnsubscribe();
+  if(!window.__fb || !window.__fb.listenEntryLookup) return;
+  entryLookupSyncUnsubscribe=window.__fb.listenEntryLookup(circleId, entryLookupSyncApplyRemote);
+}
+
+/* ---------- sync: Entry MIMS data, same pattern ----------
+   MIMS is a bulk import that changes rarely (a weekly SAVE FILE refresh),
+   so keeping it in its own document means one heavy write on import and
+   near-zero traffic between imports. */
+let entryMimsSyncWriteTimer=null, entryMimsSyncApplyingRemote=false, entryMimsSyncUnsubscribe=null;
+function entryMimsSyncScheduleWrite(){
+  if(entryMimsSyncApplyingRemote) return;
+  if(!syncCircleId || !window.__fb || !window.__fb.writeEntryMims) return;
+  clearTimeout(entryMimsSyncWriteTimer);
+  entryMimsSyncWriteTimer=setTimeout(()=>{
+    window.__fb.writeEntryMims(syncCircleId, entryMims).catch(()=>{});
+  }, 700);
+}
+function entryMimsSyncApplyRemote(remoteMims){
+  if(!Array.isArray(remoteMims)) return;
+  entryMimsSyncApplyingRemote=true;
+  try{
+    entryMims = remoteMims;
+    localStorage.setItem(LS_ENTRY_MIMS, JSON.stringify(entryMims));
+    // If the person is on the export view of Records right now, refresh it so
+    // the newly-arrived MIMS cross-reference is applied immediately.
+    if(currentTab==='entry' && entrySubTab==='records' && entryRecordsView==='export'){
+      renderEntryExportView();
+    }
+  } finally { entryMimsSyncApplyingRemote=false; }
+}
+function entryMimsSyncStartListening(circleId){
+  if(entryMimsSyncUnsubscribe) entryMimsSyncUnsubscribe();
+  if(!window.__fb || !window.__fb.listenEntryMims) return;
+  entryMimsSyncUnsubscribe=window.__fb.listenEntryMims(circleId, entryMimsSyncApplyRemote);
+}
 
 document.getElementById('entrySamplerName').addEventListener('change', e=>{
   localStorage.setItem('unified.samplerName', e.target.value.trim());
