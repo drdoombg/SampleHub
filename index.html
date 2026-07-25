@@ -563,6 +563,11 @@
   .entry-or-divider::before, .entry-or-divider::after { content:''; flex:1; height:1px; background:var(--line); }
   .entry-qf-preview { text-align:center; font-size:16px; font-weight:700; font-family:monospace;
     color:var(--monthly); margin:10px 0 4px; }
+
+  .entry-multisel-bar { display:flex; align-items:center; gap:8px; margin-bottom:10px; min-height:36px; }
+  .entry-table tr.selected td { background:rgba(124,140,248,0.14); }
+  .entry-table td.selcol, .entry-table th.selcol { text-align:center; }
+  .entry-selbox { width:20px; height:20px; }
 </style>
 </head>
 <body>
@@ -856,12 +861,70 @@
 
     <!-- Simplified: Scanner's familiar shape, with # added -->
     <div id="entrySimplifiedWrap">
+      <div class="entry-multisel-bar">
+        <button class="btn ghost" id="entryBtnMultiToggle" style="padding:8px 14px; font-size:12.5px;">Select</button>
+        <div id="entryMultiActions" class="hidden" style="display:flex; gap:8px; flex-wrap:wrap;">
+          <span class="entry-result-tag" id="entryMultiCount">0 selected</span>
+          <button class="btn ghost" id="entryBtnBulkEdit" style="padding:8px 12px; font-size:12px;">Edit dates/times</button>
+          <button class="btn ghost" id="entryBtnMultiCancel" style="padding:8px 12px; font-size:12px;">Cancel</button>
+        </div>
+      </div>
       <div id="entryRecordsWrap">
         <table class="entry-table">
-          <thead><tr><th>#</th><th>Barcode</th><th>Description</th><th>Cat</th><th>Date</th><th>Time</th><th></th></tr></thead>
+          <thead><tr>
+            <th id="entryThSel" class="hidden" style="width:8%"></th>
+            <th>#</th><th>Barcode</th><th>Description</th><th>Cat</th><th>Date</th><th>Time</th><th></th></tr></thead>
           <tbody id="entryTbody"></tbody>
         </table>
         <div class="empty" id="entryEmpty">No records yet.</div>
+      </div>
+    </div>
+
+    <!-- Bulk edit sheet: appears once records are selected. Kill Date and Pack
+         Date each apply as ONE value to every selected record at once. Time
+         is edited per-record, one at a time, reusing the same digit-entry UI
+         as the Caeca quick-fill (minus the line field). -->
+    <div class="card-like hidden" id="entryBulkEditCard">
+      <div class="entry-section-head" style="margin:0 0 10px;">
+        <span>Edit <span id="entryBulkCount">0</span> selected</span>
+      </div>
+
+      <label>Kill date (applies to all selected)</label>
+      <input type="date" id="entryBulkKillDate">
+      <div class="sheet-actions" style="margin-top:8px;">
+        <button class="btn ghost" id="entryBtnApplyKillDate" style="width:100%;">Apply kill date to all selected</button>
+      </div>
+
+      <label style="margin-top:14px;">Pack date (applies to all selected)</label>
+      <input type="date" id="entryBulkPackDate">
+      <div class="sheet-actions" style="margin-top:8px;">
+        <button class="btn ghost" id="entryBtnApplyPackDate" style="width:100%;">Apply pack date to all selected</button>
+      </div>
+
+      <div class="divider"></div>
+      <div class="sheet-actions">
+        <button class="btn primary" id="entryBtnEditTimesIndividually" style="width:100%;">Edit time for each, one at a time</button>
+      </div>
+      <div class="sheet-actions" style="margin-top:8px;">
+        <button class="btn ghost" id="entryBtnBulkDone" style="width:100%;">Done</button>
+      </div>
+    </div>
+
+    <!-- Individual time editor: same digit-entry pattern as the Caeca
+         quick-fill, minus the line field — walks the selection one record
+         at a time. -->
+    <div class="card-like hidden" id="entryTimeEditCard">
+      <div class="entry-section-head" style="margin:0 0 10px;">
+        <span>Edit time</span>
+        <span class="entry-result-tag" id="entryTeProgress">1 of 5</span>
+      </div>
+      <p class="hint">Type 4 digits for the time. e.g. <b>0840</b> → 08:40.</p>
+      <label>Sample #<span id="entryTeNum">—</span> — <span id="entryTeDesc">—</span></label>
+      <input id="entryTeDigits" class="entry-search mono" inputmode="numeric" placeholder="e.g. 0840" style="font-size:20px; text-align:center; letter-spacing:2px;">
+      <div class="entry-qf-preview" id="entryTePreview">Time: —:—</div>
+      <div class="sheet-actions">
+        <button class="btn ghost" id="entryTeSkip">Skip</button>
+        <button class="btn primary" id="entryTeNext">Next</button>
       </div>
     </div>
 
@@ -7466,8 +7529,13 @@ function entryRenderQfStep(){
   document.getElementById('entryQfProgress').textContent = (entryQfIndex+1)+' of '+entryQfQueue.length;
   document.getElementById('entryQfNum').textContent = num;
   document.getElementById('entryQfDesc').textContent = rec ? rec.desc : '';
-  document.getElementById('entryQfDigits').value='';
+  const digitsEl = document.getElementById('entryQfDigits');
+  digitsEl.value='';
   document.getElementById('entryQfPreview').textContent = 'Time: —:— · Line: —';
+  // Re-focus without scrolling the page (mobile keyboards can jank the
+  // viewport otherwise) so the keyboard stays open between entries and the
+  // cursor is ready in the box for the next digit string immediately.
+  digitsEl.focus({preventScroll:true});
 }
 function entryQfParse(digits){
   digits = (digits||'').replace(/\D/g,'');
@@ -7479,10 +7547,15 @@ function entryQfParse(digits){
   return { hh, mm, line };
 }
 document.getElementById('entryQfDigits').addEventListener('input', e=>{
-  const p = entryQfParse(e.target.value);
+  const raw = e.target.value.replace(/\D/g,'');
+  const p = entryQfParse(raw);
   document.getElementById('entryQfPreview').textContent = p
     ? `Time: ${p.hh}:${p.mm} · Line: ${p.line||'—'}`
     : 'Time: —:— · Line: —';
+  // Auto-advance once a full 5-digit string (HHMM + one-digit line) is
+  // typed — the common case doesn't need a button tap or Enter at all.
+  // Longer line numbers still work via the Next button / Enter key.
+  if(raw.length===5 && p) entryQfCommitStep();
 });
 document.getElementById('entryQfDigits').addEventListener('keydown', e=>{
   if(e.key==='Enter') entryQfCommitStep();
@@ -7575,7 +7648,12 @@ function renderEntrySimplified(){
   document.getElementById('entryEmpty').style.display=sorted.length?'none':'block';
   document.getElementById('entryTbody').innerHTML=sorted.map(r=>{
     const i=entryRecords.indexOf(r);
-    return `<tr>
+    const isSel = entryMultiSelected.has(r.num);
+    const selCell = entryMultiMode
+      ? `<td class="selcol" data-selnum="${r.num}"><input type="checkbox" class="entry-selbox" ${isSel?'checked':''} data-selnum="${r.num}"></td>`
+      : '';
+    return `<tr class="${isSel?'selected':''}" data-rownum="${r.num}">
+      ${selCell}
       <td class="mono">${r.num}</td>
       <td class="mono">${esc(r.barcode || (r.line?'L'+r.line:'—'))}</td>
       <td>${esc(r.desc)}</td>
@@ -7585,6 +7663,7 @@ function renderEntrySimplified(){
       <td><button class="sched-del" data-entrydel="${i}">✕</button></td>
     </tr>`;
   }).join('');
+  document.getElementById('entryThSel').classList.toggle('hidden', !entryMultiMode);
 }
 document.getElementById('entryTbody').addEventListener('click', e=>{
   const btn=e.target.closest('[data-entrydel]'); if(!btn) return;
@@ -7599,6 +7678,162 @@ document.getElementById('entryBtnWipe').addEventListener('click', ()=>{
     entrySaveLocal(); renderEntryAll();
   }
 });
+
+/* ============================================================
+   MULTISELECT — tap a row to select it; tap a second row to select
+   the whole RANGE between the first tap and the second (by sequence
+   number, matching how the table is sorted). Tapping a third row
+   after that starts a fresh single selection from there, so ranges
+   don't awkwardly accumulate — this mirrors how range-select behaves
+   in most file pickers (shift-click semantics, without needing a
+   modifier key on a touchscreen).
+   ============================================================ */
+let entryMultiMode = false;
+let entryMultiSelected = new Set();   // set of record .num values
+let entryMultiAnchor = null;          // the num tapped first, for range extension
+
+function entryMultiToggleMode(){
+  entryMultiMode = !entryMultiMode;
+  entryMultiSelected.clear();
+  entryMultiAnchor = null;
+  document.getElementById('entryBtnMultiToggle').textContent = entryMultiMode ? 'Cancel' : 'Select';
+  document.getElementById('entryMultiActions').classList.toggle('hidden', !entryMultiMode);
+  document.getElementById('entryBulkEditCard').classList.add('hidden');
+  document.getElementById('entryTimeEditCard').classList.add('hidden');
+  entryUpdateMultiCount();
+  renderEntrySimplified();
+}
+document.getElementById('entryBtnMultiToggle').addEventListener('click', entryMultiToggleMode);
+document.getElementById('entryBtnMultiCancel').addEventListener('click', entryMultiToggleMode);
+
+function entryUpdateMultiCount(){
+  const n = entryMultiSelected.size;
+  document.getElementById('entryMultiCount').textContent = n+' selected';
+  document.getElementById('entryBulkCount').textContent = n;
+  document.getElementById('entryBtnBulkEdit').disabled = n===0;
+}
+
+function entryHandleRowTap(num){
+  if(entryMultiAnchor===null){
+    // first tap: start a fresh single selection
+    entryMultiSelected = new Set([num]);
+    entryMultiAnchor = num;
+  } else {
+    // second tap: select the full range between anchor and this row,
+    // by sequence number (not click order), so it doesn't matter which
+    // one is numerically first
+    const sorted = [...entryRecords].map(r=>r.num).sort((a,b)=>a-b);
+    const lo = Math.min(entryMultiAnchor, num), hi = Math.max(entryMultiAnchor, num);
+    entryMultiSelected = new Set(sorted.filter(n=>n>=lo && n<=hi));
+    entryMultiAnchor = null;   // next tap starts a new selection
+  }
+  entryUpdateMultiCount();
+  renderEntrySimplified();
+}
+document.getElementById('entryTbody').addEventListener('click', e=>{
+  if(!entryMultiMode) return;
+  const cb = e.target.closest('[data-selnum]');
+  const row = e.target.closest('tr[data-rownum]');
+  if(e.target.closest('[data-entrydel]')) return; // let delete still work its own handler
+  if(cb || row){
+    const num = +(cb ? cb.dataset.selnum : row.dataset.rownum);
+    entryHandleRowTap(num);
+  }
+});
+
+document.getElementById('entryBtnBulkEdit').addEventListener('click', ()=>{
+  if(!entryMultiSelected.size) return;
+  document.getElementById('entryBulkEditCard').classList.remove('hidden');
+  const bulkCardEl = document.getElementById('entryBulkEditCard');
+  if(bulkCardEl.scrollIntoView) bulkCardEl.scrollIntoView({behavior:'smooth', block:'nearest'});
+});
+document.getElementById('entryBtnBulkDone').addEventListener('click', ()=>{
+  document.getElementById('entryBulkEditCard').classList.add('hidden');
+});
+
+/* ---------- bulk Kill Date / Pack Date — one value applied to every
+   selected record. Stored as separate kdate/pdate fields distinct from
+   the record's actual scan timestamp, so export uses them when present
+   and falls back to the scan date otherwise. ---------- */
+document.getElementById('entryBtnApplyKillDate').addEventListener('click', ()=>{
+  const v = document.getElementById('entryBulkKillDate').value;
+  if(!v){ alert('Pick a kill date first.'); return; }
+  entryRecords.forEach(r=>{ if(entryMultiSelected.has(r.num)) r.kdate = v; });
+  entrySaveLocal(); renderEntryAll();
+  alert('Kill date applied to '+entryMultiSelected.size+' record(s).');
+});
+document.getElementById('entryBtnApplyPackDate').addEventListener('click', ()=>{
+  const v = document.getElementById('entryBulkPackDate').value;
+  if(!v){ alert('Pick a pack date first.'); return; }
+  entryRecords.forEach(r=>{ if(entryMultiSelected.has(r.num)) r.pdate = v; });
+  entrySaveLocal(); renderEntryAll();
+  alert('Pack date applied to '+entryMultiSelected.size+' record(s).');
+});
+
+/* ---------- individual time editor — same digit pattern as the Caeca
+   quick-fill, minus the line field, walking the current selection. ---------- */
+let entryTeQueue=[], entryTeIndex=0;
+document.getElementById('entryBtnEditTimesIndividually').addEventListener('click', ()=>{
+  if(!entryMultiSelected.size) return;
+  entryTeQueue = [...entryMultiSelected].sort((a,b)=>a-b);
+  entryTeIndex = 0;
+  document.getElementById('entryBulkEditCard').classList.add('hidden');
+  document.getElementById('entryTimeEditCard').classList.remove('hidden');
+  entryRenderTeStep();
+});
+function entryRenderTeStep(){
+  const num = entryTeQueue[entryTeIndex];
+  const rec = entryRecords.find(r=>r.num===num);
+  document.getElementById('entryTeProgress').textContent = (entryTeIndex+1)+' of '+entryTeQueue.length;
+  document.getElementById('entryTeNum').textContent = num;
+  document.getElementById('entryTeDesc').textContent = rec ? rec.desc : '';
+  const digitsEl = document.getElementById('entryTeDigits');
+  digitsEl.value='';
+  document.getElementById('entryTePreview').textContent = 'Time: —:—';
+  digitsEl.focus({preventScroll:true});
+}
+function entryTeParse(digits){
+  digits = (digits||'').replace(/\D/g,'');
+  if(digits.length!==4) return null;
+  const hh=digits.slice(0,2), mm=digits.slice(2,4);
+  if(+hh>23 || +mm>59) return null;
+  return {hh,mm};
+}
+document.getElementById('entryTeDigits').addEventListener('input', e=>{
+  const raw = e.target.value.replace(/\D/g,'');
+  const p = entryTeParse(raw);
+  document.getElementById('entryTePreview').textContent = p ? `Time: ${p.hh}:${p.mm}` : 'Time: —:—';
+  if(raw.length===4 && p) entryTeCommitStep();
+});
+document.getElementById('entryTeDigits').addEventListener('keydown', e=>{
+  if(e.key==='Enter') entryTeCommitStep();
+});
+function entryTeCommitStep(){
+  const p = entryTeParse(document.getElementById('entryTeDigits').value);
+  if(p){
+    const num = entryTeQueue[entryTeIndex];
+    const rec = entryRecords.find(r=>r.num===num);
+    if(rec){
+      const d = new Date(rec.time);
+      d.setHours(+p.hh, +p.mm, 0, 0);
+      rec.time = d.toISOString();
+    }
+  }
+  entryTeAdvance();
+}
+function entryTeAdvance(){
+  entryTeIndex++;
+  if(entryTeIndex >= entryTeQueue.length){
+    entrySaveLocal();
+    renderEntryAll();
+    document.getElementById('entryTimeEditCard').classList.add('hidden');
+    entryMultiToggleMode();  // exit selection mode once the batch is done
+    return;
+  }
+  entryRenderTeStep();
+}
+document.getElementById('entryTeNext').addEventListener('click', entryTeCommitStep);
+document.getElementById('entryTeSkip').addEventListener('click', entryTeAdvance);
 
 /* ---------- Export view: same row-builder the actual export uses,
    rendered as an on-screen table so it's checkable before exporting. ---------- */
@@ -7742,8 +7977,15 @@ const ENTRY_SIS_HEADERS = ['PRODUCT','MATERIAL','RISE','UNIT','DESCRIPTN','SIZE'
   'LINE','OTHER_ID','SUITE','PRICE','BARCODE','KILLDATE','PACKDATE','MANUFTIME','USE_BY','EOL',
   'BATCH','SUPPLIER','COMMS','ORDER','SAMPCOUNT','SAMDATE','SAMBY','FARM_NO','PEN_NO','SHED_NO',
   'LOT_NO','LORRY_NO','FLOCK_NO','LOAD_NO','CLIENT','MANUFDATE','LOCATION','PERIOD','CONDITIONS'];
+function entryIsoToUK(iso){
+  // <input type="date"> gives YYYY-MM-DD; the export uses DD/MM/YYYY everywhere else.
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||'');
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+}
 function entryBuildSisRow(r){
   const now=new Date(r.time); const kdpd=entryFmtDateUK(now);
+  const killDate = r.kdate ? entryIsoToUK(r.kdate) : kdpd;
+  const packDate = r.pdate ? entryIsoToUK(r.pdate) : kdpd;
   const row={}; ENTRY_SIS_HEADERS.forEach(h=>row[h]='');
   // Correlate against the CURRENT MIMS data at render/export time (not just
   // whatever was resolved at commit time), so uploading a fresher MIMS file
@@ -7764,14 +8006,22 @@ function entryBuildSisRow(r){
     row.DESCRIPTN=r.desc; row.BARCODE=r.barcode||'';
     row.SHIFT = r.cat==='Category 2'?'Weekly': r.cat==='Category 3'?'Monthly':'Daily';
   }
-  row.KILLDATE=kdpd; row.PACKDATE=kdpd; row.MANUFTIME=entryFmtHHMM(now);
+  row.KILLDATE=killDate; row.PACKDATE=packDate; row.MANUFTIME=entryFmtHHMM(now);
   row.ORDER=r.cat; row.SAMPCOUNT=String(r.num); row.SAMDATE=entryFmtDateUK(new Date());
   row.SAMBY = localStorage.getItem('unified.samplerName') || 'Sampler';
-  row.CLIENT='SIS'; row.MANUFDATE=kdpd;
+  row.CLIENT='SIS'; row.MANUFDATE=killDate;
   // Time/Line quick-fill (Neck, Caeca, etc.): the line number goes into the
   // BARCODE column so the whole row pastes straight into the line-lookup
   // toolkit — Manufacturing Time + Line-as-Barcode, exactly as it's used there.
   if(r.line) row.BARCODE = r.line;
+  // Category 4 (End of Life) / Category 5 (Start of Life): MIMS carries the
+  // SAME barcode under both suites for meat-prep EOL/SOL pairs (verified:
+  // every 2SL003E barcode also appears under 2SL003S), so which one applies
+  // is determined by the category the person picked, not by whatever a
+  // single MIMS lookup happens to return. This overrides EOL/SUITE
+  // regardless of what the MIMS correlation set above.
+  if(r.cat==='Category 4'){ row.EOL='Y'; row.SUITE='2SL003E'; }
+  if(r.cat==='Category 5'){ row.EOL='N'; row.SUITE='2SL003S'; }
   return row;
 }
 function entryExportSis(){
