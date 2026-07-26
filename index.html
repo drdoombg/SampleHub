@@ -575,22 +575,35 @@
     cursor:pointer; display:flex; align-items:center; gap:6px; user-select:none; position:relative; }
   .entry-mini-num small { display:none; }
   .entry-mini-num span#entryNextNum { font-size:10.5px; font-variant-numeric:tabular-nums; font-weight:600; }
-  /* Fixed icon bar for Entry — Entry/Records/Manual/Settings — sits just above
-     the app's main bottom nav, same visual language as .bottom-nav/.mtab. */
+  /* Fixed icon bar for Entry — Entry/Records/Settings — sits just above
+     the app's main bottom nav. Circular icon ring, no button background, so it
+     doesn't compete visually with the panel colours around it. */
   .entry-bottombar { position:fixed; left:0; right:0; bottom:calc(60px + env(safe-area-inset-bottom)); z-index:34;
-    display:flex; background:var(--panel); border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+    display:flex; background:transparent; border:none;
     padding:6px 4px; }
-  .entry-bottombar > button { flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:3px;
-    padding:6px 2px; border-radius:11px; font-size:10.5px; font-weight:600; color:var(--ink-dim);
+  .entry-bottombar > button { flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:4px;
+    padding:4px 2px; border-radius:11px; font-size:10.5px; font-weight:600; color:var(--ink-dim);
     cursor:pointer; border:none; background:transparent; font-family:inherit; }
-  .entry-bottombar > button svg { width:20px; height:20px; flex-shrink:0; }
-  .entry-bottombar > button.on, .entry-bottombar > button#entrySubReference.on { color:var(--ink); background:var(--panel-2); }
+  .entry-tabicon { width:34px; height:34px; border-radius:50%; border:1.5px solid var(--line);
+    display:grid; place-items:center; color:var(--ink-dim); }
+  .entry-tabicon svg { width:18px; height:18px; }
+  .entry-bottombar > button.on { color:var(--ink); }
+  .entry-bottombar > button.on .entry-tabicon { border-color:var(--monthly); color:var(--monthly); background:rgba(124,140,248,.12); }
   .entry-bottombar > button > span:not(.entry-mini-num) { line-height:1; }
   /* Jump-to input pops up above its button instead of squeezing into the bar. */
   .entry-jump { position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%);
     width:110px; text-align:center; background:var(--panel-2); border:1px solid var(--line);
     border-radius:8px; padding:8px; color:var(--ink); font-size:15px; font-family:inherit; box-shadow:0 4px 16px rgba(0,0,0,.4); }
   .entry-jump.hidden { display:none; }
+
+  /* Manual-entry shortcut floats over the bottom-right of the live camera view,
+     since the search bar (its usual home) is hidden while the camera is open. */
+  #entryReaderWrap { position:relative; }
+  #entryReaderWrap:has(#entryReader.hidden) { display:none; }
+  .entry-manual-float { position:absolute; right:10px; bottom:10px; z-index:2; width:46px; height:46px;
+    border-radius:50%; background:rgba(15,27,45,.78); border:1.5px solid rgba(255,255,255,.3);
+    color:#fff; display:grid; place-items:center; cursor:pointer; }
+  .entry-manual-float svg { width:20px; height:20px; }
   /* Count pill next to the # header in the Records simplified table. */
   .entry-count-inline { display:inline-block; margin-left:4px; padding:1px 7px; border-radius:99px;
     background:var(--panel); color:var(--ink-dim); font-size:9.5px; font-weight:700;
@@ -618,9 +631,9 @@
   .entry-ref-sheet h2 { margin:0 0 16px; font-size:17px; display:flex; align-items:center; justify-content:space-between; }
 
   .entry-export-scroll { overflow-x:auto; border-radius:12px; border:1px solid var(--line); }
-  .entry-export-table { min-width:1400px; background:var(--panel); }
+  .entry-export-table { min-width:1400px; background:var(--panel); table-layout:auto; }
   .entry-export-table th { white-space:nowrap; }
-  .entry-export-table td { white-space:nowrap; max-width:none; }
+  .entry-export-table td { white-space:nowrap; max-width:none; overflow:visible; text-overflow:clip; padding:7px 14px; }
 
   #entryAddLookupCard { margin-top:10px; }
 
@@ -858,7 +871,12 @@
       <button class="btn primary" id="entryBtnCam" style="width:100%; height:64px; font-size:16px;">Start camera</button>
       <input id="entrySearchAll" class="entry-search" placeholder="Search Barcode or Name" autocomplete="off" style="width:100%; height:64px; margin-top:10px; font-size:16px;">
     </div>
-    <div id="entryReader" class="entry-reader hidden"></div>
+    <div id="entryReaderWrap">
+      <div id="entryReader" class="entry-reader hidden"></div>
+      <button type="button" class="entry-manual-float" id="entryBtnManual" title="Manual entry">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"></rect><path d="M6 15h4M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01"></path></svg>
+      </button>
+    </div>
     <div class="entry-results" id="entryResultsAll"></div>
 
     <!-- Confirm card. Hidden by default; only appears once a scan or a search
@@ -908,6 +926,10 @@
     <div id="entrySimplifiedWrap">
       <div id="entryRecordsWrap">
         <table class="entry-table">
+          <colgroup>
+            <col style="width:9%"><col style="width:19%"><col style="width:34%">
+            <col style="width:9%"><col style="width:13%"><col style="width:11%"><col style="width:5%">
+          </colgroup>
           <thead><tr><th># <span id="entryCount" class="entry-count-inline">0</span></th><th>Barcode</th><th>Description</th><th>Cat</th><th>Date</th><th>Time</th><th></th></tr></thead>
           <tbody id="entryTbody"></tbody>
         </table>
@@ -976,7 +998,9 @@
        current #, tap to jump), Records, Manual entry, and Reference settings. -->
   <nav class="entry-bottombar">
     <button id="entrySubScan" class="on" title="Entry">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5v14M8 5v14M11 5v14M13.5 5v14M17 5v14M20 5v14"></path></svg>
+      <span class="entry-tabicon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18"></path></svg>
+      </span>
       <span class="entry-mini-num" id="entryNumHeader">
         <small>Entry</small>
         <input type="number" id="entryNextNumEdit" placeholder="jump to #" class="entry-jump hidden">
@@ -984,15 +1008,15 @@
       </span>
     </button>
     <button id="entrySubRecords" title="Records">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>
+      <span class="entry-tabicon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>
+      </span>
       <span>Records</span>
     </button>
-    <button type="button" class="entry-manual-btn" id="entryBtnManual" title="Manual">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"></rect><path d="M6 15h4M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01"></path></svg>
-      <span>Manual</span>
-    </button>
     <button type="button" class="entry-ref-btn" id="entrySubReference" title="Settings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 13a7.4 7.4 0 0 0 0-2l2-1.4-2-3.4-2.3.7a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.4 2.4a7.4 7.4 0 0 0-1.7 1l-2.3-.7-2 3.4L6.6 11a7.4 7.4 0 0 0 0 2l-2 1.4 2 3.4 2.3-.7a7.4 7.4 0 0 0 1.7 1l.4 2.4h4l.4-2.4a7.4 7.4 0 0 0 1.7-1l2.3.7 2-3.4-2-1.4Z"></path></svg>
+      <span class="entry-tabicon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 13a7.4 7.4 0 0 0 0-2l2-1.4-2-3.4-2.3.7a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.4 2.4a7.4 7.4 0 0 0-1.7 1l-2.3-.7-2 3.4L6.6 11a7.4 7.4 0 0 0 0 2l-2 1.4 2 3.4 2.3-.7a7.4 7.4 0 0 0 1.7 1l.4 2.4h4l.4-2.4a7.4 7.4 0 0 0 1.7-1l2.3.7 2-3.4-2-1.4Z"></path></svg>
+      </span>
       <span>Settings</span>
     </button>
   </nav>
