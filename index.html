@@ -139,6 +139,17 @@
       return onSnapshot(doc(db,'circles',circleId,'line','mims'), (snap)=>{
         callback(snap.exists() ? snap.data().data : null);
       });
+    },
+    // Diagnostic probe — writes to circles/{id}/line/diagtest, a document in
+    // the SAME subcollection as the real sync docs (so it exercises the same
+    // Firestore security rules) but one that no listener watches, so probing
+    // never clobbers real data on any device.
+    async writeDiagProbe(circleId, value){
+      await setDoc(doc(db,'circles',circleId,'line','diagtest'), { data: value, updatedAt: serverTimestamp() });
+    },
+    async getDiagProbe(circleId){
+      const snap = await getDoc(doc(db,'circles',circleId,'line','diagtest'));
+      return snap.exists() ? snap.data().data : null;
     }
   };
   window.dispatchEvent(new Event('firebase-ready'));
@@ -2368,9 +2379,12 @@ function syncScheduleWrite(){
   if(!syncCircleId || !window.__fb) return;
   clearTimeout(syncWriteTimer);
   syncWriteTimer = setTimeout(()=>{
-    window.__fb.writeCircle(syncCircleId, state).catch(()=>{
-      // offline or transient error — localStorage already has the latest data,
-      // and the next successful save() will retry the write
+    window.__fb.writeCircle(syncCircleId, state).then(()=>{
+      syncLastLocalWriteAt = Date.now();
+    }).catch(err=>{
+      // localStorage already has the latest data and the next save() retries,
+      // but surface the reason so a silent failure isn't invisible.
+      console.warn('State write failed:', err && (err.code || err.message) || err);
     });
   }, 600); // small debounce so a burst of ticks becomes one write
 }
@@ -2503,15 +2517,103 @@ async function syncRenderMenu(){
   parts.push(`<div class="sync-hint" style="margin-top:6px;">Last received: <b>${fmt(syncLastRemoteAt)}</b> · Last sent: <b>${fmt(syncLastLocalWriteAt)}</b></div>`);
   parts.push(`<div class="sync-hint" style="margin-top:6px;">Circle ID: <span style="font-family:monospace">${esc((syncCircleId||'').slice(0,8))}…</span></div>`);
   parts.push('<button type="button" id="syncRepairBtn" class="btn ghost" style="width:100%; margin-top:10px; font-size:12.5px; padding:8px;">Repair sync (re-subscribe all listeners)</button>');
+  parts.push('<button type="button" id="syncTestBtn" class="btn ghost" style="width:100%; margin-top:6px; font-size:12.5px; padding:8px;">Run sync diagnostic</button>');
+  parts.push('<div id="syncTestResults" style="margin-top:8px; font-size:11px; line-height:1.6; font-family:monospace; white-space:normal;"></div>');
+  parts.push('<button type="button" id="syncTestBtn" class="btn ghost" style="width:100%; margin-top:8px; font-size:12.5px; padding:8px;">Test sync now (write + read every path)</button>');
+  parts.push('<div id="syncTestResults" class="sync-hint" style="margin-top:8px; font-family:monospace; font-size:11px; line-height:1.6;"></div>');
   statusEl.innerHTML = parts.join('');
   statusEl.className = syncPaired ? 'sync-status ok' : 'sync-status';
   codeBox.classList.remove('hidden');
   pairRow.classList.remove('hidden');
   codeDisplay.textContent = syncShownCode || '(tap to reveal)';
   codeDisplay.style.cursor = 'pointer';
-  // Wire the newly-rendered Repair button.
+  // Wire the newly-rendered Repair button. Not {once:true} — it should be
+  // tappable repeatedly while diagnosing.
   const repair = document.getElementById('syncRepairBtn');
-  if(repair) repair.addEventListener('click', syncRepair, {once:true});
+  if(repair) repair.addEventListener('click', syncRepair);
+  const test = document.getElementById('syncTestBtn');
+  if(test) test.addEventListener('click', syncSelfTest);
+}
+
+// While the menu sheet is open, refresh the sync status every couple of
+// seconds so Last received / Last sent update live. Without this they're
+// frozen at whatever they were when the menu opened, which makes it
+// impossible to watch a sync happen in real time.
+let syncStatusTimer = null;
+function syncStatusStartLive(){
+  clearInterval(syncStatusTimer);
+  syncStatusTimer = setInterval(()=>{
+    const sheet = document.getElementById('menuSheet');
+    if(!sheet || !sheet.classList.contains('show')){
+      clearInterval(syncStatusTimer); syncStatusTimer = null; return;
+    }
+    // Don't clobber diagnostic output that's on screen — the re-render
+    // rebuilds the whole status block including the (empty) results div.
+    const res = document.getElementById('syncTestResults');
+    if(res && res.innerHTML.trim()) return;
+    syncRenderMenu();
+  }, 2000);
+}
+
+// On-screen sync self-test — NON-DESTRUCTIVE. Writes only to a dedicated
+// probe doc (circles/{id}/line/diagtest — same subcollection, same security
+// rules, but nothing listens to it), and does read-only checks on the real
+// sync docs. Prints PASS/FAIL per path with the raw error code, all in the
+// menu itself. No real data is touched on any device.
+async function syncSelfTest(){
+  const out = document.getElementById('syncTestResults');
+  if(!out) return;
+  const log = (line)=>{ out.innerHTML += line + '<br>'; };
+  out.innerHTML = 'Testing circle: <b>' + esc((syncCircleId||'?').slice(0,8)) + '…</b><br>';
+  if(!window.__fb || !syncCircleId){ log('✗ No Firebase or no circle id'); return; }
+  const probe = 'probe_' + Date.now();
+
+  // 1) WRITE test on the subcollection via the safe probe doc.
+  let writeOK = false;
+  try{
+    await window.__fb.writeDiagProbe(syncCircleId, probe);
+    writeOK = true;
+    log('✓ subcollection WRITE ok (line/diagtest)');
+  }catch(err){
+    log('✗ subcollection WRITE failed: <b>' + esc(err && (err.code || err.message) || String(err)) + '</b>');
+  }
+  // 2) READ it back.
+  if(writeOK){
+    try{
+      const v = await window.__fb.getDiagProbe(syncCircleId);
+      if(v === probe) log('✓ subcollection READ ok (value round-tripped)');
+      else log('△ subcollection READ returned unexpected value');
+    }catch(err){
+      log('✗ subcollection READ failed: <b>' + esc(err && (err.code || err.message) || String(err)) + '</b>');
+    }
+  }
+  // 3) Read-only status of the real sync docs — shows whether either device
+  //    has ever successfully pushed each doc type to THIS circle.
+  const readonlyChecks = [
+    ['line/current (Line Timeline)', () => window.__fb.getLineSnapshot(syncCircleId)],
+    ['line/entry (Records)',         () => window.__fb.getEntrySnapshot(syncCircleId)],
+    ['line/lookup (Lookup table)',   () => window.__fb.getEntryLookup(syncCircleId)],
+    ['line/mims (MIMS)',             () => window.__fb.getEntryMims(syncCircleId)]
+  ];
+  for(const [label, fn] of readonlyChecks){
+    try{
+      const v = await fn();
+      if(v == null) log('• ' + esc(label) + ': <b>empty</b> — nothing pushed to this circle yet');
+      else {
+        const size = typeof v === 'string' ? v.length : JSON.stringify(v).length;
+        log('✓ ' + esc(label) + ': has data (~' + Math.round(size/1024) + ' KB)');
+      }
+    }catch(err){
+      log('✗ ' + esc(label) + ' read failed: <b>' + esc(err && (err.code || err.message) || String(err)) + '</b>');
+    }
+  }
+  log('');
+  if(!writeOK){
+    log('→ <b>permission-denied</b> on WRITE means the Firestore Security Rules only allow the top-level circles docs, not the line subcollection. Fix in Firebase console → Firestore Database → Rules:');
+    log('<span style="opacity:.8">match /circles/{circleId}/{document=**} { allow read, write: if true; }</span>');
+  } else {
+    log('→ Writes work. If the docs above are all "empty", tap <b>Repair sync</b> on this device (it pushes local data up), then run this test again on the OTHER device — the docs should show data there.');
+  }
 }
 
 // Force-re-subscribe every snapshot listener to the CURRENT circleId. Useful
@@ -3140,13 +3242,49 @@ function schedChipHTML(tab, entry, info){
 // carries a LINE field, which the Night Hygiene picker and search-by-REF
 // code path both rely on.
 const LS_ENTRY_RECORDS='unified.entryRecords.v1', LS_ENTRY_TICKS='unified.entryTicks.v1',
-      LS_ENTRY_MIMS='unified.entryMims.v3', LS_ENTRY_LOOKUP='unified.entryLookup.v3';
+      LS_ENTRY_MIMS='unified.entryMims.v3', LS_ENTRY_LOOKUP='unified.entryLookup.v3',
+      LS_ENTRY_DELETED='unified.entryDeleted.v1';
 
 let entryRecords = JSON.parse(localStorage.getItem(LS_ENTRY_RECORDS) || '[]');
 let entryTicks = JSON.parse(localStorage.getItem(LS_ENTRY_TICKS) || '{}');   // { barcode: {freq,period} }
+// Tombstones: { num: deletedAtISO }. Records sync by merge (so two devices
+// can't clobber each other's additions), which means a plain removal would
+// just be re-added from the other device's copy. A tombstone says "num N was
+// deleted at time T" — any incoming record with that num whose own commit
+// time is EARLIER than T is dropped. A record committed later (num reused
+// after a Delete all) survives, so numbering can safely restart.
+let entryDeleted = JSON.parse(localStorage.getItem(LS_ENTRY_DELETED) || '{}');
 let entryMims = JSON.parse(localStorage.getItem(LS_ENTRY_MIMS) || 'null')
   || (typeof MIMS_SEED!=='undefined' ? MIMS_SEED : []);
 const ENTRY_TEMPLATES = (typeof TEMPLATES_SEED!=='undefined') ? TEMPLATES_SEED : [];
+
+// Mark records as deleted. Called by both the single-record delete button and
+// the Delete all wipe, so every removal leaves a tombstone that can travel to
+// the other device.
+function entryMarkDeleted(nums){
+  const now = new Date().toISOString();
+  nums.forEach(n => { entryDeleted[String(n)] = now; });
+  entryPruneTombstones();
+}
+// Tombstones would otherwise accumulate forever. Anything older than 30 days
+// is well past the point where a stale copy could still be floating on
+// another device, so it's safe to forget.
+function entryPruneTombstones(){
+  const cutoff = Date.now() - 30*24*60*60*1000;
+  Object.keys(entryDeleted).forEach(k=>{
+    const t = new Date(entryDeleted[k]).getTime();
+    if(!t || t < cutoff) delete entryDeleted[k];
+  });
+}
+// Is this record superseded by a tombstone? True when a deletion for its num
+// happened AFTER the record was committed.
+function entryIsTombstoned(rec, tombstones){
+  const t = tombstones[String(rec.num)];
+  if(!t) return false;
+  const deletedAt = new Date(t).getTime();
+  const committedAt = new Date(rec.time || 0).getTime();
+  return deletedAt >= committedAt;
+}
 
 // A row without a real barcode carries a synthetic "MIMS_NNNN" id in the
 // barcode slot so that every downstream lookup keyed by barcode keeps working
@@ -3220,6 +3358,7 @@ let entryRecordsView = 'simplified'; // 'simplified' | 'export'
 function entrySaveLocal(){
   localStorage.setItem(LS_ENTRY_RECORDS, JSON.stringify(entryRecords));
   localStorage.setItem(LS_ENTRY_TICKS, JSON.stringify(entryTicks));
+  localStorage.setItem(LS_ENTRY_DELETED, JSON.stringify(entryDeleted));
   entrySyncScheduleWrite();
 }
 function entrySaveMims(){ localStorage.setItem(LS_ENTRY_MIMS, JSON.stringify(entryMims)); entryMimsSyncScheduleWrite(); }
@@ -4417,6 +4556,7 @@ document.getElementById('entryTbody').addEventListener('click', e=>{
   if(delBtn){
     const i=+delBtn.dataset.entrydel;
     if(confirm('Delete record #'+entryRecords[i].num+'?')){
+      entryMarkDeleted([entryRecords[i].num]);
       entryRecords.splice(i,1); entrySaveLocal(); renderEntryAll();
     }
     return;
@@ -4530,6 +4670,9 @@ document.getElementById('entryTimeEditApply').addEventListener('click', ()=>{
 });
 document.getElementById('entryBtnWipe').addEventListener('click', ()=>{
   if(confirm('Delete ALL Entry records and start a fresh list? This cannot be undone.')){
+    // Tombstone every num being removed, otherwise the paired device's copy
+    // merges straight back in on the next sync tick.
+    entryMarkDeleted(entryRecords.map(r=>r.num));
     entryRecords=[]; entryTicks={};
     entrySaveLocal(); renderEntryAll();
   }
@@ -4964,6 +5107,7 @@ function entrySyncScheduleWrite(){
   try{
     localStorage.setItem(LS_ENTRY_RECORDS, JSON.stringify(entryRecords));
     localStorage.setItem(LS_ENTRY_TICKS, JSON.stringify(entryTicks));
+    localStorage.setItem(LS_ENTRY_DELETED, JSON.stringify(entryDeleted));
   }catch(_e){}
   if(!syncCircleId || !window.__fb || !window.__fb.writeEntrySnapshot) return;
   clearTimeout(entrySyncWriteTimer);
@@ -4973,7 +5117,7 @@ function entrySyncScheduleWrite(){
     // "Unsupported field value: undefined" error. This is the single most
     // common way sync silently breaks after a code change that adds a new
     // optional field to records.
-    const payload = JSON.parse(JSON.stringify({records:entryRecords, ticks:entryTicks}));
+    const payload = JSON.parse(JSON.stringify({records:entryRecords, ticks:entryTicks, deleted:entryDeleted}));
     const serialized = JSON.stringify(payload);
     if(serialized.length > 800000){
       console.warn('Entry snapshot is', serialized.length, 'bytes — kept locally, not synced (Firestore 1 MiB cap).');
@@ -5024,6 +5168,21 @@ function entrySyncApplyRemote(snapshot){
       });
       entryRecords = [...byNum.values()].sort((a,b)=>a.num-b.num);
     }
+    // Tombstones: union both sides, keeping the LATER deletion time for any
+    // num present in both. Then drop every record the merged tombstone set
+    // supersedes. Doing this after the record merge means a deletion made on
+    // either device wins over the other device's surviving copy — which is
+    // what makes Delete all actually propagate instead of the records
+    // flowing straight back.
+    if(snapshot.deleted && typeof snapshot.deleted === 'object'){
+      Object.keys(snapshot.deleted).forEach(k=>{
+        const remoteAt = new Date(snapshot.deleted[k]).getTime();
+        const localAt = entryDeleted[k] ? new Date(entryDeleted[k]).getTime() : 0;
+        if(remoteAt > localAt) entryDeleted[k] = snapshot.deleted[k];
+      });
+      entryPruneTombstones();
+    }
+    entryRecords = entryRecords.filter(r => !entryIsTombstoned(r, entryDeleted));
     if(snapshot.ticks && typeof snapshot.ticks === 'object'){
       // Ticks are a plain {barcode: {freq,period}} map. Union both maps —
       // if both sides have a tick for the same barcode, remote wins (they're
@@ -5032,6 +5191,7 @@ function entrySyncApplyRemote(snapshot){
     }
     localStorage.setItem(LS_ENTRY_RECORDS, JSON.stringify(entryRecords));
     localStorage.setItem(LS_ENTRY_TICKS, JSON.stringify(entryTicks));
+    localStorage.setItem(LS_ENTRY_DELETED, JSON.stringify(entryDeleted));
     if(currentTab==='entry') renderEntryAll();
   } finally { entrySyncApplyingRemote=false; }
 }
@@ -5665,7 +5825,7 @@ document.getElementById('addCustBtn').addEventListener('click',()=>{
   if(otherIdx>=0) state.customers.splice(otherIdx,0,nc); else state.customers.push(nc);
   input.value=''; save(); renderCustList(); render();
 });
-document.getElementById('menuBtn').addEventListener('click',()=>{ renderCustList(); syncRenderMenu(); menuSheet.classList.add('show'); });
+document.getElementById('menuBtn').addEventListener('click',()=>{ renderCustList(); syncRenderMenu(); syncStatusStartLive(); menuSheet.classList.add('show'); });
 document.getElementById('closeMenu').addEventListener('click',()=>menuSheet.classList.remove('show'));
 document.getElementById('editToggle').addEventListener('click',()=>{ editing=!editing; if(editing) sorting=false; menuSheet.classList.remove('show'); render(); });
 document.getElementById('sortToggle').addEventListener('click',()=>{ sorting=!sorting; if(sorting) editing=false; menuSheet.classList.remove('show'); render(); });
