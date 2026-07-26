@@ -169,7 +169,7 @@
     border-radius:10px; padding:9px; font-size:13px; font-weight:600; cursor:pointer; }
   .toolbar button:active { background:var(--panel-2); color:var(--ink); }
 
-  main { padding:8px 16px 120px; }
+  main { padding:8px 16px calc(100px + env(safe-area-inset-bottom)); }
 
   .cust { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
     margin-bottom:10px; overflow:hidden; }
@@ -262,7 +262,7 @@
   .empty { text-align:center; color:var(--ink-dim); padding:50px 24px; line-height:1.6; }
   .empty b { color:var(--ink); }
 
-  .fab { position:fixed; right:16px; bottom:calc(16px + env(safe-area-inset-bottom)); z-index:30;
+  .fab { position:fixed; right:16px; bottom:calc(78px + env(safe-area-inset-bottom)); z-index:30;
     background:var(--done); color:#06231a; border:none; border-radius:30px; padding:15px 22px;
     font-size:15px; font-weight:700; box-shadow:0 8px 24px rgba(0,0,0,.4); cursor:pointer; }
   .fab:active { transform:translateY(1px); }
@@ -320,16 +320,18 @@
   .locked { opacity:.5; pointer-events:none; }
   .hidden { display:none !important; }
 
-  /* main tabs */
-  .main-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; background:var(--panel);
-    padding:4px; border-radius:12px; border:1px solid var(--line); }
-  .mtab { flex:1 1 30%; min-width:72px; text-align:center; padding:10px 4px; border-radius:9px; font-size:12.5px;
+  /* main tabs — bottom nav bar, one row, icon + label, thumb-reachable */
+  .bottom-nav { position:fixed; left:0; right:0; bottom:0; z-index:35; display:flex;
+    background:var(--panel); border-top:1px solid var(--line);
+    padding:6px 4px calc(6px + env(safe-area-inset-bottom)); box-shadow:0 -4px 20px rgba(0,0,0,.25); }
+  .mtab { flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:3px;
+    text-align:center; padding:7px 2px 6px; border-radius:11px; font-size:10.5px; letter-spacing:.01em;
     font-weight:600; color:var(--ink-dim); cursor:pointer; border:none; background:transparent; }
-  .mtab.active { background:var(--panel-2); color:var(--ink); }
-  /* Entry sits on its own row underneath the four schedule tabs, yellow-tinted
-     so it's visually distinct as a different workflow (barcode capture + records). */
-  .entry-tab-row { margin-top:6px; }
-  .mtab.mtab-entry { color:var(--weekly); font-weight:700; }
+  .mtab svg { width:21px; height:21px; flex-shrink:0; }
+  .mtab.active { color:var(--ink); background:var(--panel-2); }
+  /* Entry is visually distinct (accent colour) since it's a separate workflow
+     from the four schedule tabs, but lives in the same reachable row. */
+  .mtab.mtab-entry { color:var(--weekly); }
   .mtab.mtab-entry.active { background:rgba(242,160,61,.14); color:var(--weekly);
     box-shadow:inset 0 0 0 1px rgba(242,160,61,.4); }
 
@@ -387,7 +389,7 @@
   .pack-check { width:24px; height:24px; border-radius:6px; border:2px solid var(--line);
     flex-shrink:0; display:grid; place-items:center; font-size:13px; color:#06231a; }
   .pack-check.on { background:var(--done); border-color:var(--done); }
-  .pack-bar { position:fixed; left:16px; right:16px; bottom:calc(84px + env(safe-area-inset-bottom));
+  .pack-bar { position:fixed; left:16px; right:16px; bottom:calc(146px + env(safe-area-inset-bottom));
     z-index:29; background:var(--panel-2); border:1px solid var(--line); border-radius:12px;
     padding:10px; display:none; gap:8px; box-shadow:0 8px 24px rgba(0,0,0,.4); }
   .pack-bar.show { display:flex; }
@@ -513,13 +515,11 @@
   .mono { font-family:monospace; }
 
   /* ===== ENTRY TAB ===== */
-  #entryRoot { padding:14px 16px 90px; }
+  #entryRoot { padding:14px 16px calc(140px + env(safe-area-inset-bottom)); }
   .entry-hero { text-align:center; padding:18px 12px; background:var(--panel); border:1px solid var(--line);
     border-radius:var(--radius); margin-bottom:14px; }
   .entry-hero-label { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-dim); }
   .entry-hero-num { font-size:52px; font-weight:800; line-height:1.1; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
-  .entry-jump { margin-top:8px; width:110px; text-align:center; background:var(--panel-2); border:1px solid var(--line);
-    border-radius:8px; padding:8px; color:var(--ink); font-size:15px; }
   .entry-picktabs { display:flex; gap:6px; margin-bottom:10px; background:var(--panel); padding:4px;
     border-radius:12px; border:1px solid var(--line); }
   .entry-picktabs button { flex:1; padding:9px 4px; font-size:12.5px; font-weight:600; color:var(--ink-dim);
@@ -571,20 +571,25 @@
     font-weight:700; padding:14px; }
   .entry-filelabel.entry-filelabel-secondary:active { filter:brightness(.92); }
   /* Compact top bar that replaces the old big "Next sample number" hero. */
-  .entry-topbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:10px; }
-  .entry-mini-num { font-size:15px; font-weight:700; color:var(--ink); letter-spacing:.02em;
-    cursor:pointer; display:flex; align-items:center; gap:8px; user-select:none; }
-  .entry-mini-num small { font-size:10.5px; color:var(--ink-dim); text-transform:uppercase;
-    letter-spacing:.09em; font-weight:600; }
-  .entry-mini-num span#entryNextNum { font-size:18px; font-variant-numeric:tabular-nums; }
-  .entry-manual-btn { background:var(--panel-2); color:var(--ink-dim); border:1px solid var(--line);
-    border-radius:8px; padding:7px 14px; font-size:12.5px; font-weight:600; cursor:pointer;
-    font-family:inherit; }
-  .entry-manual-btn:active { background:var(--panel); color:var(--ink); }
-  /* Jump-to input inlined into the number bar, revealed on long-press of the Entry tab
-     or a tap on the number label. */
-  .entry-jump { width:90px; text-align:center; background:var(--panel-2); border:1px solid var(--line);
-    border-radius:8px; padding:6px 8px; color:var(--ink); font-size:14px; font-family:inherit; }
+  .entry-mini-num { font-size:15px; font-weight:700; color:inherit; letter-spacing:.02em;
+    cursor:pointer; display:flex; align-items:center; gap:6px; user-select:none; position:relative; }
+  .entry-mini-num small { display:none; }
+  .entry-mini-num span#entryNextNum { font-size:10.5px; font-variant-numeric:tabular-nums; font-weight:600; }
+  /* Fixed icon bar for Entry — Entry/Records/Manual/Settings — sits just above
+     the app's main bottom nav, same visual language as .bottom-nav/.mtab. */
+  .entry-bottombar { position:fixed; left:0; right:0; bottom:calc(60px + env(safe-area-inset-bottom)); z-index:34;
+    display:flex; background:var(--panel); border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+    padding:6px 4px; }
+  .entry-bottombar > button { flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:3px;
+    padding:6px 2px; border-radius:11px; font-size:10.5px; font-weight:600; color:var(--ink-dim);
+    cursor:pointer; border:none; background:transparent; font-family:inherit; }
+  .entry-bottombar > button svg { width:20px; height:20px; flex-shrink:0; }
+  .entry-bottombar > button.on, .entry-bottombar > button#entrySubReference.on { color:var(--ink); background:var(--panel-2); }
+  .entry-bottombar > button > span:not(.entry-mini-num) { line-height:1; }
+  /* Jump-to input pops up above its button instead of squeezing into the bar. */
+  .entry-jump { position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%);
+    width:110px; text-align:center; background:var(--panel-2); border:1px solid var(--line);
+    border-radius:8px; padding:8px; color:var(--ink); font-size:15px; font-family:inherit; box-shadow:0 4px 16px rgba(0,0,0,.4); }
   .entry-jump.hidden { display:none; }
   /* Count pill next to the # header in the Records simplified table. */
   .entry-count-inline { display:inline-block; margin-left:4px; padding:1px 7px; border-radius:99px;
@@ -598,10 +603,19 @@
     border:none; background:transparent; border-radius:9px; cursor:pointer; }
   .entry-subtabs button.on { background:var(--bg); color:var(--ink); }
 
-  .entry-viewtoggle { display:flex; gap:6px; margin-bottom:10px; }
-  .entry-viewtoggle button { flex:1; padding:9px 4px; font-size:12.5px; font-weight:600; color:var(--ink-dim);
+  /* Compact icon-pair instead of a full tab row — sits inline with the # count header. */
+  .entry-viewtoggle { display:flex; gap:5px; margin-bottom:10px; justify-content:flex-end; }
+  .entry-viewtoggle button { width:34px; height:34px; padding:0; display:grid; place-items:center; font-size:12.5px; font-weight:600; color:var(--ink-dim);
     border:1px solid var(--line); background:var(--panel); border-radius:9px; cursor:pointer; }
+  .entry-viewtoggle button svg { width:16px; height:16px; }
   .entry-viewtoggle button.on { background:var(--panel-2); color:var(--ink); border-color:var(--monthly); }
+
+  .entry-ref-overlay { position:fixed; inset:0; z-index:45; background:rgba(0,0,0,.55);
+    display:flex; align-items:flex-end; } /* .hidden (global, !important) hides it when off-screen */
+  .entry-ref-sheet { background:var(--panel); width:100%; border-radius:20px 20px 0 0;
+    padding:20px 18px calc(24px + env(safe-area-inset-bottom)); border-top:1px solid var(--line);
+    max-height:88vh; overflow-y:auto; }
+  .entry-ref-sheet h2 { margin:0 0 16px; font-size:17px; display:flex; align-items:center; justify-content:space-between; }
 
   .entry-export-scroll { overflow-x:auto; border-radius:12px; border:1px solid var(--line); }
   .entry-export-table { min-width:1400px; background:var(--panel); }
@@ -627,17 +641,6 @@
     </div>
     <button class="icon-btn" id="menuBtn">Menu</button>
   </div>
-  <div class="main-tabs">
-    <button class="mtab active" data-tab="routine">Routine</button>
-    <button class="mtab" data-tab="nutri">Nutritional</button>
-    <button class="mtab" data-tab="shelf">Shelf-Life</button>
-    <button class="mtab" data-tab="line">Line Timeline</button>
-  </div>
-  <!-- Entry sits on its own row at the bottom, yellow-tinted so it's visually
-       distinct from the four schedule tabs above. -->
-  <div class="main-tabs entry-tab-row">
-    <button class="mtab mtab-entry" data-tab="entry">Entry</button>
-  </div>
   <div class="toolbar" id="routineToolbar">
     <button id="expandAll">Expand all</button>
     <button id="collapseAll">Collapse all</button>
@@ -658,6 +661,29 @@
     <button id="lineExpandCollapseAll">Expand all</button>
   </div>
 </header>
+
+<nav class="bottom-nav">
+  <button class="mtab active" data-tab="routine">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="M8 12.5l2.5 2.5L16 9"></path></svg>
+    <span>Routine</span>
+  </button>
+  <button class="mtab" data-tab="nutri">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3h4"></path><path d="M11 3v6.2L5.8 18a2 2 0 0 0 1.7 3h9a2 2 0 0 0 1.7-3L13 9.2V3"></path><path d="M7.5 15h9"></path></svg>
+    <span>Nutritional</span>
+  </button>
+  <button class="mtab" data-tab="shelf">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+    <span>Shelf-Life</span>
+  </button>
+  <button class="mtab" data-tab="line">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6h17M3.5 12h17M3.5 18h10"></path><circle cx="16" cy="6" r="1.6" fill="currentColor" stroke="none"></circle><circle cx="9" cy="12" r="1.6" fill="currentColor" stroke="none"></circle><circle cx="19" cy="18" r="1.6" fill="currentColor" stroke="none"></circle></svg>
+    <span>Line Timeline</span>
+  </button>
+  <button class="mtab mtab-entry" data-tab="entry">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 5v14M8 5v14M11 5v14M13.5 5v14M17 5v14M20 5v14"></path></svg>
+    <span>Entry</span>
+  </button>
+</nav>
 
 <main id="main"></main>
 <input type="file" id="lineImportFile" accept=".xlsx,.xls" style="display:none;">
@@ -824,34 +850,15 @@
      collide with the app's existing product/tick/schedule data.
      ============================================================ -->
 <div id="entryRoot" class="hidden">
-  <!-- Compact top bar: current sample number on the left, Manual shortcut on the right.
-       The number is tappable to reveal a jump-to input inline (the old big hero is gone). -->
-  <div class="entry-topbar">
-    <div class="entry-mini-num" id="entryNumHeader">
-      <small>Entry</small><span id="entryNextNum">1</span>
-      <input type="number" id="entryNextNumEdit" placeholder="jump to #" class="entry-jump hidden">
-    </div>
-    <button type="button" class="entry-manual-btn" id="entryBtnManual">Manual</button>
-  </div>
-
-  <!-- Entry's own sub-navigation: Scan / Records / Reference -->
-  <div class="entry-subtabs">
-    <button id="entrySubScan" class="on">Scan</button>
-    <button id="entrySubRecords">Records</button>
-    <button id="entrySubReference">Reference</button>
-  </div>
-
-  <!-- ===== SCAN sub-tab ===== -->
+  <!-- ===== SCAN sub-tab — Start camera + search now occupy the space the
+       Scan/Records tabs used to; both controls are equal-size and fat (thumb-friendly),
+       switching between modes moved to the small icon bar fixed at the bottom. ===== -->
   <div id="entryPaneScan">
-    <!-- Just the green bar button — no card, no explanatory hint -->
     <div id="entryScanIdleCard">
-      <button class="btn primary" id="entryBtnCam" style="width:100%;">Start camera</button>
+      <button class="btn primary" id="entryBtnCam" style="width:100%; height:64px; font-size:16px;">Start camera</button>
+      <input id="entrySearchAll" class="entry-search" placeholder="Search Barcode or Name" autocomplete="off" style="width:100%; height:64px; margin-top:10px; font-size:16px;">
     </div>
     <div id="entryReader" class="entry-reader hidden"></div>
-
-    <!-- Manual search (typing a barcode or a name).
-         Placeholder trimmed of the swab/amber/aldi/tesco examples. -->
-    <input id="entrySearchAll" class="entry-search" placeholder="Search Barcode or Name" autocomplete="off" style="margin-top:12px;">
     <div class="entry-results" id="entryResultsAll"></div>
 
     <!-- Confirm card. Hidden by default; only appears once a scan or a search
@@ -888,8 +895,12 @@
   <!-- ===== RECORDS sub-tab — Simplified / Export toggle ===== -->
   <div id="entryPaneRecords" class="hidden">
     <div class="entry-viewtoggle">
-      <button id="entryViewSimplified" class="on">Simplified</button>
-      <button id="entryViewExport">Export view</button>
+      <button id="entryViewSimplified" class="on" title="Simplified list">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>
+      </button>
+      <button id="entryViewExport" title="Export table">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"></rect><path d="M3.5 9.5h17M9 9.5V19.5"></path></svg>
+      </button>
     </div>
 
     <!-- Simplified: today's count is now the little pill on the # column header,
@@ -924,7 +935,9 @@
        adding is handled inline on the Scan tab when an unknown barcode arrives.
        Their elements are kept in the DOM (hidden) so existing JS references
        (entryLookupSearch etc.) continue to work without any code changes. ===== -->
-  <div id="entryPaneReference" class="hidden">
+  <div id="entryPaneReference" class="hidden entry-ref-overlay">
+   <div class="entry-ref-sheet">
+    <h2>Reference<button type="button" class="icon-btn" id="entryRefDone">Done</button></h2>
     <!-- Hidden — preserved for JS references -->
     <div style="display:none;">
       <input id="entryLookupSearch" autocomplete="off">
@@ -956,7 +969,34 @@
     <div class="divider"></div>
     <div class="entry-section-head"><span>Sampled by</span></div>
     <input id="entrySamplerName" class="entry-search" placeholder="Your name, for the export's SAMBY column" style="margin-bottom:0">
+   </div>
   </div>
+
+  <!-- Small icon bar, fixed above the main bottom nav: Entry (back to Scan +
+       current #, tap to jump), Records, Manual entry, and Reference settings. -->
+  <nav class="entry-bottombar">
+    <button id="entrySubScan" class="on" title="Entry">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5v14M8 5v14M11 5v14M13.5 5v14M17 5v14M20 5v14"></path></svg>
+      <span class="entry-mini-num" id="entryNumHeader">
+        <small>Entry</small>
+        <input type="number" id="entryNextNumEdit" placeholder="jump to #" class="entry-jump hidden">
+        <span id="entryNextNum">1</span>
+      </span>
+    </button>
+    <button id="entrySubRecords" title="Records">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>
+      <span>Records</span>
+    </button>
+    <button type="button" class="entry-manual-btn" id="entryBtnManual" title="Manual">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"></rect><path d="M6 15h4M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01"></path></svg>
+      <span>Manual</span>
+    </button>
+    <button type="button" class="entry-ref-btn" id="entrySubReference" title="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 13a7.4 7.4 0 0 0 0-2l2-1.4-2-3.4-2.3.7a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.4 2.4a7.4 7.4 0 0 0-1.7 1l-2.3-.7-2 3.4L6.6 11a7.4 7.4 0 0 0 0 2l-2 1.4 2 3.4 2.3-.7a7.4 7.4 0 0 0 1.7 1l.4 2.4h4l.4-2.4a7.4 7.4 0 0 0 1.7-1l2.3.7 2-3.4-2-1.4Z"></path></svg>
+      <span>Settings</span>
+    </button>
+  </nav>
+</div>
 </div>
 
 <script>
@@ -7238,6 +7278,7 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
 let entryOverrideNum = null;
 let entryPending = null;
 let entrySubTab = 'scan';        // 'scan' | 'records' | 'reference'
+let entryPrevSubTab = 'scan';    // last non-reference tab, so the Reference sheet's Done button returns to it
 let entryRecordsView = 'simplified'; // 'simplified' | 'export'
 
 function entrySaveLocal(){
@@ -7578,6 +7619,7 @@ document.getElementById('entryNumHeader').addEventListener('click', e=>{
    ENTRY SUB-TABS — Scan / Records / Reference
    ============================================================ */
 function entrySwitchSubTab(tab){
+  if(entrySubTab!=='reference' && entrySubTab!==tab) entryPrevSubTab=entrySubTab;
   if(entrySubTab==='scan' && tab!=='scan') entryStopCam();
   entrySubTab=tab;
   document.getElementById('entrySubScan').classList.toggle('on', tab==='scan');
@@ -7592,6 +7634,7 @@ function entrySwitchSubTab(tab){
 document.getElementById('entrySubScan').addEventListener('click', ()=>entrySwitchSubTab('scan'));
 document.getElementById('entrySubRecords').addEventListener('click', ()=>entrySwitchSubTab('records'));
 document.getElementById('entrySubReference').addEventListener('click', ()=>entrySwitchSubTab('reference'));
+document.getElementById('entryRefDone').addEventListener('click', ()=>entrySwitchSubTab(entryPrevSubTab));
 
 /* ============================================================
    RECORDS — Simplified view / Export view toggle
