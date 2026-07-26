@@ -2448,7 +2448,9 @@ async function syncInit(){
 // device's pairing code (generated on demand, not shown until asked for), and the
 // "enter a code to join" box if this device somehow has no circle yet.
 let syncShownCode = null;
-function syncRenderMenu(){
+let syncLastRemoteAt = null;   // wall-clock of most recent incoming remote update
+let syncLastLocalWriteAt = null; // wall-clock of most recent outgoing write
+async function syncRenderMenu(){
   const statusEl = document.getElementById('syncStatus');
   const codeBox = document.getElementById('syncCodeBox');
   const codeDisplay = document.getElementById('syncCodeDisplay');
@@ -2456,12 +2458,34 @@ function syncRenderMenu(){
   if(!statusEl) return;
 
   if(!window.__fb){
-    statusEl.textContent = 'Sync unavailable right now.';
+    statusEl.innerHTML = 'Sync unavailable right now.';
     statusEl.className = 'sync-status err';
     return;
   }
-  statusEl.textContent = 'This device is synced. Changes appear on your other devices automatically.';
-  statusEl.className = 'sync-status ok';
+
+  // Solo vs paired: check if the circle doc has ever been written to by
+  // "another device" — proxy: does the circle doc exist AND is there any
+  // sync snapshot (line / weekly / entry / lookup / mims) already in it?
+  // If only this device ever created it, none of the snapshot subdocs exist.
+  let hasRemoteActivity = false;
+  try{
+    // Cheap check: pick one snapshot doc; if any exists, someone (this device
+    // or another) wrote it.
+    const [ln, en] = await Promise.all([
+      window.__fb.getLineSnapshot(syncCircleId),
+      window.__fb.getEntrySnapshot(syncCircleId)
+    ]);
+    hasRemoteActivity = !!(ln || en);
+  }catch(_e){}
+
+  const parts = [];
+  parts.push(hasRemoteActivity
+    ? '✓ This device is on a shared sync circle.'
+    : '• This device is on its own sync circle. Enter a pairing code from another device to link them.');
+  const fmt = (t) => t ? new Date(t).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}) : '—';
+  parts.push(`<div class="sync-hint" style="margin-top:6px;">Last received: <b>${fmt(syncLastRemoteAt)}</b> · Last sent: <b>${fmt(syncLastLocalWriteAt)}</b></div>`);
+  statusEl.innerHTML = parts.join('');
+  statusEl.className = hasRemoteActivity ? 'sync-status ok' : 'sync-status';
   codeBox.classList.remove('hidden');
   pairRow.classList.remove('hidden');
   codeDisplay.textContent = syncShownCode || '(tap to reveal)';
@@ -2579,12 +2603,18 @@ function lineSyncUpload(){
     console.warn('Line Timeline snapshot is', serialized.length, 'bytes — kept locally, not synced (Firestore 1 MiB cap).');
     return;
   }
-  window.__fb.writeLineSnapshot(syncCircleId, serialized).catch(()=>{
-    // Firebase failed — local copy is already saved, so a refresh still recovers.
+  window.__fb.writeLineSnapshot(syncCircleId, serialized).then(()=>{
+    syncLastLocalWriteAt = Date.now();
+  }).catch(err=>{
+    // Firebase write failed — local copy is already saved, so a refresh
+    // still recovers. Surface the reason so pair-not-syncing complaints
+    // have a paper trail in the console.
+    console.warn('Line snapshot write failed:', err && (err.code || err.message) || err);
   });
 }
 
 function lineSyncApplyRemote(serialized){
+  if(serialized) syncLastRemoteAt = Date.now();
   lineSyncApplyingRemote = true;
   try{
     if(!serialized){
@@ -2648,7 +2678,9 @@ function weeklySyncUpload(){
   try{ localStorage.setItem(LS_WEEKLY_SNAPSHOT, serialized); }catch(_e){}
   if(!syncCircleId || !window.__fb) return;
   if(serialized.length > 800000) return; // over Firestore's 1 MiB cap — kept locally only
-  window.__fb.writeWeeklySnapshot(syncCircleId, serialized).catch(()=>{});
+  window.__fb.writeWeeklySnapshot(syncCircleId, serialized).catch(err=>{
+    console.warn('Weekly snapshot write failed:', err && (err.code || err.message) || err);
+  });
 }
 
 function weeklySyncApplyRemote(serialized){
@@ -4856,18 +4888,72 @@ document.getElementById('entryFileMims').addEventListener('change', async e=>{
 let entrySyncWriteTimer=null, entrySyncApplyingRemote=false, entrySyncUnsubscribe=null;
 function entrySyncScheduleWrite(){
   if(entrySyncApplyingRemote) return;
+  // Always persist locally first — this is what makes a refresh survive
+  // even if Firebase is unreachable / rules reject the write / the doc is
+  // over the 1 MiB Firestore limit.
+  try{
+    localStorage.setItem(LS_ENTRY_RECORDS, JSON.stringify(entryRecords));
+    localStorage.setItem(LS_ENTRY_TICKS, JSON.stringify(entryTicks));
+  }catch(_e){}
   if(!syncCircleId || !window.__fb || !window.__fb.writeEntrySnapshot) return;
   clearTimeout(entrySyncWriteTimer);
   entrySyncWriteTimer=setTimeout(()=>{
-    window.__fb.writeEntrySnapshot(syncCircleId, {records:entryRecords, ticks:entryTicks}).catch(()=>{});
+    const payload = {records:entryRecords, ticks:entryTicks};
+    const serialized = JSON.stringify(payload);
+    if(serialized.length > 800000){
+      console.warn('Entry snapshot is', serialized.length, 'bytes — kept locally, not synced (Firestore 1 MiB cap).');
+      return;
+    }
+    window.__fb.writeEntrySnapshot(syncCircleId, payload).then(()=>{
+      syncLastLocalWriteAt = Date.now();
+    }).catch(err=>{
+      // Surface the failure so pair-not-syncing complaints have a paper trail
+      // in the console. Previously this was `.catch(()=>{})` which made every
+      // Firestore rejection invisible.
+      console.warn('Entry snapshot write failed:', err && (err.code || err.message) || err);
+    });
   }, 700);
 }
 function entrySyncApplyRemote(snapshot){
   if(!snapshot) return;
+  syncLastRemoteAt = Date.now();
   entrySyncApplyingRemote=true;
   try{
-    if(snapshot.records) entryRecords=snapshot.records;
-    if(snapshot.ticks) entryTicks=snapshot.ticks;
+    // MERGE by record.num — don't replace. This prevents the classic sync
+    // race where two devices "fight": A commits nums 1..47, writes; B
+    // commits nums 48,49 offline; B's listener fires with A's snapshot;
+    // under the old wholesale-replace, B would lose 48+49. Under merge,
+    // both sets stay.
+    // Rule: a num that exists on both sides — keep whichever was edited
+    // more recently (compared by whatever combination of timeOverride /
+    // kdate / pdate is set, then by original time). In practice "commit
+    // wins over old" is the intuitive outcome.
+    if(Array.isArray(snapshot.records)){
+      const byNum = new Map();
+      entryRecords.forEach(r => byNum.set(r.num, r));
+      snapshot.records.forEach(rr => {
+        const existing = byNum.get(rr.num);
+        if(!existing){ byNum.set(rr.num, rr); return; }
+        // Conflict: same num, two records. Prefer the record that has more
+        // fields filled in (timeOverride / kdate / pdate); if it's a tie,
+        // prefer the one with the later time.
+        const localScore = (existing.timeOverride?1:0)+(existing.kdate?1:0)+(existing.pdate?1:0);
+        const remoteScore = (rr.timeOverride?1:0)+(rr.kdate?1:0)+(rr.pdate?1:0);
+        if(remoteScore > localScore){ byNum.set(rr.num, rr); return; }
+        if(remoteScore === localScore){
+          const lt = new Date(existing.time||0).getTime();
+          const rt = new Date(rr.time||0).getTime();
+          if(rt > lt) byNum.set(rr.num, rr);
+        }
+      });
+      entryRecords = [...byNum.values()].sort((a,b)=>a.num-b.num);
+    }
+    if(snapshot.ticks && typeof snapshot.ticks === 'object'){
+      // Ticks are a plain {barcode: {freq,period}} map. Union both maps —
+      // if both sides have a tick for the same barcode, remote wins (they're
+      // idempotent bookkeeping, not user-authored data).
+      Object.assign(entryTicks, snapshot.ticks);
+    }
     localStorage.setItem(LS_ENTRY_RECORDS, JSON.stringify(entryRecords));
     localStorage.setItem(LS_ENTRY_TICKS, JSON.stringify(entryTicks));
     if(currentTab==='entry') renderEntryAll();
