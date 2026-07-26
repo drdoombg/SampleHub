@@ -3404,7 +3404,17 @@ const ENTRY_SWAB_MATRIX_PPE_ROOMS = [
 // filter fields) and the count of records to push. The `note` field ends up
 // as the record's `desc` (visible in the Simplified table), the actual
 // MIMS row supplies PRODUCT / MATERIAL / SUITE / RETAILER / OTHER_ID etc.
+// `retailerOverride` overrides ONLY the exported RETAILER cell for this
+// record — the MIMS row itself isn't filtered on it. Used by the customer-
+// crate entries where every row hits the same MIMS row but the customer
+// varies (Tesco / KFC / M&S / Coop / Iceland / Ocado / Aldi).
+const ENTRY_SWAB_MATRIX_CRATE_CUSTOMERS = ['Tesco','KFC','M&S','Coop','Iceland','Ocado','Aldi'];
 function entrySwabMatrixFixedItems(){
+  const crates = ENTRY_SWAB_MATRIX_CRATE_CUSTOMERS.map(c => ({
+    count:1, material:'Basket Swab', descrptn:'Customer Basket (Crate)',
+    other_id:'Intake', retailerOverride: c,
+    note: 'Customer Basket (Crate) — ' + c
+  }));
   return [
     // Packaging
     { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'CO-OP', other_id:'Fresh Pack 1' },
@@ -3412,11 +3422,12 @@ function entrySwabMatrixFixedItems(){
     { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'CO-OP', other_id:'Cutting' },
     { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'',       other_id:'Fresh Pack 1' },
     { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'',       other_id:'Fresh Pack 2' },
-    // Crates + Dolav
-    { count:1, material:'Basket Swab',    descrptn:'Customer Basket (Crate)', other_id:'Intake' },     // Tesco/M&S/Aldi etc — user tags retailer manually
-    { count:1, material:'Basket Swab',    descrptn:'Dolav' },
-    { count:2, material:'Basket Swab',    descrptn:'Dolav', note:'Clean Dolav' },                     // 2 Clean Dolavs
-    { count:1, material:'Basket Swab',    descrptn:'Basket E.Coli & Salmonella' },                    // Spongy — M&S
+    // Customer crates — 7, one per customer.
+    ...crates,
+    // Dolav — one entry.
+    { count:1, material:'Basket Swab', descrptn:'Dolav' },
+    // Spongy — M&S basket E.Coli & Salmonella swab.
+    { count:1, material:'Basket Swab', descrptn:'Basket E.Coli & Salmonella' },
   ];
 }
 
@@ -3560,7 +3571,8 @@ function entrySwabMatrixCommit(){
         mimsBarcode: mimsRow.barcode,
         cat: 'Category 2',           // Swab Matrix is a weekly bundle
         time: now.toISOString(),
-        source: 'swab-matrix', tmpl:null, mimsRow: null
+        source: 'swab-matrix', tmpl:null, mimsRow: null,
+        retailerOverride: spec.retailerOverride || null
       });
       pushed++;
     }
@@ -4622,6 +4634,11 @@ function entryBuildSisRow(r){
   row.ORDER=r.cat; row.SAMPCOUNT=String(r.num); row.SAMDATE=entryFmtDateUK(new Date());
   row.SAMBY = localStorage.getItem('unified.samplerName') || 'Sampler';
   row.CLIENT='SIS'; row.MANUFDATE=row.KILLDATE;
+  // Per-record retailer override — currently used by the Swab-Matrix customer
+  // crates block, where all 7 records hit the same MIMS row but each carries
+  // its own customer name (Tesco / KFC / M&S / Coop / Iceland / Ocado / Aldi)
+  // into the export's RETAILER cell.
+  if(r.retailerOverride) row.RETAILER = r.retailerOverride;
   return row;
 }
 // Is this record a Caeca/Neck unit? Those get the export's actual MANUFTIME
