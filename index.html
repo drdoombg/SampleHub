@@ -34,16 +34,22 @@
   const fbApp = initializeApp(firebaseConfig);
   const db = getFirestore(fbApp);
 
+  // Deep-strip undefined values (Firestore rejects them) by JSON round-trip.
+  // Applied to every payload before setDoc so no code path anywhere in the
+  // app can silently break the sync by passing an object with an undefined
+  // field. Cheap; the payloads we send are already JSON-serializable.
+  const clean = (v) => JSON.parse(JSON.stringify(v));
+
   window.__fb = {
     async getCircle(circleId){
       const snap = await getDoc(doc(db,'circles',circleId));
       return snap.exists() ? snap.data() : null;
     },
     async createCircle(circleId, stateData){
-      await setDoc(doc(db,'circles',circleId), { state: stateData, updatedAt: serverTimestamp() });
+      await setDoc(doc(db,'circles',circleId), { state: clean(stateData), updatedAt: serverTimestamp() });
     },
     async writeCircle(circleId, stateData){
-      await setDoc(doc(db,'circles',circleId), { state: stateData, updatedAt: serverTimestamp() }, { merge:true });
+      await setDoc(doc(db,'circles',circleId), { state: clean(stateData), updatedAt: serverTimestamp() }, { merge:true });
     },
     async getCodeMapping(code){
       const snap = await getDoc(doc(db,'codes',code));
@@ -95,7 +101,7 @@
     // Entry tab's numbered sequence + MIMS data — same subdocument pattern as
     // the Line Timeline snapshots above, its own path so it can't collide.
     async writeEntrySnapshot(circleId, entrySnapshot){
-      await setDoc(doc(db,'circles',circleId,'line','entry'), { data: entrySnapshot, updatedAt: serverTimestamp() });
+      await setDoc(doc(db,'circles',circleId,'line','entry'), { data: clean(entrySnapshot), updatedAt: serverTimestamp() });
     },
     async getEntrySnapshot(circleId){
       const snap = await getDoc(doc(db,'circles',circleId,'line','entry'));
@@ -109,7 +115,7 @@
     // Entry lookup table (product database used by the scanner to match barcodes)
     // — same subdocument pattern so additions/removals sync across paired devices.
     async writeEntryLookup(circleId, entryLookup){
-      await setDoc(doc(db,'circles',circleId,'line','lookup'), { data: entryLookup, updatedAt: serverTimestamp() });
+      await setDoc(doc(db,'circles',circleId,'line','lookup'), { data: clean(entryLookup), updatedAt: serverTimestamp() });
     },
     async getEntryLookup(circleId){
       const snap = await getDoc(doc(db,'circles',circleId,'line','lookup'));
@@ -123,7 +129,7 @@
     // Entry MIMS data (the imported MIMS SAVE FILE used for export cross-reference)
     // — same subdocument pattern, so a MIMS import on one device is available everywhere.
     async writeEntryMims(circleId, entryMims){
-      await setDoc(doc(db,'circles',circleId,'line','mims'), { data: entryMims, updatedAt: serverTimestamp() });
+      await setDoc(doc(db,'circles',circleId,'line','mims'), { data: clean(entryMims), updatedAt: serverTimestamp() });
     },
     async getEntryMims(circleId){
       const snap = await getDoc(doc(db,'circles',circleId,'line','mims'));
@@ -2371,6 +2377,14 @@ function syncScheduleWrite(){
 
 function syncApplyRemoteState(remoteState){
   syncApplyingRemote = true;
+  syncLastRemoteAt = Date.now();
+  // Only mark paired if this isn't a self-echo of our own recent write. A
+  // real remote change from another device typically arrives well after our
+  // last outgoing write, whereas Firestore's listenCircle fires for our own
+  // writes within a second of them.
+  if(!syncLastLocalWriteAt || (Date.now() - syncLastLocalWriteAt) > 3000){
+    syncMarkPaired();
+  }
   try{
     state = remoteState;
     if(!state.nutri) state.nutri=[];
@@ -2450,6 +2464,24 @@ async function syncInit(){
 let syncShownCode = null;
 let syncLastRemoteAt = null;   // wall-clock of most recent incoming remote update
 let syncLastLocalWriteAt = null; // wall-clock of most recent outgoing write
+// Explicit paired flag — set when this device joins another's circle by code,
+// or when another device joins ours by entering our code. Stored in localStorage
+// so a refresh remembers it. This is the true "is sync live" signal — the
+// previous check (does a snapshot subdoc exist?) was wrong because a paired
+// circle where nobody's committed anything yet has no subdocs, and would show
+// "on its own sync circle" despite being fully paired.
+const PAIRED_KEY = 'sampleTracker.paired';
+let syncPaired = localStorage.getItem(PAIRED_KEY) === '1';
+function syncMarkPaired(){
+  if(!syncPaired){
+    syncPaired = true;
+    localStorage.setItem(PAIRED_KEY, '1');
+  }
+}
+function syncMarkUnpaired(){
+  syncPaired = false;
+  localStorage.removeItem(PAIRED_KEY);
+}
 async function syncRenderMenu(){
   const statusEl = document.getElementById('syncStatus');
   const codeBox = document.getElementById('syncCodeBox');
@@ -2463,33 +2495,67 @@ async function syncRenderMenu(){
     return;
   }
 
-  // Solo vs paired: check if the circle doc has ever been written to by
-  // "another device" — proxy: does the circle doc exist AND is there any
-  // sync snapshot (line / weekly / entry / lookup / mims) already in it?
-  // If only this device ever created it, none of the snapshot subdocs exist.
-  let hasRemoteActivity = false;
-  try{
-    // Cheap check: pick one snapshot doc; if any exists, someone (this device
-    // or another) wrote it.
-    const [ln, en] = await Promise.all([
-      window.__fb.getLineSnapshot(syncCircleId),
-      window.__fb.getEntrySnapshot(syncCircleId)
-    ]);
-    hasRemoteActivity = !!(ln || en);
-  }catch(_e){}
-
   const parts = [];
-  parts.push(hasRemoteActivity
+  parts.push(syncPaired
     ? '✓ This device is on a shared sync circle.'
-    : '• This device is on its own sync circle. Enter a pairing code from another device to link them.');
+    : '• This device is on its own sync circle. Enter a pairing code from another device to link them, OR share your code below.');
   const fmt = (t) => t ? new Date(t).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}) : '—';
   parts.push(`<div class="sync-hint" style="margin-top:6px;">Last received: <b>${fmt(syncLastRemoteAt)}</b> · Last sent: <b>${fmt(syncLastLocalWriteAt)}</b></div>`);
+  parts.push(`<div class="sync-hint" style="margin-top:6px;">Circle ID: <span style="font-family:monospace">${esc((syncCircleId||'').slice(0,8))}…</span></div>`);
+  parts.push('<button type="button" id="syncRepairBtn" class="btn ghost" style="width:100%; margin-top:10px; font-size:12.5px; padding:8px;">Repair sync (re-subscribe all listeners)</button>');
   statusEl.innerHTML = parts.join('');
-  statusEl.className = hasRemoteActivity ? 'sync-status ok' : 'sync-status';
+  statusEl.className = syncPaired ? 'sync-status ok' : 'sync-status';
   codeBox.classList.remove('hidden');
   pairRow.classList.remove('hidden');
   codeDisplay.textContent = syncShownCode || '(tap to reveal)';
   codeDisplay.style.cursor = 'pointer';
+  // Wire the newly-rendered Repair button.
+  const repair = document.getElementById('syncRepairBtn');
+  if(repair) repair.addEventListener('click', syncRepair, {once:true});
+}
+
+// Force-re-subscribe every snapshot listener to the CURRENT circleId. Useful
+// when a device joined its circle via an older code path that didn't re-wire
+// the Line/Entry/Lookup/MIMS listeners, or when something got tangled.
+async function syncRepair(){
+  if(!syncCircleId || !window.__fb) return;
+  const statusEl = document.getElementById('syncStatus');
+  if(statusEl) statusEl.innerHTML = '<div class="sync-hint">Repairing sync…</div>';
+  // Tear down every listener that has an unsubscribe handle.
+  try{ if(syncUnsubscribe){ syncUnsubscribe(); syncUnsubscribe=null; } }catch(_e){}
+  try{ if(lineSyncUnsubscribe){ lineSyncUnsubscribe(); lineSyncUnsubscribe=null; } }catch(_e){}
+  try{ if(weeklySyncUnsubscribe){ weeklySyncUnsubscribe(); weeklySyncUnsubscribe=null; } }catch(_e){}
+  try{ if(entrySyncUnsubscribe){ entrySyncUnsubscribe(); entrySyncUnsubscribe=null; } }catch(_e){}
+  try{ if(entryLookupSyncUnsubscribe){ entryLookupSyncUnsubscribe(); entryLookupSyncUnsubscribe=null; } }catch(_e){}
+  try{ if(entryMimsSyncUnsubscribe){ entryMimsSyncUnsubscribe(); entryMimsSyncUnsubscribe=null; } }catch(_e){}
+  // Pull whatever's currently at each subdoc path, then re-subscribe fresh.
+  try{
+    const [ln, wk, en, lk, mi] = await Promise.all([
+      window.__fb.getLineSnapshot(syncCircleId).catch(()=>null),
+      window.__fb.getWeeklySnapshot(syncCircleId).catch(()=>null),
+      window.__fb.getEntrySnapshot(syncCircleId).catch(()=>null),
+      window.__fb.getEntryLookup(syncCircleId).catch(()=>null),
+      window.__fb.getEntryMims(syncCircleId).catch(()=>null)
+    ]);
+    if(ln) lineSyncApplyRemote(ln);
+    if(wk) weeklySyncApplyRemote(wk);
+    if(en) entrySyncApplyRemote(en);
+    if(lk) entryLookupSyncApplyRemote(lk);
+    if(mi) entryMimsSyncApplyRemote(mi);
+  }catch(_e){}
+  syncStartListening(syncCircleId);
+  lineSyncStartListening(syncCircleId);
+  weeklySyncStartListening(syncCircleId);
+  entrySyncStartListening(syncCircleId);
+  entryLookupSyncStartListening(syncCircleId);
+  entryMimsSyncStartListening(syncCircleId);
+  // Also push our current local state so the other device gets it right now.
+  lineSyncUpload();
+  weeklySyncUpload();
+  entrySyncScheduleWrite();
+  entryLookupSyncScheduleWrite();
+  entryMimsSyncScheduleWrite();
+  syncRenderMenu();
 }
 
 function syncShowCode(){
@@ -2547,6 +2613,7 @@ async function syncPairWithCode(rawCode){
       if(existingMims) entryMimsSyncApplyRemote(existingMims);
     }catch(e){}
     entryMimsSyncStartListening(syncCircleId);
+    syncMarkPaired(); // this device just joined another's circle
     hint.textContent = 'Synced! This device now shares data with your other device(s).';
     syncShownCode = null;
     syncRenderMenu();
@@ -2614,7 +2681,10 @@ function lineSyncUpload(){
 }
 
 function lineSyncApplyRemote(serialized){
-  if(serialized) syncLastRemoteAt = Date.now();
+  if(serialized){
+    syncLastRemoteAt = Date.now();
+    if(!syncLastLocalWriteAt || (Date.now() - syncLastLocalWriteAt) > 3000) syncMarkPaired();
+  }
   lineSyncApplyingRemote = true;
   try{
     if(!serialized){
@@ -4898,7 +4968,12 @@ function entrySyncScheduleWrite(){
   if(!syncCircleId || !window.__fb || !window.__fb.writeEntrySnapshot) return;
   clearTimeout(entrySyncWriteTimer);
   entrySyncWriteTimer=setTimeout(()=>{
-    const payload = {records:entryRecords, ticks:entryTicks};
+    // Round-trip through JSON so any `undefined` fields are stripped — Firestore
+    // rejects documents containing undefined values with an unhelpful
+    // "Unsupported field value: undefined" error. This is the single most
+    // common way sync silently breaks after a code change that adds a new
+    // optional field to records.
+    const payload = JSON.parse(JSON.stringify({records:entryRecords, ticks:entryTicks}));
     const serialized = JSON.stringify(payload);
     if(serialized.length > 800000){
       console.warn('Entry snapshot is', serialized.length, 'bytes — kept locally, not synced (Firestore 1 MiB cap).');
@@ -4917,6 +4992,7 @@ function entrySyncScheduleWrite(){
 function entrySyncApplyRemote(snapshot){
   if(!snapshot) return;
   syncLastRemoteAt = Date.now();
+  if(!syncLastLocalWriteAt || (Date.now() - syncLastLocalWriteAt) > 3000) syncMarkPaired();
   entrySyncApplyingRemote=true;
   try{
     // MERGE by record.num — don't replace. This prevents the classic sync
@@ -4977,7 +5053,16 @@ function entryLookupSyncScheduleWrite(){
   if(!syncCircleId || !window.__fb || !window.__fb.writeEntryLookup) return;
   clearTimeout(entryLookupSyncWriteTimer);
   entryLookupSyncWriteTimer=setTimeout(()=>{
-    window.__fb.writeEntryLookup(syncCircleId, entryLookup).catch(()=>{});
+    const serialized = JSON.stringify(entryLookup);
+    if(serialized.length > 800000){
+      console.warn('Lookup snapshot is', serialized.length, 'bytes — kept locally, not synced (Firestore 1 MiB cap).');
+      return;
+    }
+    window.__fb.writeEntryLookup(syncCircleId, entryLookup).then(()=>{
+      syncLastLocalWriteAt = Date.now();
+    }).catch(err=>{
+      console.warn('Lookup snapshot write failed:', err && (err.code || err.message) || err);
+    });
   }, 700);
 }
 function entryLookupSyncApplyRemote(remoteLookup){
@@ -5017,7 +5102,16 @@ function entryMimsSyncScheduleWrite(){
   if(!syncCircleId || !window.__fb || !window.__fb.writeEntryMims) return;
   clearTimeout(entryMimsSyncWriteTimer);
   entryMimsSyncWriteTimer=setTimeout(()=>{
-    window.__fb.writeEntryMims(syncCircleId, entryMims).catch(()=>{});
+    const serialized = JSON.stringify(entryMims);
+    if(serialized.length > 800000){
+      console.warn('MIMS snapshot is', serialized.length, 'bytes — kept locally, not synced (Firestore 1 MiB cap).');
+      return;
+    }
+    window.__fb.writeEntryMims(syncCircleId, entryMims).then(()=>{
+      syncLastLocalWriteAt = Date.now();
+    }).catch(err=>{
+      console.warn('MIMS snapshot write failed:', err && (err.code || err.message) || err);
+    });
   }, 700);
 }
 function entryMimsSyncApplyRemote(remoteMims){
