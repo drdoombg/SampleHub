@@ -1123,7 +1123,8 @@
     </div>
 
     <!-- Export button moved below the table as a green bar. Delete/reset lives underneath. -->
-    <button class="btn primary" id="entryBtnExport" style="width:100%; margin-top:14px;">Export SIS_Micro_Sub</button>
+    <button class="btn primary" id="entryBtnExport" style="width:100%; margin-top:14px;">Export SIS_Micro_Sub (today's sequence)</button>
+    <button class="btn ghost" id="entryBtnExportAllMims" style="width:100%; margin-top:8px;">Export Full MIMS catalogue</button>
     <div class="sheet-actions" style="margin-top:10px;">
       <button class="btn ghost" id="entryBtnWipe" style="width:100%;">Delete all</button>
     </div>
@@ -2228,7 +2229,12 @@ let viewMonth = new Date().getMonth(); // 0-11, for nutritional/shelf tabs
 let packMode = false;               // shelf-life: bulk pack-info selection mode
 let packSel = new Set();            // selected shelf entry ids in pack mode
 
-// Line Timeline tab state (not persisted — re-derived fresh from each xlsx upload)
+// Line Timeline tab state. Persisted locally so a refresh survives even when
+// Firebase is unreachable / unpaired / the doc is over the 1 MiB Firestore
+// limit and the write silently fails. Sync still writes to Firebase on top —
+// this is a strictly-additional local backup, not a replacement.
+const LS_LINE_SNAPSHOT = 'unified.lineSnapshot.v1';
+const LS_WEEKLY_SNAPSHOT = 'unified.weeklySnapshot.v1';
 let lineData = { rooms:null, customers:null, kfcEvents:null, fileName:null, error:null };
 let lineSubtab = 'rooms';           // 'rooms' | 'customers' | 'kfc'
 let lineCollapsedRooms = {};
@@ -2560,10 +2566,21 @@ function lineSyncDeserialize(json){
 }
 
 function lineSyncUpload(){
+  // Always keep a local copy first. This is the belt in a belt-and-braces
+  // setup: even if Firebase is unpaired, offline, or the doc is too big,
+  // the tab survives a refresh.
+  const serialized = lineSyncSerialize();
+  try{ localStorage.setItem(LS_LINE_SNAPSHOT, serialized); }catch(_e){}
   if(!syncCircleId || !window.__fb) return;
-  window.__fb.writeLineSnapshot(syncCircleId, lineSyncSerialize()).catch(()=>{
-    // offline/transient — the local view is already showing the fresh upload;
-    // nothing further to do here, this isn't a blocking error for the person
+  // Firestore hard-caps at 1 MiB per document; snapshots that big can happen
+  // with a fully-loaded multi-room export. Skip the write in that case rather
+  // than repeatedly failing.
+  if(serialized.length > 800000){
+    console.warn('Line Timeline snapshot is', serialized.length, 'bytes — kept locally, not synced (Firestore 1 MiB cap).');
+    return;
+  }
+  window.__fb.writeLineSnapshot(syncCircleId, serialized).catch(()=>{
+    // Firebase failed — local copy is already saved, so a refresh still recovers.
   });
 }
 
@@ -2571,12 +2588,17 @@ function lineSyncApplyRemote(serialized){
   lineSyncApplyingRemote = true;
   try{
     if(!serialized){
-      // remote was cleared — reset to the empty upload screen
+      // remote was cleared — reset to the empty upload screen (and drop the
+      // local backup too, so a refresh doesn't resurrect what was just cleared).
       lineData = { rooms:null, customers:null, kfcEvents:null, fileName:null, error:null };
+      try{ localStorage.removeItem(LS_LINE_SNAPSHOT); }catch(_e){}
     } else {
       const parsed = lineSyncDeserialize(serialized);
       lineData = { rooms:parsed.rooms, customers:parsed.customers, kfcEvents:parsed.kfcEvents, fileName:parsed.fileName, error:null };
       if(lineData.rooms) lineCollapseAllRoomsAndLines(lineData.rooms, lineData.kfcEvents);
+      // Sync down = also refresh the local backup so a subsequent refresh
+      // doesn't fall back to a stale one.
+      try{ localStorage.setItem(LS_LINE_SNAPSHOT, serialized); }catch(_e){}
     }
     lineSubtab='rooms';
     lineViewMode='daily';
@@ -2585,6 +2607,19 @@ function lineSyncApplyRemote(serialized){
     lineSyncApplyingRemote = false;
   }
 }
+
+// Load whatever's in localStorage on module init — this makes the tab
+// survive a page refresh regardless of Firebase reachability, and gets
+// overwritten if a fresh remote snapshot arrives shortly after startup.
+(function lineSyncRestoreLocal(){
+  try{
+    const cached = localStorage.getItem(LS_LINE_SNAPSHOT);
+    if(!cached) return;
+    const parsed = lineSyncDeserialize(cached);
+    lineData = { rooms:parsed.rooms, customers:parsed.customers, kfcEvents:parsed.kfcEvents, fileName:parsed.fileName, error:null };
+    if(lineData.rooms) lineCollapseAllRoomsAndLines(lineData.rooms, lineData.kfcEvents);
+  }catch(_e){}
+})();
 
 function lineSyncStartListening(circleId){
   if(lineSyncUnsubscribe) lineSyncUnsubscribe();
@@ -2596,6 +2631,7 @@ function lineSyncStartListening(circleId){
 function lineSyncClear(){
   lineData = { rooms:null, customers:null, kfcEvents:null, fileName:null, error:null };
   lineViewMode='daily';
+  try{ localStorage.removeItem(LS_LINE_SNAPSHOT); }catch(_e){}
   render();
   if(syncCircleId && window.__fb){
     window.__fb.clearLineSnapshot(syncCircleId).catch(()=>{});
@@ -2608,20 +2644,36 @@ function lineSyncClear(){
 let weeklySyncUnsubscribe = null;
 
 function weeklySyncUpload(){
+  const serialized = JSON.stringify(lineWeeklyReport);
+  try{ localStorage.setItem(LS_WEEKLY_SNAPSHOT, serialized); }catch(_e){}
   if(!syncCircleId || !window.__fb) return;
-  window.__fb.writeWeeklySnapshot(syncCircleId, JSON.stringify(lineWeeklyReport)).catch(()=>{});
+  if(serialized.length > 800000) return; // over Firestore's 1 MiB cap — kept locally only
+  window.__fb.writeWeeklySnapshot(syncCircleId, serialized).catch(()=>{});
 }
 
 function weeklySyncApplyRemote(serialized){
   lineSyncApplyingRemote = true;
   try{
     lineWeeklyReport = serialized ? JSON.parse(serialized) : null;
+    if(serialized){
+      try{ localStorage.setItem(LS_WEEKLY_SNAPSHOT, serialized); }catch(_e){}
+    } else {
+      try{ localStorage.removeItem(LS_WEEKLY_SNAPSHOT); }catch(_e){}
+    }
     if(lineWeeklyReport){ lineViewMode='weekly'; }
     if(currentTab==='line') render();
   } finally {
     lineSyncApplyingRemote = false;
   }
 }
+
+(function weeklySyncRestoreLocal(){
+  try{
+    const cached = localStorage.getItem(LS_WEEKLY_SNAPSHOT);
+    if(!cached) return;
+    lineWeeklyReport = JSON.parse(cached);
+  }catch(_e){}
+})();
 
 function weeklySyncStartListening(circleId){
   if(weeklySyncUnsubscribe) weeklySyncUnsubscribe();
@@ -2632,6 +2684,7 @@ function weeklySyncStartListening(circleId){
 
 function weeklySyncClear(){
   lineWeeklyReport = null;
+  try{ localStorage.removeItem(LS_WEEKLY_SNAPSHOT); }catch(_e){}
   render();
   if(syncCircleId && window.__fb){
     window.__fb.clearWeeklySnapshot(syncCircleId).catch(()=>{});
@@ -3026,6 +3079,33 @@ function entryBuildInitialLookup(){
     out.push({ id:'lk_t'+i, name:t.desc, barcode:'', product:t.product||'', cat:'Category 1', source:'template', tmpl:t });
   });
   return out;
+}
+
+// Stable content signature for a MIMS row. The seed and re-uploads both
+// assign synthetic MIMS_NNNN ids by row order — the signature is what lets
+// us treat two rows describing the same catalogue entry as the same thing,
+// even if their synthetic ids differ.
+//
+// Used by the MIMS merge on re-upload: existing content-key match ⇒ keep the
+// current barcode/id, refresh fields; new key ⇒ append with a fresh id.
+// Any real (non-synthetic) barcode overrides the signature — real barcodes
+// are already unique keys.
+function entryMimsContentKey(m){
+  if(m && m.barcode && !entryIsSyntheticBarcode(m.barcode)) return 'REAL::' + m.barcode;
+  return 'SIG::' + [
+    (m.product||''), (m.material||''), (m.descrptn||''), (m.unit||''),
+    (m.size||''), (m.retailer||''), (m.shift||''), (m.line||''),
+    (m.other_id||''), (m.suite||'')
+  ].map(s=>String(s).trim().toLowerCase()).join('|');
+}
+// Same helper on record-side, applied to whatever mimsBarcode a record
+// stored. Used by the merge to re-map records whose old synthetic id
+// disappeared but whose content matches an existing row on the new list.
+function entryFindMimsIdByContentKey(mimsList, key){
+  for(const m of mimsList){
+    if(entryMimsContentKey(m) === key) return m.barcode;
+  }
+  return null;
 }
 let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') || entryBuildInitialLookup();
 
@@ -4568,38 +4648,22 @@ const ENTRY_SIS_COL_WIDTHS = [
   5.89, 10.00, 23.89, 6.11, 17.44
 ];
 
-function entryExportSis(){
-  if(!entryRecords.length){ alert('Nothing to export yet.'); return; }
-  const sorted=[...entryRecords].sort((a,b)=>a.num-b.num);
-  const rows=sorted.map(entryBuildSisRow);
-  const aoa=[ENTRY_SIS_HEADERS, ...rows.map(r=>ENTRY_SIS_HEADERS.map(h=>r[h]))];
+// Shared styler for both SIS exports (today's sequence + full MIMS catalogue).
+// aoa[0] is the header row, aoa[1..] are data rows. Applies Arial 8pt with
+// borders on every cell, freeze pane on the header row, and MIMS_SAVE_FILE's
+// exact column widths.
+function entryStyleAndWriteSisSheet(aoa, filename){
   const ws=XLSX.utils.aoa_to_sheet(aoa);
   const range=XLSX.utils.decode_range(ws['!ref']);
-
-  // Clone MIMS_SAVE_FILE's formatting:
-  //   • Arial 8pt, non-bold (the reference file's header isn't bold either)
-  //   • FFFF99 fill on the header row
-  //   • Thin black border on every used cell — this is what gives the file
-  //     its compact "grid" look; without it Excel renders the interior lines
-  //     as light grey guides that vanish on print / on any dark-theme viewer
-  //   • ~10pt row height everywhere (204 twips in the reference file)
-  //   • Freeze pane on row 1 so the header row stays visible when scrolling
-  //     the file open in Excel too, matching the app's sticky-header UI
   const FONT = {name:'Arial', sz:8};
   const HEADER_FILL = {fgColor:{rgb:'FFFF99'}};
   const BORDER_SIDE = {style:'thin', color:{rgb:'000000'}};
   const BORDER_ALL  = {top:BORDER_SIDE, bottom:BORDER_SIDE, left:BORDER_SIDE, right:BORDER_SIDE};
-
   for(let R=0; R<=range.e.r; R++){
     for(let C=0; C<=range.e.c; C++){
       const addr=XLSX.utils.encode_cell({r:R,c:C});
       let cell=ws[addr];
-      // aoa_to_sheet skips empty strings — but we want the border on every
-      // cell in the used range, empty ones included, otherwise the grid
-      // has holes anywhere a field like OTHER_ID or BATCH was blank.
       if(!cell){ cell = {t:'s', v:''}; ws[addr] = cell; }
-      // Excel dates come from other places in the workflow. Everything the
-      // app writes is stringified so a lone numeric doesn't format weirdly.
       if(cell.v!=='' && typeof cell.v==='number'){ cell.t='s'; cell.v=String(cell.v); }
       cell.s = (R===0)
         ? { font:FONT, fill:HEADER_FILL, alignment:{vertical:'center', horizontal:'left'}, border:BORDER_ALL }
@@ -4607,25 +4671,59 @@ function entryExportSis(){
     }
   }
   ws['!cols'] = ENTRY_SIS_COL_WIDTHS.map(w => ({wch: w}));
-  // Uniform 10.2pt (204 twips) row height across every row, matching the
-  // reference file exactly. `hpt` needs an entry per row we want to size.
   const rowHeights = [];
   for(let r=0; r<=range.e.r; r++) rowHeights.push({hpt:10.2});
   ws['!rows'] = rowHeights;
-  // Freeze the header row.
   ws['!freeze'] = { xSplit:0, ySplit:1 };
   ws['!views'] = [{ state:'normal', ySplit:1, topLeftCell:'A2', activePane:'bottomLeft' }];
-
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Submission');
+  XLSX.writeFile(wb, filename, {bookType:'xlsx'});
+}
+function entryExportStamp(){
   const now=new Date(); const p=n=>String(n).padStart(2,'0');
-  const stamp=`${p(now.getDate())}${p(now.getMonth()+1)}${now.getFullYear()}${p(now.getHours())}${p(now.getMinutes())}`;
-  // .xlsx, not the old .xls/biff8 binary format — biff8 carries no cell
-  // styling at all, which is why previous exports always looked plain
-  // regardless of what was attempted here. .xlsx opens the same in Excel.
-  XLSX.writeFile(wb, `SIS_Micro_Sub_${stamp}.xlsx`, {bookType:'xlsx'});
+  return `${p(now.getDate())}${p(now.getMonth()+1)}${now.getFullYear()}${p(now.getHours())}${p(now.getMinutes())}`;
+}
+
+function entryExportSis(){
+  if(!entryRecords.length){ alert('Nothing to export yet.'); return; }
+  const sorted=[...entryRecords].sort((a,b)=>a.num-b.num);
+  const rows=sorted.map(entryBuildSisRow);
+  const aoa=[ENTRY_SIS_HEADERS, ...rows.map(r=>ENTRY_SIS_HEADERS.map(h=>r[h]))];
+  entryStyleAndWriteSisSheet(aoa, `SIS_Micro_Sub_${entryExportStamp()}.xlsx`);
+}
+// Build a SIS row directly from a MIMS catalogue entry — used by the full
+// MIMS export. No sample-specific fields (KILLDATE/PACKDATE/MANUFTIME/
+// SAMPCOUNT/SAMDATE/SAMBY/CLIENT/etc.) are set here; the point of this
+// export is the catalogue itself, not a submission.
+function entryBuildMimsCatalogueRow(m){
+  const row={}; ENTRY_SIS_HEADERS.forEach(h=>row[h]='');
+  row.PRODUCT=m.product||''; row.MATERIAL=m.material||''; row.RISE=m.rise||''; row.UNIT=m.unit||'';
+  row.DESCRIPTN=m.descrptn||''; row.SIZE=m.size||''; row.RETAILER=m.retailer||'';
+  row.SHIFT = m.shift||''; row.LINE = m.line||'';
+  row.OTHER_ID=m.other_id||''; row.SUITE=m.suite||'';
+  row.PRICE = (m.price===''||m.price==null) ? '' : m.price;
+  row.BARCODE = entryIsSyntheticBarcode(m.barcode) ? '' : (m.barcode||'');
+  row.EOL=m.eol||''; row.BATCH=m.batch||''; row.ORDER=m.order||'';
+  return row;
+}
+function entryExportFullMims(){
+  if(!entryMims.length){ alert('MIMS list is empty — nothing to export.'); return; }
+  // Sort by (PRODUCT category, then DESCRIPTN) so the file reads roughly like
+  // MIMS_SAVE_FILE.xls did — Intake block, Prep block, Swab block, etc.
+  const catOrder = ['Intake','Prep','Swab','Water','Allergen','Air','Product'];
+  const sorted = [...entryMims].sort((a,b)=>{
+    const ca = catOrder.indexOf(a.product||''); const cb = catOrder.indexOf(b.product||'');
+    const pa = ca<0?99:ca; const pb = cb<0?99:cb;
+    if(pa!==pb) return pa-pb;
+    return (a.descrptn||'').localeCompare(b.descrptn||'');
+  });
+  const rows = sorted.map(entryBuildMimsCatalogueRow);
+  const aoa = [ENTRY_SIS_HEADERS, ...rows.map(r=>ENTRY_SIS_HEADERS.map(h=>r[h]))];
+  entryStyleAndWriteSisSheet(aoa, `MIMS_Full_Catalogue_${entryExportStamp()}.xlsx`);
 }
 document.getElementById('entryBtnExport').addEventListener('click', entryExportSis);
+document.getElementById('entryBtnExportAllMims').addEventListener('click', entryExportFullMims);
 
 /* ---------- MIMS upload ---------- */
 document.getElementById('entryFileMims').addEventListener('change', async e=>{
@@ -4633,39 +4731,101 @@ document.getElementById('entryFileMims').addEventListener('change', async e=>{
   try{
     const wb=XLSX.read(await f.arrayBuffer(), {type:'array'});
     const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-    // Every row is kept, not just barcode-carrying ones. Only 33-ish of the
-    // 900+ MIMS rows actually have a real barcode; the rest are identified
-    // by DESCRIPTN + MATERIAL + UNIT + SUITE. For those, mint a synthetic
-    // MIMS_NNNN id in the barcode slot so all downstream code (lookup,
-    // records, ticks, export) works without special-casing. Duplicates are
-    // dropped by the same key we use in the seed.
-    const parsed=[]; const seen=new Set(); let syn=0; let realCount=0;
+
+    // 1) Parse the file the same way the seed was built.
+    const parsed=[]; const seenSig=new Set(); let realCount=0;
+    let synCounter=0; // used only for brand-new content that lacks a real barcode
     rows.forEach(r=>{
       const bc0=String(r.BARCODE||'').trim();
-      const barcode = (bc0 && bc0!=='.') ? bc0 : `MIMS_${String(syn++).padStart(4,'0')}`;
       const row = {
-        barcode, product:r.PRODUCT||'', material:r.MATERIAL||'', rise:r.RISE||'',
+        barcode: '', // filled below by merge
+        product:r.PRODUCT||'', material:r.MATERIAL||'', rise:r.RISE||'',
         unit:r.UNIT||'', descrptn:r.DESCRIPTN||'', size:r.SIZE||'', retailer:r.RETAILER||'',
         shift:r.SHIFT||'', line:r.LINE||'', other_id:r.OTHER_ID||'', suite:r.SUITE||'', price:r.PRICE||'',
         order:r.ORDER||'', batch:r.BATCH||'', eol:r.EOL||''
       };
-      if(bc0 && bc0!=='.') realCount++;
-      else row._syn = true;
-      // Match the seed's dedup key so an uploaded file dedups the same way
-      // as the baked-in seed does (LINE and OTHER_ID included).
-      const dkey = [row.barcode,row.product,row.material,row.descrptn,row.unit,row.size,row.retailer,row.shift,row.line,row.other_id,row.suite].join('|');
-      if(seen.has(dkey)) return;
-      seen.add(dkey);
-      parsed.push(row);
+      const hasRealBarcode = bc0 && bc0!=='.';
+      if(hasRealBarcode){ row.barcode = bc0; realCount++; }
+      // Dedup within the file itself so a re-uploaded MIMS with duplicates
+      // doesn't push the same content twice.
+      const sig = entryMimsContentKey({...row, barcode: hasRealBarcode ? bc0 : ''});
+      if(seenSig.has(sig)) return;
+      seenSig.add(sig);
+      parsed.push({row, sig, hasRealBarcode});
     });
-    entryMims=parsed; entrySaveMims();
-    // The lookup table is derived from MIMS; rebuild it so the freshly
-    // uploaded catalogue is what Search / the square buttons read from,
-    // instead of the stale table from the previous file.
-    entryLookup = entryBuildInitialLookup();
+
+    // 2) Build a content-key → existing row map from the CURRENT entryMims.
+    //    Existing synthetic ids stay stable this way — any current lookup
+    //    entry, sequence record or tick that referenced them keeps working.
+    const currentByKey = new Map();
+    const currentSyntheticIds = new Set();
+    entryMims.forEach(m=>{
+      currentByKey.set(entryMimsContentKey(m), m);
+      if(entryIsSyntheticBarcode(m.barcode)){
+        // Track the highest existing synthetic index so newly-added rows
+        // pick up ids that don't collide with any existing one.
+        const n = parseInt(String(m.barcode).slice('MIMS_'.length), 10);
+        if(!Number.isNaN(n)) synCounter = Math.max(synCounter, n+1);
+        currentSyntheticIds.add(m.barcode);
+      }
+    });
+
+    // 3) Merge: for each parsed row, either update the existing MIMS entry
+    //    (same content-key ⇒ refresh mutable fields, keep the id) or add
+    //    it as new. The output is a NEW list built from
+    //    (a) all currently-existing rows, mutated in place with fresh field
+    //        values where the file provides them, and
+    //    (b) any file rows whose content-key isn't in the current map.
+    //    Removing rows: NOT done. Even if the file dropped a row we already
+    //    have, the person's records may still reference it, so we keep it.
+    //    "Uploading a fresher MIMS" means "add / update", never "remove".
+    const nextMims = [...entryMims]; // start from a copy, mutate in place
+    const nextByBarcode = new Map();
+    nextMims.forEach(m=> nextByBarcode.set(m.barcode, m));
+
+    let added=0, updated=0, unchanged=0;
+    // Mutable fields we're willing to refresh on match; DO NOT overwrite
+    // barcode / product / material / descrpton / suite / line / other_id
+    // — those are the identity fields that make the row THIS row.
+    const MUTABLE = ['rise','unit','size','retailer','shift','price','order','batch','eol'];
+    parsed.forEach(({row, sig, hasRealBarcode})=>{
+      const existing = currentByKey.get(sig);
+      if(existing){
+        let changed=false;
+        MUTABLE.forEach(k=>{
+          const nv = row[k]; const ov = existing[k];
+          if(nv !== undefined && nv !== '' && nv !== ov){ existing[k] = nv; changed=true; }
+        });
+        if(changed) updated++; else unchanged++;
+        return;
+      }
+      // New content. Assign a stable id: real barcode wins; else a fresh
+      // synthetic that doesn't collide with any existing one.
+      if(!hasRealBarcode){
+        row.barcode = `MIMS_${String(synCounter++).padStart(4,'0')}`;
+        row._syn = true;
+      }
+      // If a real barcode collides with an existing synthetic one (very
+      // unlikely but defensive), skip.
+      if(nextByBarcode.has(row.barcode)){ unchanged++; return; }
+      nextMims.push(row);
+      nextByBarcode.set(row.barcode, row);
+      added++;
+    });
+
+    entryMims = nextMims;
+    entrySaveMims();
+
+    // 4) Rebuild the lookup table from the merged MIMS list. Any custom
+    //    lookup rows the user added manually (source==='scan' | 'import') are
+    //    preserved so hand-added items don't disappear on re-upload.
+    const preservedCustom = entryLookup.filter(p => p.source && p.source!=='mims');
+    entryLookup = entryBuildInitialLookup().concat(preservedCustom);
     entrySaveLookup();
+
+    // 5) Report — merge stats, not the previous "replaced everything" line.
     document.getElementById('entryMimsStatus').textContent =
-      `Loaded ${parsed.length} rows from ${f.name} (${realCount} with barcodes, ${parsed.length-realCount} without).`;
+      `Merged ${f.name}: ${added} new · ${updated} updated · ${unchanged} unchanged · ${realCount} rows had real barcodes.`;
     if(entrySubTab==='records' && entryRecordsView==='export') renderEntryExportView();
     if(entrySubTab==='reference') renderEntryLookupResults(entrySearchLookup(document.getElementById('entryLookupSearch').value));
   }catch(err){
@@ -4721,9 +4881,21 @@ function entryLookupSyncApplyRemote(remoteLookup){
   if(!Array.isArray(remoteLookup)) return;
   entryLookupSyncApplyingRemote=true;
   try{
-    entryLookup = remoteLookup;
+    // MERGE, don't replace. Key each entry by (mimsBarcode || barcode || id)
+    // — that's the identity slot the rest of the app uses. Adds new remote
+    // entries (e.g. hand-added scans from another device), keeps local ones.
+    const key = (p) => (p.mimsBarcode || p.barcode || p.id || '') + '||' + (p.name||'');
+    const have = new Set(entryLookup.map(key));
+    let added = 0;
+    remoteLookup.forEach(rp=>{
+      if(have.has(key(rp))) return;
+      entryLookup.push(rp);
+      have.add(key(rp));
+      added++;
+    });
+    entryDupNameSet = null; // subtitle disambiguator cache invalidated
     localStorage.setItem(LS_ENTRY_LOOKUP, JSON.stringify(entryLookup));
-    if(currentTab==='entry') renderEntryAll();
+    if(currentTab==='entry' && added) renderEntryAll();
   } finally { entryLookupSyncApplyingRemote=false; }
 }
 function entryLookupSyncStartListening(circleId){
@@ -4749,13 +4921,50 @@ function entryMimsSyncApplyRemote(remoteMims){
   if(!Array.isArray(remoteMims)) return;
   entryMimsSyncApplyingRemote=true;
   try{
-    entryMims = remoteMims;
+    // MERGE, don't replace. A stale remote snapshot (e.g. from before the
+    // seed was expanded, or from another paired device that never got the
+    // v3 bump) must NOT shrink the local catalogue. Content-key match ⇒
+    // trust the local row; new content-key from remote ⇒ append.
+    const byKey = new Map();
+    entryMims.forEach(m => byKey.set(entryMimsContentKey(m), m));
+    // Track synthetic id counter so any freshly-added rows from remote get
+    // ids that don't collide with existing ones.
+    let synCounter = 0;
+    entryMims.forEach(m=>{
+      if(entryIsSyntheticBarcode(m.barcode)){
+        const n = parseInt(String(m.barcode).slice('MIMS_'.length), 10);
+        if(!Number.isNaN(n)) synCounter = Math.max(synCounter, n+1);
+      }
+    });
+    let added = 0;
+    remoteMims.forEach(rm=>{
+      const key = entryMimsContentKey(rm);
+      if(byKey.has(key)) return; // already have this content — keep local
+      // Reassign synthetic id defensively so a remote-generated MIMS_XXXX
+      // that would collide with a local one is renumbered.
+      const row = {...rm};
+      if(entryIsSyntheticBarcode(row.barcode) && byKey.has(row.barcode)){
+        row.barcode = `MIMS_${String(synCounter++).padStart(4,'0')}`;
+        row._syn = true;
+      }
+      entryMims.push(row);
+      byKey.set(key, row);
+      added++;
+    });
     localStorage.setItem(LS_ENTRY_MIMS, JSON.stringify(entryMims));
+    // Rebuild the lookup on merge — lookup entries are derived from MIMS and
+    // are cheap to recompute.
+    if(added){
+      const preservedCustom = entryLookup.filter(p => p.source && p.source!=='mims');
+      entryLookup = entryBuildInitialLookup().concat(preservedCustom);
+      localStorage.setItem(LS_ENTRY_LOOKUP, JSON.stringify(entryLookup));
+    }
     // If the person is on the export view of Records right now, refresh it so
     // the newly-arrived MIMS cross-reference is applied immediately.
     if(currentTab==='entry' && entrySubTab==='records' && entryRecordsView==='export'){
       renderEntryExportView();
     }
+    if(currentTab==='entry' && added) renderEntryAll();
   } finally { entryMimsSyncApplyingRemote=false; }
 }
 function entryMimsSyncStartListening(circleId){
