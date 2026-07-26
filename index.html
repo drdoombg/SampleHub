@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
 <script type="module">
@@ -557,6 +557,23 @@
     color:var(--ink-dim); border-bottom:1px solid var(--line); }
   .entry-table td { padding:7px 6px; border-bottom:1px solid var(--line); font-size:11.5px; overflow:hidden;
     text-overflow:ellipsis; white-space:nowrap; }
+  /* Scroll container so the table header can stick while the body scrolls —
+     radius moves onto the wrapper since border-radius + sticky thead don't
+     combine cleanly on the table itself. */
+  .entry-table-scroll { max-height:60vh; overflow-y:auto; border:1px solid var(--line); border-radius:12px; }
+  .entry-table-scroll .entry-table { border:none; border-radius:0; }
+  .entry-table-scroll thead th { position:sticky; top:0; z-index:2; box-shadow:0 1px 0 var(--line); }
+  /* Select mode: toggle button + bulk action bar that appears once records are picked. */
+  .entry-select-bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px; flex-wrap:wrap; }
+  .entry-select-toggle { background:var(--panel-2); color:var(--ink-dim); border:1px solid var(--line);
+    border-radius:8px; padding:7px 14px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .entry-select-toggle.on { background:rgba(242,160,61,.14); color:var(--weekly); border-color:rgba(242,160,61,.4); }
+  .entry-bulk-actions { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--ink-dim); flex-wrap:wrap; }
+  .entry-bulk-actions.hidden { display:none; }
+  tr.entry-row-selected td { background:rgba(242,160,61,.10); }
+  tr.entry-row-selected td:first-child { box-shadow:inset 3px 0 0 var(--weekly); }
+  .entry-time-btn { background:none; border:none; color:var(--ink-dim); font-family:inherit; font-size:11.5px;
+    padding:0; cursor:pointer; text-decoration:underline; text-decoration-style:dotted; }
   .entry-suggest-badge { display:inline-block; font-size:11px; padding:3px 9px; border-radius:6px; margin-bottom:8px;
     background:var(--panel-2); border:1px solid var(--line); color:var(--ink-dim); }
   .entry-suggest-badge.wk { color:var(--weekly); border-color:#6b5510; background:#241d08; }
@@ -896,7 +913,7 @@
       <div class="entry-row-two">
         <div>
           <label>Entries</label>
-          <input id="entryFEntries" type="number" min="1" value="1" readonly>
+          <input id="entryFEntries" type="number" min="1" value="1" inputmode="numeric">
         </div>
         <div>
           <label>Barcode (if any)</label>
@@ -924,7 +941,15 @@
     <!-- Simplified: today's count is now the little pill on the # column header,
          instead of the removed "Today's sequence" line above the table. -->
     <div id="entrySimplifiedWrap">
-      <div id="entryRecordsWrap">
+      <div class="entry-select-bar">
+        <button class="entry-select-toggle" id="entryBtnSelectMode">Select</button>
+        <div class="entry-bulk-actions hidden" id="entryBulkActions">
+          <span id="entrySelectCount">0 selected</span>
+          <button class="btn ghost" id="entryBtnBulkDate" style="padding:6px 12px; font-size:12px;">Set dates</button>
+          <button class="btn ghost" id="entryBtnSelectCancel" style="padding:6px 12px; font-size:12px;">Cancel</button>
+        </div>
+      </div>
+      <div id="entryRecordsWrap" class="entry-table-scroll">
         <table class="entry-table">
           <colgroup>
             <col style="width:9%"><col style="width:19%"><col style="width:34%">
@@ -934,6 +959,30 @@
           <tbody id="entryTbody"></tbody>
         </table>
         <div class="empty" id="entryEmpty">No records yet.</div>
+      </div>
+    </div>
+
+    <!-- Bulk Kill Date / Pack Date sheet — applies to every currently-selected record at once. -->
+    <div class="card-like hidden" id="entryBulkDateCard">
+      <label>Kill date (applies to all selected)</label>
+      <input type="date" id="entryBulkKillDate">
+      <label style="margin-top:10px">Pack date (applies to all selected)</label>
+      <input type="date" id="entryBulkPackDate">
+      <div class="sheet-actions">
+        <button class="btn ghost" id="entryBulkDateCancel">Cancel</button>
+        <button class="btn primary" id="entryBulkDateApply">Apply to selection</button>
+      </div>
+    </div>
+
+    <!-- Single-record time edit sheet. For Caeca/Neck units the field takes
+         HH:MM (e.g. 14:52); every other unit takes HHMM (e.g. 1452), matching
+         the export format used everywhere else. -->
+    <div class="card-like hidden" id="entryTimeEditCard">
+      <label id="entryTimeEditLabel">Time</label>
+      <input type="text" id="entryTimeEditInput" inputmode="numeric" placeholder="1452" maxlength="5">
+      <div class="sheet-actions">
+        <button class="btn ghost" id="entryTimeEditCancel">Cancel</button>
+        <button class="btn primary" id="entryTimeEditApply">Save time</button>
       </div>
     </div>
 
@@ -7507,9 +7556,27 @@ function entryShowConfirm(sug){
 function entrySetCat(cat){
   entryPending.cat=cat;
   document.querySelectorAll('.entry-catbtn').forEach(b=>b.classList.toggle('sel', b.dataset.cat===cat));
-  entryPending.entries = (cat==='Category 4'||cat==='Category 5') ? 5 : 1;
-  document.getElementById('entryFEntries').value=entryPending.entries;
+  const entriesInput = document.getElementById('entryFEntries');
+  const isManual = (cat==='Category 4'||cat==='Category 5');
+  if(isManual){
+    entryPending.entries = 5;
+    entriesInput.value = 5;
+    entriesInput.disabled = true;
+  } else {
+    // Daily/Weekly/Monthly: leave whatever count is already typed in place
+    // (don't stomp a value the person just entered), default to 1 only if
+    // nothing sensible is set yet.
+    entriesInput.disabled = false;
+    if(!entryPending.entries || entryPending.entries===5){ entryPending.entries=1; }
+    entriesInput.value = entryPending.entries;
+  }
 }
+// Keep entryPending.entries in sync as the person types, with a sane floor of 1.
+document.getElementById('entryFEntries').addEventListener('input', e=>{
+  if(e.target.disabled) return;
+  const v = parseInt(e.target.value, 10);
+  entryPending.entries = (v && v>=1) ? v : 1;
+});
 document.querySelectorAll('.entry-catbtn').forEach(b=>{
   b.addEventListener('click', ()=>entrySetCat(b.dataset.cat));
 });
@@ -7689,28 +7756,157 @@ const entryFmtTime = d=>{ const x=new Date(d); const p=n=>String(n).padStart(2,'
 const entryFmtDateShort = d=>{ const x=new Date(d); const p=n=>String(n).padStart(2,'0');
   return `${p(x.getDate())}/${p(x.getMonth()+1)}`; };
 
+/* ---------- Records: Select mode + range-select + bulk date edit ---------- */
+let entrySelectMode=false;
+let entrySelectedNums=new Set();   // set of r.num values, not array indices — stable across re-sorts
+let entrySelectAnchorNum=null;     // the first tap in a tap-first/tap-second range selection
+
+function entryRenderSimplifiedRow(r){
+  const timeLabel = r.timeOverride ? r.timeOverride : entryFmtTime(r.time);
+  const timeEditable = `<button type="button" class="entry-time-btn" data-entrytimeedit="${r.num}">${esc(timeLabel)}</button>`;
+  const selected = entrySelectedNums.has(r.num);
+  return `<tr class="${selected?'entry-row-selected':''}" data-entrynum="${r.num}">
+    <td class="mono">${r.num}</td>
+    <td class="mono">${esc(r.barcode||'—')}</td>
+    <td>${esc(r.desc)}</td>
+    <td>${(r.cat||'').replace('Category ','C')}</td>
+    <td class="mono">${entryFmtDateShort(r.time)}</td>
+    <td class="mono">${timeEditable}</td>
+    <td>${entrySelectMode ? '' : `<button class="sched-del" data-entrydel="${entryRecords.indexOf(r)}">✕</button>`}</td>
+  </tr>`;
+}
+
 function renderEntrySimplified(){
   const sorted=[...entryRecords].sort((a,b)=>a.num-b.num);
   document.getElementById('entryEmpty').style.display=sorted.length?'none':'block';
-  document.getElementById('entryTbody').innerHTML=sorted.map(r=>{
-    const i=entryRecords.indexOf(r);
-    return `<tr>
-      <td class="mono">${r.num}</td>
-      <td class="mono">${esc(r.barcode||'—')}</td>
-      <td>${esc(r.desc)}</td>
-      <td>${(r.cat||'').replace('Category ','C')}</td>
-      <td class="mono">${entryFmtDateShort(r.time)}</td>
-      <td class="mono">${entryFmtTime(r.time)}</td>
-      <td><button class="sched-del" data-entrydel="${i}">✕</button></td>
-    </tr>`;
-  }).join('');
+  document.getElementById('entryTbody').innerHTML=sorted.map(entryRenderSimplifiedRow).join('');
+  entryUpdateBulkBar();
 }
+function entryUpdateBulkBar(){
+  const bar=document.getElementById('entryBulkActions');
+  const n=entrySelectedNums.size;
+  document.getElementById('entrySelectCount').textContent = n+' selected';
+  bar.classList.toggle('hidden', n===0);
+}
+
+document.getElementById('entryBtnSelectMode').addEventListener('click', ()=>{
+  entrySelectMode = !entrySelectMode;
+  document.getElementById('entryBtnSelectMode').classList.toggle('on', entrySelectMode);
+  if(!entrySelectMode){ entrySelectedNums.clear(); entrySelectAnchorNum=null; }
+  renderEntrySimplified();
+});
+document.getElementById('entryBtnSelectCancel').addEventListener('click', ()=>{
+  entrySelectedNums.clear(); entrySelectAnchorNum=null;
+  renderEntrySimplified();
+});
+
 document.getElementById('entryTbody').addEventListener('click', e=>{
-  const btn=e.target.closest('[data-entrydel]'); if(!btn) return;
-  const i=+btn.dataset.entrydel;
-  if(confirm('Delete record #'+entryRecords[i].num+'?')){
-    entryRecords.splice(i,1); entrySaveLocal(); renderEntryAll();
+  // Delete button (only present outside select mode)
+  const delBtn=e.target.closest('[data-entrydel]');
+  if(delBtn){
+    const i=+delBtn.dataset.entrydel;
+    if(confirm('Delete record #'+entryRecords[i].num+'?')){
+      entryRecords.splice(i,1); entrySaveLocal(); renderEntryAll();
+    }
+    return;
   }
+  // Per-record time edit button
+  const timeBtn=e.target.closest('[data-entrytimeedit]');
+  if(timeBtn){
+    entryOpenTimeEdit(+timeBtn.dataset.entrytimeedit);
+    return;
+  }
+  // Row tap in select mode: tap-first / tap-second range select.
+  if(entrySelectMode){
+    const tr=e.target.closest('tr[data-entrynum]'); if(!tr) return;
+    const num=+tr.dataset.entrynum;
+    if(entrySelectAnchorNum===null){
+      // First tap: select just this row, remember it as the range anchor.
+      entrySelectedNums.clear();
+      entrySelectedNums.add(num);
+      entrySelectAnchorNum=num;
+    } else {
+      // Second tap: select everything between anchor and this row (inclusive),
+      // by displayed order, then reset the anchor so a third tap starts fresh.
+      const sorted=[...entryRecords].sort((a,b)=>a.num-b.num).map(r=>r.num);
+      const iA=sorted.indexOf(entrySelectAnchorNum), iB=sorted.indexOf(num);
+      const [lo,hi] = iA<iB ? [iA,iB] : [iB,iA];
+      entrySelectedNums.clear();
+      for(let i=lo;i<=hi;i++) entrySelectedNums.add(sorted[i]);
+      entrySelectAnchorNum=null;
+    }
+    renderEntrySimplified();
+  }
+});
+
+/* ---------- Bulk Kill Date / Pack Date ---------- */
+document.getElementById('entryBtnBulkDate').addEventListener('click', ()=>{
+  if(!entrySelectedNums.size) return;
+  document.getElementById('entryBulkDateCard').classList.remove('hidden');
+  document.getElementById('entryBulkDateCard').scrollIntoView({behavior:'smooth', block:'nearest'});
+});
+document.getElementById('entryBulkDateCancel').addEventListener('click', ()=>{
+  document.getElementById('entryBulkDateCard').classList.add('hidden');
+});
+document.getElementById('entryBulkDateApply').addEventListener('click', ()=>{
+  const kd=document.getElementById('entryBulkKillDate').value;
+  const pd=document.getElementById('entryBulkPackDate').value;
+  if(!kd && !pd){ alert('Set a kill date or pack date first.'); return; }
+  entryRecords.forEach(r=>{
+    if(!entrySelectedNums.has(r.num)) return;
+    if(kd) r.kdate = kd+'T00:00:00';
+    if(pd) r.pdate = pd+'T00:00:00';
+  });
+  entrySaveLocal();
+  document.getElementById('entryBulkDateCard').classList.add('hidden');
+  document.getElementById('entryBulkKillDate').value='';
+  document.getElementById('entryBulkPackDate').value='';
+  entrySelectedNums.clear(); entrySelectAnchorNum=null;
+  renderEntryAll();
+});
+
+/* ---------- Single-record time edit ----------
+   Caeca/Neck units: HH:MM (matches the export's actual MANUFTIME format for
+   those two units). Everything else: HHMM digits-only, same as the rest of
+   the export. */
+let entryTimeEditNum=null;
+function entryOpenTimeEdit(num){
+  const r = entryRecords.find(x=>x.num===num); if(!r) return;
+  entryTimeEditNum = num;
+  const isCN = entryIsCaecaNeck(r);
+  document.getElementById('entryTimeEditLabel').textContent = isCN ? 'Time (HH:MM)' : 'Time (HHMM)';
+  const input = document.getElementById('entryTimeEditInput');
+  input.placeholder = isCN ? '14:52' : '1452';
+  input.value = r.timeOverride || (isCN ? entryFmtTime(r.time) : entryFmtHHMM(new Date(r.time)));
+  document.getElementById('entryTimeEditCard').classList.remove('hidden');
+  document.getElementById('entryTimeEditCard').scrollIntoView({behavior:'smooth', block:'nearest'});
+  input.focus();
+}
+document.getElementById('entryTimeEditCancel').addEventListener('click', ()=>{
+  document.getElementById('entryTimeEditCard').classList.add('hidden');
+  entryTimeEditNum=null;
+});
+document.getElementById('entryTimeEditApply').addEventListener('click', ()=>{
+  const r = entryRecords.find(x=>x.num===entryTimeEditNum); if(!r) return;
+  const isCN = entryIsCaecaNeck(r);
+  let v = document.getElementById('entryTimeEditInput').value.trim();
+  if(isCN){
+    // Accept "1452" or "14:52" typed in, normalize to HH:MM.
+    const digits = v.replace(/[^0-9]/g,'');
+    if(digits.length!==4){ alert('Enter a 4-digit time, e.g. 1452 for 14:52.'); return; }
+    v = digits.slice(0,2)+':'+digits.slice(2);
+  } else {
+    const digits = v.replace(/[^0-9]/g,'');
+    if(digits.length!==4){ alert('Enter a 4-digit time, e.g. 1452.'); return; }
+    v = digits;
+  }
+  const hh = parseInt(v.slice(0,2),10), mm = parseInt(v.slice(isCN?3:2),10);
+  if(hh>23 || mm>59){ alert('Not a valid 24-hour time.'); return; }
+  r.timeOverride = v;
+  entrySaveLocal();
+  document.getElementById('entryTimeEditCard').classList.add('hidden');
+  entryTimeEditNum=null;
+  renderEntryAll();
 });
 document.getElementById('entryBtnWipe').addEventListener('click', ()=>{
   if(confirm('Delete ALL Entry records and reset Weekly/Monthly ticks for this tab? This cannot be undone.')){
@@ -7883,11 +8079,26 @@ function entryBuildSisRow(r){
     row.DESCRIPTN=r.desc; row.BARCODE=r.barcode||'';
     row.SHIFT = r.cat==='Category 2'?'Weekly': r.cat==='Category 3'?'Monthly':'Daily';
   }
-  row.KILLDATE=kdpd; row.PACKDATE=kdpd; row.MANUFTIME=entryFmtHHMM(now);
+  // Manual overrides win over the auto-computed values — set via the bulk
+  // date editor (kdate/pdate) or the per-record time editor (timeOverride)
+  // in the Records tab.
+  row.KILLDATE = r.kdate ? entryFmtDateUK(r.kdate) : kdpd;
+  row.PACKDATE = r.pdate ? entryFmtDateUK(r.pdate) : kdpd;
+  row.MANUFTIME = r.timeOverride ? r.timeOverride.replace(':','') : entryFmtHHMM(now);
   row.ORDER=r.cat; row.SAMPCOUNT=String(r.num); row.SAMDATE=entryFmtDateUK(new Date());
   row.SAMBY = localStorage.getItem('unified.samplerName') || 'Sampler';
-  row.CLIENT='SIS'; row.MANUFDATE=kdpd;
+  row.CLIENT='SIS'; row.MANUFDATE=row.KILLDATE;
   return row;
+}
+// Is this record a Caeca/Neck unit? Those get the export's actual MANUFTIME
+// column formatted with a colon (14:52); everything else is digits-only (1452).
+function entryRecordUnit(r){
+  const mimsRow = r.barcode ? entryMimsRowFor(r.barcode) : r.mimsRow;
+  return (mimsRow && mimsRow.unit) || (r.tmpl && r.tmpl.unit) || '';
+}
+function entryIsCaecaNeck(r){
+  const u = entryRecordUnit(r).toLowerCase();
+  return u==='caeca' || u==='neck';
 }
 function entryExportSis(){
   if(!entryRecords.length){ alert('Nothing to export yet.'); return; }
@@ -7896,15 +8107,40 @@ function entryExportSis(){
   const aoa=[ENTRY_SIS_HEADERS, ...rows.map(r=>ENTRY_SIS_HEADERS.map(h=>r[h]))];
   const ws=XLSX.utils.aoa_to_sheet(aoa);
   const range=XLSX.utils.decode_range(ws['!ref']);
-  for(let R=1;R<=range.e.r;R++) for(let C=0;C<=range.e.c;C++){
-    const addr=XLSX.utils.encode_cell({r:R,c:C}); const cell=ws[addr];
-    if(cell && cell.v!=='' && typeof cell.v==='number'){ cell.t='s'; cell.v=String(cell.v); }
+
+  // Arial 8pt everywhere, yellow header row (matches the reference SIS_Micro_Sub
+  // layout), and every column sized to fit its own content so nothing is
+  // clipped or hidden behind a fixed cell size.
+  const FONT = {name:'Arial', sz:8};
+  const HEADER_FILL = {fgColor:{rgb:'FFFF00'}};
+  const colWidths = ENTRY_SIS_HEADERS.map(h => Math.max(h.length, 8));
+
+  for(let R=0; R<=range.e.r; R++){
+    for(let C=0; C<=range.e.c; C++){
+      const addr=XLSX.utils.encode_cell({r:R,c:C});
+      const cell=ws[addr];
+      if(!cell) continue;
+      if(cell.v!=='' && typeof cell.v==='number'){ cell.t='s'; cell.v=String(cell.v); }
+      cell.s = R===0
+        ? { font:{...FONT, bold:true}, fill:HEADER_FILL, alignment:{vertical:'center'} }
+        : { font:FONT, alignment:{vertical:'center'} };
+      // Track the widest actual value per column so the sheet ships with
+      // every cell's text visible rather than a uniform guessed width.
+      const len = String(cell.v ?? '').length;
+      if(len+2 > colWidths[C]) colWidths[C] = len+2;
+    }
   }
+  ws['!cols'] = colWidths.map(w => ({wch: Math.min(w, 40)}));
+  ws['!rows'] = [{hpt:16}]; // slightly taller header row
+
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Submission');
   const now=new Date(); const p=n=>String(n).padStart(2,'0');
   const stamp=`${p(now.getDate())}${p(now.getMonth()+1)}${now.getFullYear()}${p(now.getHours())}${p(now.getMinutes())}`;
-  XLSX.writeFile(wb, `SIS_Micro_Sub_${stamp}.xls`, {bookType:'biff8'});
+  // .xlsx, not the old .xls/biff8 binary format — biff8 carries no cell
+  // styling at all, which is why previous exports always looked plain
+  // regardless of what was attempted here. .xlsx opens the same in Excel.
+  XLSX.writeFile(wb, `SIS_Micro_Sub_${stamp}.xlsx`, {bookType:'xlsx'});
 }
 document.getElementById('entryBtnExport').addEventListener('click', entryExportSis);
 
