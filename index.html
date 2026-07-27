@@ -720,6 +720,14 @@
 
   .entry-export-scroll { overflow:auto; max-height:65vh; -webkit-overflow-scrolling:touch;
     border-radius:12px; border:1px solid var(--line); }
+  /* Cells that contain a [Enter]-style placeholder from MIMS get a distinct
+     tint so the person can spot everything that still needs a manual fill
+     at a glance. Once filled, the tint switches to a "done" green so they
+     don't get re-edited by accident. Both variants remain click-editable. */
+  .entry-export-manual-empty { background:rgba(242,160,61,.18) !important; cursor:text; }
+  .entry-export-manual-filled { background:rgba(56,191,138,.14) !important; cursor:text; }
+  .entry-export-inline-input { width:100%; box-sizing:border-box; font-family:inherit; font-size:11.5px;
+    background:var(--panel); color:var(--ink); border:1px solid var(--done); border-radius:4px; padding:4px 6px; }
   .entry-export-scroll .entry-table { border:none; border-radius:0; border-collapse:separate; border-spacing:0; overflow:visible; }
   .entry-export-scroll thead { position:sticky; top:0; z-index:5; }
   .entry-export-scroll thead th { position:sticky; top:0; z-index:5;
@@ -992,6 +1000,8 @@
     <!-- Confirm card. Hidden by default; only appears once a scan or a search
          has produced a candidate, exactly like Sample Scanner. -->
     <div class="card-like hidden" id="entryConfirmCard">
+      <div id="entryJumpReplaceBadge" class="entry-suggest-badge hidden"
+           style="background:#7a4b1a; color:#ffd8b3; margin-bottom:8px;"></div>
       <div id="entrySuggestBadge"></div>
       <label>Description</label>
       <input id="entryFDesc" readonly>
@@ -1066,6 +1076,7 @@
       <div id="entryNightHygieneEntries" class="hidden" style="max-height:340px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:2px 0; margin-top:4px;"></div>
       <div class="sheet-actions" style="margin-top:14px;">
         <button class="btn ghost hidden" id="entryNightHygieneBack">← Back to letters</button>
+        <button class="btn ghost hidden" id="entryNightHygieneToggleView">Grid view</button>
         <button class="btn ghost" id="entryNightHygieneClose">Done</button>
       </div>
     </div>
@@ -1090,7 +1101,9 @@
         <div class="entry-bulk-actions hidden" id="entryBulkActions">
           <span id="entrySelectCount">0 selected</span>
           <button class="btn ghost" id="entryBtnBulkDate" style="padding:6px 12px; font-size:12px;">Edit date</button>
-          <button class="btn ghost" id="entryBtnBulkTime" style="padding:6px 12px; font-size:12px;">Edit time</button>
+          <button class="btn ghost" id="entryBtnBulkTime" style="padding:6px 12px; font-size:12px;">Edit time (each)</button>
+          <button class="btn ghost" id="entryBtnBulkTimeAll" style="padding:6px 12px; font-size:12px;">Set all times</button>
+          <button class="btn ghost" id="entryBtnBulkDelete" style="padding:6px 12px; font-size:12px; color:#ff9b9b;">Delete selected</button>
           <button class="btn ghost" id="entryBtnSelectCancel" style="padding:6px 12px; font-size:12px;">Cancel</button>
         </div>
       </div>
@@ -2212,6 +2225,104 @@ const MIMS_SEED = [
  {"barcode": "MIMS_0871", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "Hot cooked Fresh Whole Bird", "size": "Various", "retailer": "Booth", "shift": "Daily", "line": "", "other_id": "Fresh Pack 1", "suite": "2SP163", "price": 1.08, "order": "", "batch": "", "eol": "N", "_syn": true},
  {"barcode": "MIMS_0872", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "Hot cooked Fresh Whole Bird", "size": "Various", "retailer": "Booth", "shift": "Monthly", "line": "", "other_id": "Fresh Pack 1", "suite": "2SP080", "price": 11.93, "order": "", "batch": "", "eol": "Y", "_syn": true}
 ];const TEMPLATES_SEED = [];
+const UB_RULES = [
+ {"customer": "Aldi", "product": "Breast Fillet", "weight": "300", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Breast Fillet", "weight": "650", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Breast Fillet", "weight": "850-1000", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Breast Fillet", "weight": "1 kg", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Breast Fillet", "weight": "2 kg", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Breast Fillet", "weight": "2.5 kg", "days": 8, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Mini Fillet (Inner)", "weight": "400", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Mini Fillet (Inner)", "weight": "600", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Mini Fillet (Inner)", "weight": "900", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Diced Breast", "weight": "400", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Diced Breast", "weight": "600", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Diced Breast", "weight": "1.5 kg", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Drumsticks", "weight": "1 kg", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Drumsticks", "weight": "2 kg", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Drum Fillet", "weight": "600", "days": 9, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Drum Fillet", "weight": "900", "days": 9, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Oyster Thighs", "weight": "1 kg", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Thigh Fillet", "weight": "600", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Thigh Fillet", "weight": "900", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Oyster Legs", "weight": "1 kg", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Breast Sizzler", "weight": "500", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Breast Pieces", "weight": "500", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Wings", "weight": "1 kg", "days": 10, "source": "Cutting"},
+ {"customer": "Aldi", "product": "Wings", "weight": "2 kg", "days": 8, "source": "Cutting"},
+ {"customer": "Tesco", "product": "Breast Fillet", "weight": "320", "days": 9, "source": "Cutting"},
+ {"customer": "Tesco", "product": "Breast Fillet", "weight": "580", "days": 10, "source": "Cutting"},
+ {"customer": "Tesco", "product": "Breast Fillet", "weight": "650", "days": 9, "source": "Cutting"},
+ {"customer": "Tesco", "product": "Breast Fillet", "weight": "1 kg", "days": 9, "source": "Cutting"},
+ {"customer": "Tesco", "product": "Breast Fillet", "weight": "1.6", "days": 9, "source": "Cutting"},
+ {"customer": "Tesco", "product": "Mini Fillet (Inner)", "weight": "400", "days": 10, "source": "Cutting"},
+ {"customer": "Tesco", "product": "Mini Fillet (Inner)", "weight": "650", "days": 10, "source": "Cutting"},
+ {"customer": "Tesco", "product": "Diced Breast", "weight": "400", "days": 9, "source": "Cutting"},
+ {"customer": "Tesco", "product": "Diced Breast", "weight": "650", "days": 9, "source": "Cutting"},
+ {"customer": "Tesco", "product": "Drumsticks", "weight": "1 kg", "days": 10, "source": "Cutting"},
+ {"customer": "Tesco", "product": "Oyster Thighs", "weight": "600", "days": 10, "source": "Cutting"},
+ {"customer": "Tesco", "product": "Oyster Thighs", "weight": "1 kg", "days": 9, "source": "Cutting"},
+ {"customer": "Tesco", "product": "Thigh Fillet", "weight": "600", "days": 9, "source": "Cutting"},
+ {"customer": "Tesco", "product": "Oyster Legs", "weight": "1 kg", "days": 10, "source": "Cutting"},
+ {"customer": "Tesco", "product": "Wings", "weight": "1 kg", "days": 10, "source": "Cutting"},
+ {"customer": "Iceland", "product": "Oyster Legs", "weight": "1 kg", "days": 10, "source": "Cutting"},
+ {"customer": "CO-OP", "product": "Breast Fillet", "weight": "300", "days": 10, "source": "Cutting"},
+ {"customer": "CO-OP", "product": "Breast Fillet", "weight": "580", "days": 10, "source": "Cutting"},
+ {"customer": "CO-OP", "product": "Breast Fillet", "weight": "850", "days": 10, "source": "Cutting"},
+ {"customer": "CO-OP", "product": "Mini Fillet", "weight": "400", "days": 10, "source": "Cutting"},
+ {"customer": "CO-OP", "product": "Diced Breast", "weight": "400", "days": 10, "source": "Cutting"},
+ {"customer": "CO-OP", "product": "Breast Strips", "weight": "250", "days": 10, "source": "Cutting"},
+ {"customer": "CO-OP", "product": "Oyster Thigh", "weight": "600", "days": 10, "source": "Cutting"},
+ {"customer": "CO-OP", "product": "Thigh Fillet", "weight": "500", "days": 10, "source": "Cutting"},
+ {"customer": "CO-OP", "product": "Drumsticks", "weight": "750", "days": 10, "source": "Cutting"},
+ {"customer": "CO-OP", "product": "Drum Fillet", "weight": "450", "days": 9, "source": "Cutting"},
+ {"customer": "CO-OP", "product": "Wings", "weight": "775", "days": 10, "source": "Cutting"},
+ {"customer": "ALDI", "product": "Medium", "weight": "1400-1800", "days": 10, "source": "FP1"},
+ {"customer": "ALDI", "product": "Large", "weight": "1700-1999", "days": 10, "source": "FP1"},
+ {"customer": "ALDI", "product": "Extra Large", "weight": "2000-2300", "days": 10, "source": "FP1"},
+ {"customer": "ASDA", "product": "Whole Chicken", "weight": "1200-2500", "days": 10, "source": "FP1"},
+ {"customer": "ASDA", "product": "Medium", "weight": "1450-1690", "days": 10, "source": "FP1"},
+ {"customer": "ASDA", "product": "Large", "weight": "1700-1900", "days": 10, "source": "FP1"},
+ {"customer": "ASDA", "product": "Extra Large", "weight": "1900-2300", "days": 10, "source": "FP1"},
+ {"customer": "Iceland", "product": "Small", "weight": "1100-1300", "days": 10, "source": "FP1"},
+ {"customer": "Iceland", "product": "Medium", "weight": "1300-1700", "days": 10, "source": "FP1"},
+ {"customer": "Iceland", "product": "Large", "weight": "1700-2200", "days": 10, "source": "FP1"},
+ {"customer": "Ocado", "product": "Medium", "weight": "1400-1600", "days": 9, "source": "FP1"},
+ {"customer": "Ocado", "product": "Large", "weight": "1600-1900", "days": 9, "source": "FP1"},
+ {"customer": "Ocado", "product": "Extra Large", "weight": "1900-22005", "days": 8, "source": "FP1"},
+ {"customer": "Co-op", "product": "Large", "weight": "1500-1900", "days": 10, "source": "FP1"},
+ {"customer": "Co-op", "product": "Extra Large", "weight": "1910-2300", "days": 10, "source": "FP1"},
+ {"customer": "Costco", "product": "Twin Pack", "weight": "3400-4200", "days": 8, "source": "FP1"},
+ {"customer": "ALDI", "product": "Extra Tasty", "weight": "1600-1900", "days": 10, "source": "FP2"},
+ {"customer": "ALDI", "product": "PSO", "weight": "1600-1900", "days": 10, "source": "FP2"},
+ {"customer": "ALDI", "product": "Spatchcock Garlic and Herb", "weight": "1100-1296", "days": 10, "source": "FP2"},
+ {"customer": "ALDI", "product": "Spatchcock Rotisserie", "weight": "1100-1315", "days": 10, "source": "FP2"},
+ {"customer": "ALDI", "product": "Spatchcock Chinese", "weight": "1150-1352", "days": 10, "source": "FP2"},
+ {"customer": "ASDA", "product": "Extra Tasty Small", "weight": "1250-1500", "days": 10, "source": "FP2"},
+ {"customer": "ASDA", "product": "Extra Tasty Large", "weight": "1600-1920", "days": 10, "source": "FP2"},
+ {"customer": "ASDA", "product": "PSO", "weight": "1600-1920", "days": 10, "source": "FP2"},
+ {"customer": "ASDA", "product": "Spatchcock Smoky BBQ", "weight": "1150-1300", "days": 10, "source": "FP2"},
+ {"customer": "ASDA", "product": "Spatchcock Lemon and Herb", "weight": "1128-1461", "days": 10, "source": "FP2"},
+ {"customer": "ASDA", "product": "Spatchcock Piri Piri", "weight": "1160-1460", "days": 10, "source": "FP2"},
+ {"customer": "Iceland", "product": "Extra Tasty Small", "weight": "1300-1700", "days": 9, "source": "FP2"},
+ {"customer": "Iceland", "product": "PSO", "weight": "1300-1700", "days": 9, "source": "FP2"},
+ {"customer": "Ocado", "product": "Extra Tasty", "weight": "1500-1800", "days": 10, "source": "FP2"},
+ {"customer": "Ocado", "product": "PSO", "weight": "1500-1800", "days": 10, "source": "FP2"},
+ {"customer": "Ocado", "product": "Garlic and Herb", "weight": "1800-2035", "days": 10, "source": "FP2"},
+ {"customer": "Ocado", "product": "Salt and Pepper Crown", "weight": "700-840", "days": 10, "source": "FP2"},
+ {"customer": "Co-op", "product": "Rotisserie", "weight": "1615-1831", "days": 10, "source": "FP2"},
+ {"customer": "Co-op", "product": "PSO", "weight": "1708-1953", "days": 10, "source": "FP2"},
+ {"customer": "M&S", "product": "Rotisserie", "weight": "1550-1860", "days": 8, "source": "FP2"},
+ {"customer": "M&S", "product": "PSO", "weight": "2458-2874", "days": 10, "source": "FP2"},
+ {"customer": "M&S", "product": "Garlic and Herb", "weight": "1395-1743", "days": 8, "source": "FP2"},
+ {"customer": "M&S", "product": "Salt and Pepper BDF", "weight": "2294-2694", "days": 8, "source": "FP2"},
+ {"customer": "M&S", "product": "Hot Honey BDF", "weight": "2373-2758", "days": 8, "source": "FP2"},
+ {"customer": "M&S", "product": "Spatchcock Sweet Smokey", "weight": "1530-1680", "days": 10, "source": "FP2"},
+ {"customer": "M&S", "product": "Rotisserie joint", "weight": "490-579", "days": 9, "source": "FP2"},
+ {"customer": "M&S", "product": "Butter Basted joint", "weight": "452-506", "days": 8, "source": "FP2"},
+ {"customer": "M&S", "product": "Butter Basted Deli (1.1", "weight": "1.3)", "days": 2, "source": "FP2"},
+ {"customer": "M&S", "product": "BBQ Deli (1.17", "weight": "1.1358)", "days": 9, "source": "FP2"}
+];
 const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#06231a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
 
 // Room order + labels. Display order follows this array.
@@ -3487,7 +3598,12 @@ function entryLookupMatches(p, q){
   const oid = (m.other_id||'').toLowerCase();
   const retail = (m.retailer||'').toLowerCase();
   const mat = (m.material||'').toLowerCase();
-  return line.includes(q) || oid.includes(q) || retail.includes(q) || mat.includes(q);
+  // Also let the person type frequency ("weekly") or a weight ("500g") and
+  // have the search narrow to matching rows — both are visible in the
+  // subtitle now, so it'd be jarring for them not to be searchable too.
+  const shift = (m.shift||'').toLowerCase();
+  const size = (m.size||'').toLowerCase();
+  return line.includes(q) || oid.includes(q) || retail.includes(q) || mat.includes(q) || shift.includes(q) || size.includes(q);
 }
 function entrySearchAll(q){
   q=q.trim().toLowerCase();
@@ -3542,13 +3658,19 @@ function entryResultSubtitle(p){
   const m = entryMimsRowFor(p.mimsBarcode || p.barcode || '');
   const retailer = (m && m.retailer) || '';
   const suite = (m && m.suite) || '';
+  const shift = (m && m.shift) || '';
+  const size = (m && m.size) || '';
   const barcodeText = p.barcode ? p.barcode : '';
   const isDup = entryDupNameSetGet().has((p.name||'').trim().toLowerCase());
-  // Bits, in order: barcode (if any), retailer, suite, then disambiguators
-  // only when the name is duplicated across multiple lookup entries.
+  // Bits, in order: barcode (if any), retailer, shift, size, suite, then
+  // disambiguators only when the name is duplicated across multiple lookup
+  // entries. Shift + size are the two extras — telling apart a Weekly 500g
+  // fillet from a Daily 300g one is the main reason to add them.
   const bits = [];
   if(barcodeText) bits.push(barcodeText);
   if(retailer) bits.push(retailer);
+  if(shift && shift !== '.') bits.push(shift);
+  if(size && size !== '.') bits.push(size);
   if(suite) bits.push(suite);
   if(isDup && m){
     // Material is the strongest signal (Hand Swab vs Investigation Swab for
@@ -3649,7 +3771,7 @@ const ENTRY_SWAB_MATRIX_PPE_ROOMS = [
 // record — the MIMS row itself isn't filtered on it. Used by the customer-
 // crate entries where every row hits the same MIMS row but the customer
 // varies (Tesco / KFC / M&S / Coop / Iceland / Ocado / Aldi).
-const ENTRY_SWAB_MATRIX_CRATE_CUSTOMERS = ['Tesco','KFC','M&S','Coop','Iceland','Ocado','Aldi'];
+const ENTRY_SWAB_MATRIX_CRATE_CUSTOMERS = ['Tesco','KFC','M&S','Coop','Iceland','Ocado','Aldi','Asda'];
 function entrySwabMatrixFixedItems(){
   const crates = ENTRY_SWAB_MATRIX_CRATE_CUSTOMERS.map(c => ({
     count:1, material:'Basket Swab', descrptn:'Customer Basket (Crate)',
@@ -3735,9 +3857,18 @@ function entrySwabMatrixGoStage3(){
     `Overall: <b>${esc(week.pair.join(' + '))}</b> · PPE room: <b>${esc(room)}</b>`;
   const total = items.reduce((s,i)=>s+i.count,0);
   document.getElementById('entrySwabMatrixReviewCount').textContent = total;
-  document.getElementById('entrySwabMatrixReviewList').innerHTML = items.map(it =>
-    `<div>${it.count}× ${esc(it.note || (it.material + ' — ' + (it.descrptn || '')))}${it.retailer?` <span style="color:var(--ink-dim)">· ${esc(it.retailer||'no retailer')}</span>`:''}</div>`
-  ).join('');
+  document.getElementById('entrySwabMatrixReviewList').innerHTML = items.map(it => {
+    // Body: note if present, else material/descrpton.
+    const body = esc(it.note || (it.material + ' — ' + (it.descrptn || '')));
+    // Extra bits after · — retailer (already shown) plus other_id, so
+    // packaging swabs read as "Product Packaging swabs · CO-OP · Fresh Pack 1"
+    // rather than the room being invisible.
+    const extras = [];
+    if(it.retailer) extras.push(it.retailer);
+    if(it.other_id) extras.push(it.other_id);
+    const tail = extras.length ? ` <span style="color:var(--ink-dim)">· ${esc(extras.join(' · '))}</span>` : '';
+    return `<div>${it.count}× ${body}${tail}</div>`;
+  }).join('');
 
   document.getElementById('entrySwabMatrixStage1').classList.add('hidden');
   document.getElementById('entrySwabMatrixStage2').classList.add('hidden');
@@ -3923,27 +4054,58 @@ function entryNightHygieneOpen(){
   document.getElementById('entryNightHygieneEntries').classList.add('hidden');
   document.getElementById('entryNightHygieneLetters').classList.remove('hidden');
   document.getElementById('entryNightHygieneBack').classList.add('hidden');
+  document.getElementById('entryNightHygieneToggleView').classList.add('hidden');
+  entryNhCurrentLetter = null;
   document.getElementById('entryNightHygieneTitle').textContent = 'Night Hygiene · pick a group';
   document.getElementById('entryNightHygieneCard').classList.remove('hidden');
   document.getElementById('entryNightHygieneCard').scrollIntoView({behavior:'smooth', block:'end'});
 }
+let entryNhViewMode = 'list';   // 'list' | 'grid'
+let entryNhCurrentLetter = null;
+
 function entryNightHygieneShowLetter(letter){
+  entryNhCurrentLetter = letter;
   const rows = entryNightHygieneRowsForLetter(letter);
   const el = document.getElementById('entryNightHygieneEntries');
-  el.innerHTML = rows.map(m =>
-    `<div class="entry-nh-row" data-nh-barcode="${esc(m.barcode)}">
-       <span class="entry-nh-line">${esc(m.line)}</span>
-       <span class="entry-nh-desc">${esc(m.descrptn || m.material || '(unnamed)')}${
-         m.other_id ? ` <span style="color:var(--ink-dim)">· ${esc(m.other_id)}</span>` : ''
-       }</span>
-       <span class="entry-nh-added" data-nh-count="${esc(m.barcode)}">${
-         entryNhAddedThisSession.get(m.barcode) ? `+${entryNhAddedThisSession.get(m.barcode)}` : ''
-       }</span>
-     </div>`
-  ).join('');
+  if(entryNhViewMode === 'grid'){
+    // Compact grid of LINE codes only — same picker-grid CSS the letters use,
+    // so the density matches. Tap adds the entry immediately; the "+N added"
+    // count is folded into the button label so nothing extra is needed.
+    el.classList.add('entry-nh-gridwrap');
+    el.innerHTML = rows.map(m => {
+      const added = entryNhAddedThisSession.get(m.barcode) || 0;
+      return `<button type="button" class="entry-picker-btn" data-nh-barcode="${esc(m.barcode)}">
+        ${esc(m.line)}${added?`<span class="sub" data-nh-count="${esc(m.barcode)}">+${added} added</span>`:`<span class="sub" data-nh-count="${esc(m.barcode)}"></span>`}
+      </button>`;
+    }).join('');
+    el.style.display = 'grid';
+    el.style.gridTemplateColumns = 'repeat(3, 1fr)';
+    el.style.gap = '8px';
+    el.style.padding = '8px';
+  } else {
+    el.classList.remove('entry-nh-gridwrap');
+    el.innerHTML = rows.map(m =>
+      `<div class="entry-nh-row" data-nh-barcode="${esc(m.barcode)}">
+         <span class="entry-nh-line">${esc(m.line)}</span>
+         <span class="entry-nh-desc">${esc(m.descrptn || m.material || '(unnamed)')}${
+           m.other_id ? ` <span style="color:var(--ink-dim)">· ${esc(m.other_id)}</span>` : ''
+         }</span>
+         <span class="entry-nh-added" data-nh-count="${esc(m.barcode)}">${
+           entryNhAddedThisSession.get(m.barcode) ? `+${entryNhAddedThisSession.get(m.barcode)}` : ''
+         }</span>
+       </div>`
+    ).join('');
+    el.style.display = '';
+    el.style.gridTemplateColumns = '';
+    el.style.gap = '';
+    el.style.padding = '';
+  }
   document.getElementById('entryNightHygieneLetters').classList.add('hidden');
   document.getElementById('entryNightHygieneEntries').classList.remove('hidden');
   document.getElementById('entryNightHygieneBack').classList.remove('hidden');
+  const toggleBtn = document.getElementById('entryNightHygieneToggleView');
+  toggleBtn.classList.remove('hidden');
+  toggleBtn.textContent = entryNhViewMode === 'grid' ? 'List view' : 'Grid view';
   document.getElementById('entryNightHygieneTitle').textContent = 'Night Hygiene · ' + letter;
 }
 function entryNightHygieneClose(){
@@ -3968,8 +4130,13 @@ function entryNightHygieneAddRow(barcode){
   renderEntryAll();
   // Update the row's added-count pill inline (no full re-render, so scroll
   // position and letter view are preserved for rapid tapping).
+  const count = entryNhAddedThisSession.get(barcode);
   const pill = document.querySelector(`[data-nh-count="${CSS.escape(barcode)}"]`);
-  if(pill) pill.textContent = '+' + entryNhAddedThisSession.get(barcode);
+  if(pill){
+    // In grid view the pill lives inside a picker button and shows "+N added";
+    // in list view it's a right-aligned "+N" tag. Match the surrounding style.
+    pill.textContent = entryNhViewMode === 'grid' ? `+${count} added` : `+${count}`;
+  }
 }
 document.getElementById('entryNightHygieneLetters').addEventListener('click', e=>{
   const b = e.target.closest('[data-nh-letter]'); if(!b) return;
@@ -3983,7 +4150,13 @@ document.getElementById('entryNightHygieneBack').addEventListener('click', ()=>{
   document.getElementById('entryNightHygieneEntries').classList.add('hidden');
   document.getElementById('entryNightHygieneLetters').classList.remove('hidden');
   document.getElementById('entryNightHygieneBack').classList.add('hidden');
+  document.getElementById('entryNightHygieneToggleView').classList.add('hidden');
+  entryNhCurrentLetter = null;
   document.getElementById('entryNightHygieneTitle').textContent = 'Night Hygiene · pick a group';
+});
+document.getElementById('entryNightHygieneToggleView').addEventListener('click', ()=>{
+  entryNhViewMode = entryNhViewMode === 'grid' ? 'list' : 'grid';
+  if(entryNhCurrentLetter) entryNightHygieneShowLetter(entryNhCurrentLetter);
 });
 document.getElementById('entryNightHygieneClose').addEventListener('click', entryNightHygieneClose);
 
@@ -4185,6 +4358,133 @@ document.getElementById('entryBtnCancel').addEventListener('click', ()=>{
 });
 
 /* ---------- commit ---------- */
+/* ---------- Cross-tab correlation helpers ----------
+   Same product name can appear in four places with slight variations:
+     - Routines / Shelf / Nutri tab   (state.products.name)
+     - Line Timeline QA import         (rooms[…].runs[…].productName)
+     - Entry lookup table              (entryLookup[…].name)
+     - MIMS catalogue                  (mims.descrptn)
+   The correlator normalises both sides (case-fold, punctuation strip,
+   drop weight tails / parentheticals) then scores by weighted signals:
+     +5  retailer / customer match
+     +4  exact normalised-name equality
+     +2  significant token overlap (≥50% of shorter side's tokens)
+     +2  weight/size digits appear in both names
+   Anything at or above 6 is accepted; below that, no match (better to
+   skip than to auto-tick the wrong item). */
+function entryCorrelateNormalise(s){
+  return String(s||'').toLowerCase()
+    .replace(/\([^)]*\)/g,' ')                          // "(Inner)" tails
+    .replace(/[.,;:/\\_\-]/g,' ')                        // punctuation → space
+    .replace(/\s+/g,' ').trim();
+}
+function entryCorrelateTokens(s){
+  const stop = new Set(['fresh','the','and','a','of','with','fillet','fillets']);
+  return entryCorrelateNormalise(s).split(' ').filter(t => t && !stop.has(t));
+}
+function entryCorrelateWeightDigits(s){
+  // Grab the first "500" / "1.5" / "2 kg" style number so a "500g breast"
+  // and "Breast Fillet 500" can match on weight even when the descriptions
+  // don't line up otherwise.
+  const m = String(s||'').match(/(\d+(?:[.,]\d+)?)\s*(?:kg|g|ml|l)?/i);
+  return m ? m[1].replace(',','.') : null;
+}
+function entryCorrelateScore(candidateName, candidateRetailer, targetName, targetRetailer, targetSize){
+  const cName = entryCorrelateNormalise(candidateName);
+  const tName = entryCorrelateNormalise(targetName);
+  if(!cName || !tName) return 0;
+  let score = 0;
+  const cRet = (candidateRetailer||'').toLowerCase();
+  const tRet = (targetRetailer||'').toLowerCase();
+  if(cRet && tRet){
+    if(cRet === tRet) score += 5;
+    else if(cRet.includes(tRet) || tRet.includes(cRet)) score += 4;
+  }
+  if(cName === tName) score += 4;
+  else {
+    const cT = entryCorrelateTokens(candidateName);
+    const tT = entryCorrelateTokens(targetName);
+    if(cT.length && tT.length){
+      const shorter = cT.length <= tT.length ? cT : tT;
+      const longer = cT.length <= tT.length ? tT : cT;
+      const overlap = shorter.filter(t => longer.includes(t)).length;
+      if(overlap >= Math.max(1, Math.ceil(shorter.length / 2))) score += 2;
+    }
+  }
+  const cW = entryCorrelateWeightDigits(candidateName);
+  const tW = entryCorrelateWeightDigits(targetName) || entryCorrelateWeightDigits(targetSize);
+  if(cW && tW && cW === tW) score += 2;
+  return score;
+}
+
+// Find a Routines product that plausibly matches the just-scanned entry.
+// Returns the state.products entry (with .id, .name, .customer, .freq) or
+// null. Threshold of 6 = at least name-overlap plus retailer match, or an
+// exact name equality alone.
+function entryFindRoutinesMatch(pending, mimsRow){
+  if(!state || !Array.isArray(state.products)) return null;
+  const targetName = (mimsRow && mimsRow.descrptn) || (pending && pending.desc) || '';
+  const targetRet  = (mimsRow && mimsRow.retailer) || (pending && pending.retailerOverride) || '';
+  const targetSize = (mimsRow && mimsRow.size) || '';
+  if(!targetName) return null;
+  let best = null, bestScore = 5; // strictly above 5 required
+  for(const prod of state.products){
+    if(prod.delisted) continue;
+    const score = entryCorrelateScore(prod.name, prod.customer, targetName, targetRet, targetSize);
+    if(score > bestScore){ bestScore = score; best = prod; }
+  }
+  return best;
+}
+
+// Same scoring engine, applied in reverse: given a record with a description
+// and (probably) a retailer/shift but NO MIMS join key, find the best MIMS
+// row to hitch it to so the export still gets PRODUCT / MATERIAL / SUITE.
+// Used from entryBuildSisRow as a fallback when direct lookup fails.
+function entryFindMimsByContext(rec){
+  if(!rec || !Array.isArray(entryMims) || !entryMims.length) return null;
+  const targetName = rec.desc || '';
+  const targetRet  = rec.retailerOverride || '';
+  if(!targetName) return null;
+  let best = null, bestScore = 5;
+  for(const m of entryMims){
+    if(!m.descrptn && !m.material) continue;
+    let score = entryCorrelateScore(m.descrptn || m.material || '', m.retailer || '', targetName, targetRet, '');
+    // A shift/frequency match is a strong extra signal for MIMS candidates,
+    // since the same product often appears at Daily + Weekly + Monthly rows
+    // that differ only by SUITE. Prefer the row whose shift matches the
+    // record's category.
+    const wantedShift = rec.cat==='Category 2' ? 'weekly'
+                       : rec.cat==='Category 3' ? 'monthly'
+                       : rec.cat==='Category 1' ? 'daily' : '';
+    if(wantedShift && (m.shift||'').toLowerCase() === wantedShift) score += 3;
+    if(score > bestScore){ bestScore = score; best = m; }
+  }
+  return best;
+}
+
+// Small non-blocking corner banner. Fades in for a couple of seconds then
+// out; multiple calls stack. Independent of any modal so it's safe to use
+// from anywhere.
+let entryToastTimer = null;
+function entryFlashToast(msg){
+  let el = document.getElementById('entryToast');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'entryToast';
+    el.style.cssText = 'position:fixed; left:50%; bottom:calc(140px + env(safe-area-inset-bottom));'
+      + ' transform:translateX(-50%); background:rgba(56,191,138,.95); color:#06231a;'
+      + ' padding:10px 16px; border-radius:10px; font-size:13px; font-weight:600;'
+      + ' font-family:inherit; box-shadow:0 4px 12px rgba(0,0,0,.3); z-index:9999;'
+      + ' opacity:0; transition:opacity .2s; pointer-events:none; max-width:80vw;'
+      + ' text-align:center;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(entryToastTimer);
+  entryToastTimer = setTimeout(()=>{ el.style.opacity = '0'; }, 2200);
+}
+
 function entryCommit(){
   if(!entryPending) return;
   const liveDesc = document.getElementById('entryFDesc').value.trim();
@@ -4193,6 +4493,18 @@ function entryCommit(){
   let n = entryOverrideNum || entryNextNumber();
   entryOverrideNum=null;
   document.getElementById('entryNextNumEdit').value='';
+  document.getElementById('entryJumpReplaceBadge').classList.add('hidden');
+  // Jump-to replace: if the person specifically jumped to an existing num
+  // (single-entry commit only), drop the current occupant first — the
+  // whole point of jump-to a used num is "this entry was wrong, put THIS
+  // in its place". Leave a tombstone so paired devices reflect the removal.
+  if(entryPending.entries === 1){
+    const existingIdx = entryRecords.findIndex(r => r.num === n);
+    if(existingIdx !== -1){
+      entryMarkDeleted([n]);
+      entryRecords.splice(existingIdx, 1);
+    }
+  }
 
   const now=new Date();
   const lookupEntry = entryPending.lookupEntry;
@@ -4218,6 +4530,26 @@ function entryCommit(){
   if(entryPending.barcode){
     if(entryPending.cat==='Category 2') entryTicks[entryPending.barcode]={freq:'weekly', period:weekKey()};
     if(entryPending.cat==='Category 3') entryTicks[entryPending.barcode]={freq:'monthly', period:monthKey()};
+  }
+  // Cross-tab correlation: if this scan corresponds to a Routines product
+  // that's currently unticked for the chosen frequency, tick it.
+  // See entryFindRoutinesMatch for the fuzzy join rules.
+  if(entryPending.cat === 'Category 2' || entryPending.cat === 'Category 3'){
+    const targetFreq = entryPending.cat === 'Category 2' ? 'weekly' : 'monthly';
+    const match = entryFindRoutinesMatch(entryPending, mimsRow);
+    if(match && !isDone(match.id, targetFreq)){
+      // Tick it. Uses the same state.ticks / tickDates the manual-tick path
+      // in the Routines tab uses, so it syncs across paired devices too.
+      const k = tickKey(match.id, targetFreq);
+      const period = targetFreq === 'weekly' ? weekKey() : monthKey();
+      state.ticks[k] = period;
+      state.tickDates[k] = new Date().toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
+      save();
+      // Small toast-ish flash so the person notices the auto-tick happened.
+      // Reuses the same corner banner mechanism the app already has (if any);
+      // fall back to console if not.
+      try{ entryFlashToast('Also ticked in Routines: ' + match.name); }catch(_e){}
+    }
   }
   if(!lookupEntry && entryPending.barcode && entryPending.desc){
     entryLookup.push({
@@ -4389,6 +4721,18 @@ document.getElementById('entryNextNumEdit').addEventListener('change', e=>{
   if(!v||v<1) return;
   entryOverrideNum=v;
   document.getElementById('entryNextNum').textContent=v;
+  // If a record with this num already exists, tell the user they're in
+  // replace mode. The next commit will overwrite it (single-entry commits
+  // only — a bulk commit that would spill into occupied nums still just
+  // adds, since silent multi-overwrite is a footgun).
+  const existing = entryRecords.find(r => r.num === v);
+  const badge = document.getElementById('entryJumpReplaceBadge');
+  if(existing){
+    badge.textContent = `Replaces #${v}: ${existing.desc || existing.barcode || 'record'}`;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
 });
 // Jump-to input hides itself once used or when it loses focus, so the compact
 // header goes back to just showing "Entry N" again.
@@ -4625,6 +4969,53 @@ document.getElementById('entryBtnBulkTime').addEventListener('click', ()=>{
   entryStartTimeLoop(nums, {withLine:false});
 });
 
+// "Set all times": one time value applied to every selected record in a
+// single tap — the common case of "all sampled at the same moment", where
+// walking the per-record keypad wizard would be wasted taps. Reuses the
+// single-record time edit card by planting the special sentinel value
+// '__BULK__' on entryTimeEditNum plus stashing the target nums; the Save
+// handler sees the sentinel and fans out to every num.
+let entryBulkTimeNums = null;
+document.getElementById('entryBtnBulkTimeAll').addEventListener('click', ()=>{
+  if(!entrySelectedNums.size) return;
+  const nums=[...entrySelectedNums].sort((a,b)=>a-b);
+  entryBulkTimeNums = nums;
+  entryTimeEditNum = '__BULK__';
+  // Format: HHMM digit-only unless every selected record is Caeca/Neck, in
+  // which case the whole batch takes HH:MM. Mixed batches default to HHMM.
+  const allCN = nums.every(n => {
+    const r = entryRecords.find(x=>x.num===n);
+    return r && entryIsCaecaNeck(r);
+  });
+  document.getElementById('entryTimeEditLabel').textContent =
+    allCN ? `Set time for ${nums.length} records (HH:MM)` : `Set time for ${nums.length} records (HHMM)`;
+  const input = document.getElementById('entryTimeEditInput');
+  input.placeholder = allCN ? '14:52' : '1452';
+  input.value = '';
+  document.getElementById('entryTimeEditCard').classList.remove('hidden');
+  document.getElementById('entryTimeEditCard').scrollIntoView({behavior:'smooth', block:'end'});
+  input.focus();
+});
+
+// "Delete selected": remove every selected record, leaving a tombstone per
+// num so the removal propagates across paired devices instead of resurrecting
+// on the next merge. Same guardrails as the single-record delete button.
+document.getElementById('entryBtnBulkDelete').addEventListener('click', ()=>{
+  if(!entrySelectedNums.size) return;
+  const nums=[...entrySelectedNums];
+  const count = nums.length;
+  if(!confirm(`Delete ${count} selected record${count===1?'':'s'}? This cannot be undone.`)) return;
+  entryMarkDeleted(nums);
+  const remove = new Set(nums);
+  entryRecords = entryRecords.filter(r => !remove.has(r.num));
+  entrySelectedNums.clear(); entrySelectAnchorNum=null;
+  // Also drop any timeOverride / kdate / pdate the deleted records had — the
+  // record itself is gone so those hangers-on are dead weight, and clearing
+  // them keeps the sync payload tidy.
+  entrySaveLocal();
+  renderEntryAll();
+});
+
 /* ---------- Single-record time edit ----------
    Caeca/Neck units: HH:MM (matches the export's actual MANUFTIME format for
    those two units). Everything else: HHMM digits-only, same as the rest of
@@ -4645,8 +5036,34 @@ function entryOpenTimeEdit(num){
 document.getElementById('entryTimeEditCancel').addEventListener('click', ()=>{
   document.getElementById('entryTimeEditCard').classList.add('hidden');
   entryTimeEditNum=null;
+  entryBulkTimeNums=null;
 });
 document.getElementById('entryTimeEditApply').addEventListener('click', ()=>{
+  // Bulk mode: applies the one entered time to every record in entryBulkTimeNums.
+  // Each record's own unit decides HH:MM vs HHMM formatting; input is always
+  // interpreted as 4 raw digits.
+  if(entryTimeEditNum === '__BULK__'){
+    const raw = document.getElementById('entryTimeEditInput').value.trim();
+    const digits = raw.replace(/[^0-9]/g,'');
+    if(digits.length!==4){ alert('Enter a 4-digit time, e.g. 1452 for 14:52.'); return; }
+    const hh = parseInt(digits.slice(0,2),10), mm = parseInt(digits.slice(2),10);
+    if(hh>23 || mm>59){ alert('Not a valid 24-hour time.'); return; }
+    const hhmm = digits;                 // "1452"
+    const hhcolonmm = digits.slice(0,2)+':'+digits.slice(2); // "14:52"
+    let touched = 0;
+    (entryBulkTimeNums||[]).forEach(num=>{
+      const rec = entryRecords.find(x=>x.num===num);
+      if(!rec) return;
+      rec.timeOverride = entryIsCaecaNeck(rec) ? hhcolonmm : hhmm;
+      touched++;
+    });
+    entryBulkTimeNums = null;
+    entryTimeEditNum = null;
+    entrySaveLocal();
+    document.getElementById('entryTimeEditCard').classList.add('hidden');
+    renderEntryAll();
+    return;
+  }
   const r = entryRecords.find(x=>x.num===entryTimeEditNum); if(!r) return;
   const isCN = entryIsCaecaNeck(r);
   let v = document.getElementById('entryTimeEditInput').value.trim();
@@ -4686,9 +5103,76 @@ function renderEntryExportView(){
   if(!sorted.length){ table.innerHTML='<tr><td>No records yet.</td></tr>'; return; }
   const rows=sorted.map(entryBuildSisRow);
   const thead='<thead><tr>'+ENTRY_SIS_HEADERS.map(h=>`<th>${h}</th>`).join('')+'</tr></thead>';
-  const tbody='<tbody>'+rows.map(r=>'<tr>'+ENTRY_SIS_HEADERS.map(h=>`<td>${esc(String(r[h]??''))}</td>`).join('')+'</tr>').join('')+'</tbody>';
+  // Each td carries data-num and data-h so the click handler can look up
+  // exactly which record + column was tapped. Cells that came from MIMS with
+  // [Enter]-style placeholders (or that carry an already-set manual override)
+  // get a distinct class so they're findable at a glance.
+  const tbody='<tbody>'+sorted.map((rec,ri)=>{
+    const r = rows[ri];
+    return '<tr>' + ENTRY_SIS_HEADERS.map(h=>{
+      const raw = String(r[h] ?? '');
+      const hasOverride = rec.manualCellOverrides && rec.manualCellOverrides[h] !== undefined;
+      const isPlaceholder = entryExportCellIsPlaceholder(raw);
+      const cls = hasOverride ? 'entry-export-manual-filled'
+                : isPlaceholder ? 'entry-export-manual-empty'
+                : '';
+      return `<td class="${cls}" data-num="${rec.num}" data-h="${h}">${esc(hasOverride ? rec.manualCellOverrides[h] : raw)}</td>`;
+    }).join('') + '</tr>';
+  }).join('')+'</tbody>';
   table.innerHTML=thead+tbody;
 }
+// Click-to-edit for cells in the export view. Any cell can be edited, but
+// placeholder / filled cells are the primary use case. Uses event delegation
+// so the handler survives re-renders.
+function entryExportCellIsPlaceholder(v){
+  if(!v) return false;
+  // [Enter], [ENTER PRODUCT NAME], [Save + ENTER], etc. — anything in square
+  // brackets is a MIMS field marked for manual filling.
+  return /\[[^\]]+\]/.test(v);
+}
+document.getElementById('entryExportTable').addEventListener('click', e=>{
+  const td = e.target.closest('td[data-num]');
+  if(!td) return;
+  // If the click landed inside an existing input, leave it alone.
+  if(e.target.tagName === 'INPUT') return;
+  const num = parseInt(td.dataset.num, 10);
+  const h = td.dataset.h;
+  const rec = entryRecords.find(r => r.num === num);
+  if(!rec) return;
+  const current = td.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'entry-export-inline-input';
+  input.value = current;
+  input.dataset.num = String(num);
+  input.dataset.h = h;
+  td.innerHTML = '';
+  td.appendChild(input);
+  input.focus();
+  input.select();
+  const commit = (save)=>{
+    const v = input.value;
+    if(save){
+      if(!rec.manualCellOverrides) rec.manualCellOverrides = {};
+      // Empty string on a filled cell means "clear the override", so the
+      // placeholder text comes back and the person can see it's un-filled.
+      if(v === ''){
+        delete rec.manualCellOverrides[h];
+        if(Object.keys(rec.manualCellOverrides).length === 0) delete rec.manualCellOverrides;
+      } else {
+        rec.manualCellOverrides[h] = v;
+      }
+      entrySaveLocal();
+    }
+    renderEntryExportView();
+  };
+  input.addEventListener('keydown', ev=>{
+    if(ev.key === 'Enter'){ ev.preventDefault(); commit(true); }
+    else if(ev.key === 'Escape'){ ev.preventDefault(); commit(false); }
+  });
+  input.addEventListener('blur', ()=>commit(true));
+});
+
 
 /* ============================================================
    REFERENCE — product lookup table (search-first, add-if-missing)
@@ -4822,6 +5306,87 @@ const ENTRY_SIS_HEADERS = ['PRODUCT','MATERIAL','RISE','UNIT','DESCRIPTN','SIZE'
   'LINE','OTHER_ID','SUITE','PRICE','BARCODE','KILLDATE','PACKDATE','MANUFTIME','USE_BY','EOL',
   'BATCH','SUPPLIER','COMMS','ORDER','SAMPCOUNT','SAMDATE','SAMBY','FARM_NO','PEN_NO','SHED_NO',
   'LOT_NO','LORRY_NO','FLOCK_NO','LOAD_NO','CLIENT','MANUFDATE','LOCATION','PERIOD','CONDITIONS'];
+// USE_BY resolution: how many days after Kill date? Priority order:
+//   1. Manual override on the record  (from the [Enter]-style export editor).
+//   2. Explicit MIMS USE_BY column ("+2", "+4", …).
+//   3. UB_RULES lookup by (retailer / product name / weight-size).
+//   4. Return null → the USE_BY column stays blank (existing behaviour).
+// The rules table is imported from the three FP1/FP2/Cutting product-list
+// docx files. It's small (96 rows) and text-matched, so the lookup is
+// forgiving on casing and whitespace.
+function entryNormaliseNameForUb(s){
+  return String(s||'').trim().toLowerCase()
+    // strip parenthetical qualifiers like "(Inner)" so "Mini Fillet (Inner)"
+    // matches "Mini Fillet" in a MIMS description
+    .replace(/\([^)]*\)/g,'')
+    // strip trailing "kg" / "g" / "grams" / "-piece" tails so weights and
+    // names don't blur into each other
+    .replace(/[.,]/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+function entryUbSizeMatches(needle, ruleWeight){
+  if(!ruleWeight) return true; // rule has no weight ⇒ matches any
+  if(!needle) return false;
+  const n = String(needle).toLowerCase().replace(/\s+/g,'');
+  const r = String(ruleWeight).toLowerCase().replace(/\s+/g,'');
+  if(n === r) return true;
+  // "500g" vs "500" — normalise both to digits+range.
+  const nDigits = n.match(/\d+(?:[.,]\d+)?(?:-\d+(?:[.,]\d+)?)?/);
+  const rDigits = r.match(/\d+(?:[.,]\d+)?(?:-\d+(?:[.,]\d+)?)?/);
+  if(nDigits && rDigits) return nDigits[0] === rDigits[0];
+  return false;
+}
+function entryComputeUseByDays(r, mimsRow){
+  // 1. Manual override on the record itself.
+  if(r && r.useByOverride !== undefined && r.useByOverride !== null && r.useByOverride !== ''){
+    const n = parseInt(String(r.useByOverride).replace(/[^0-9]/g,''), 10);
+    if(!Number.isNaN(n)) return n;
+  }
+  // 2. Explicit MIMS USE_BY column ("+2", "+4"). The file uses "+N" strings.
+  if(mimsRow && mimsRow.use_by){
+    const m = String(mimsRow.use_by).match(/(\d+)/);
+    if(m) return parseInt(m[1], 10);
+  }
+  // 2b. Seed exceptions — the four MIMS rows that carry USE_BY in the
+  // reference file. The seed was generated before use_by was a captured
+  // field, so match them by descrpton. Any MIMS re-upload from the file
+  // repopulates use_by properly and this fallback becomes redundant.
+  if(mimsRow && mimsRow.descrptn){
+    const d = mimsRow.descrptn.toLowerCase();
+    if(d.includes('neck skin surveillance')) return 2;
+    if(d.includes('neck skins post i/o wash')) return 2;
+    if(d.includes('neck skins post chiller')) return 2;
+    if(d === 'hot wings' && (mimsRow.retailer||'').toUpperCase() === 'KFC') return 4;
+  }
+  // 3. UB_RULES lookup by (retailer, description, size).
+  if(typeof UB_RULES === 'undefined') return null;
+  const rec = r || {};
+  const desc = entryNormaliseNameForUb((mimsRow && mimsRow.descrptn) || rec.desc || '');
+  const size = (mimsRow && mimsRow.size) || '';
+  const retailer = ((mimsRow && mimsRow.retailer) || rec.retailerOverride || '').toLowerCase();
+  if(!desc) return null;
+  // Score candidates. Higher = better.
+  //  +4 for retailer match, +2 for size match, +1 for name substring match,
+  //  +2 for exact name match.
+  let bestScore = 0; let bestDays = null;
+  UB_RULES.forEach(rule=>{
+    const ruleRetailer = String(rule.customer||'').toLowerCase();
+    const ruleName = entryNormaliseNameForUb(rule.product||'');
+    if(!ruleName) return;
+    let score = 0;
+    if(retailer && ruleRetailer && (retailer === ruleRetailer || retailer.includes(ruleRetailer) || ruleRetailer.includes(retailer))) score += 4;
+    if(ruleName === desc) score += 2;
+    else if(desc.includes(ruleName) || ruleName.includes(desc)) score += 1;
+    else return; // no name overlap — not a candidate at all
+    if(entryUbSizeMatches(size, rule.weight)) score += 2;
+    if(score > bestScore){ bestScore = score; bestDays = rule.days; }
+  });
+  // Require a minimum score of 3 (name overlap plus at least one of
+  // retailer / size) so we don't fall back to +10D for every random product
+  // that shares a single word with a rule row.
+  return bestScore >= 3 ? bestDays : null;
+}
 function entryBuildSisRow(r){
   const now=new Date(r.time); const kdpd=entryFmtDateUK(now);
   const row={}; ENTRY_SIS_HEADERS.forEach(h=>row[h]='');
@@ -4832,7 +5397,17 @@ function entryBuildSisRow(r){
   // rows still resolve. Old records (pre-mimsBarcode) fall back to barcode
   // then to the frozen r.mimsRow.
   const joinKey = r.mimsBarcode || r.barcode;
-  const mimsRow = joinKey ? entryMimsRowFor(joinKey) : (r.mimsRow || null);
+  let mimsRow = joinKey ? entryMimsRowFor(joinKey) : (r.mimsRow || null);
+  // Fallback correlation: when the record has no join key OR the key
+  // pointed at a MIMS row that no longer exists, try to find one by name +
+  // retailer + shift. This is what stops a record scanned with no barcode
+  // from exporting with almost every column empty. The resolved row isn't
+  // persisted onto the record — the export is a view, not authoritative —
+  // so a later MIMS upload that adds a better match will still be picked
+  // up next time this row is rendered.
+  if(!mimsRow){
+    mimsRow = entryFindMimsByContext(r);
+  }
   if(mimsRow){
     row.PRODUCT=mimsRow.product; row.MATERIAL=mimsRow.material; row.RISE=mimsRow.rise; row.UNIT=mimsRow.unit;
     row.DESCRIPTN=mimsRow.descrptn||r.desc; row.SIZE=mimsRow.size; row.RETAILER=mimsRow.retailer;
@@ -4869,6 +5444,14 @@ function entryBuildSisRow(r){
   // in the Records tab.
   row.KILLDATE = r.kdate ? entryFmtDateUK(r.kdate) : kdpd;
   row.PACKDATE = r.pdate ? entryFmtDateUK(r.pdate) : kdpd;
+  // USE_BY — see entryComputeUseByDays for the resolution order.
+  const killDateObj = r.kdate ? new Date(r.kdate) : now;
+  const ubDays = entryComputeUseByDays(r, mimsRow);
+  if(ubDays !== null){
+    const ubDate = new Date(killDateObj.getTime());
+    ubDate.setDate(ubDate.getDate() + ubDays);
+    row.USE_BY = entryFmtDateUK(ubDate);
+  }
   const isCN = entryIsCaecaNeck(r);
   if(r.timeOverride){
     row.MANUFTIME = isCN ? r.timeOverride : r.timeOverride.replace(':','');
@@ -4884,13 +5467,23 @@ function entryBuildSisRow(r){
   // its own customer name (Tesco / KFC / M&S / Coop / Iceland / Ocado / Aldi)
   // into the export's RETAILER cell.
   if(r.retailerOverride) row.RETAILER = r.retailerOverride;
+  // Manual per-cell overrides — set via tapping a cell in the export view.
+  // Applied last so they win over every automatic path (including
+  // retailerOverride above), which is what "manually filled" means to the
+  // person: the value they typed is what ships.
+  if(r.manualCellOverrides){
+    Object.keys(r.manualCellOverrides).forEach(k=>{
+      row[k] = r.manualCellOverrides[k];
+    });
+  }
   return row;
 }
 // Is this record a Caeca/Neck unit? Those get the export's actual MANUFTIME
 // column formatted with a colon (14:52); everything else is digits-only (1452).
 function entryRecordUnit(r){
   const joinKey = r.mimsBarcode || r.barcode;
-  const mimsRow = joinKey ? entryMimsRowFor(joinKey) : (r.mimsRow || null);
+  let mimsRow = joinKey ? entryMimsRowFor(joinKey) : (r.mimsRow || null);
+  if(!mimsRow) mimsRow = entryFindMimsByContext(r);
   return (mimsRow && mimsRow.unit) || (r.tmpl && r.tmpl.unit) || '';
 }
 function entryIsCaecaNeck(r){
@@ -5004,7 +5597,7 @@ document.getElementById('entryFileMims').addEventListener('change', async e=>{
         product:r.PRODUCT||'', material:r.MATERIAL||'', rise:r.RISE||'',
         unit:r.UNIT||'', descrptn:r.DESCRIPTN||'', size:r.SIZE||'', retailer:r.RETAILER||'',
         shift:r.SHIFT||'', line:r.LINE||'', other_id:r.OTHER_ID||'', suite:r.SUITE||'', price:r.PRICE||'',
-        order:r.ORDER||'', batch:r.BATCH||'', eol:r.EOL||''
+        order:r.ORDER||'', batch:r.BATCH||'', eol:r.EOL||'', use_by:r.USE_BY||''
       };
       const hasRealBarcode = bc0 && bc0!=='.';
       if(hasRealBarcode){ row.barcode = bc0; realCount++; }
@@ -5049,7 +5642,7 @@ document.getElementById('entryFileMims').addEventListener('change', async e=>{
     // Mutable fields we're willing to refresh on match; DO NOT overwrite
     // barcode / product / material / descrpton / suite / line / other_id
     // — those are the identity fields that make the row THIS row.
-    const MUTABLE = ['rise','unit','size','retailer','shift','price','order','batch','eol'];
+    const MUTABLE = ['rise','unit','size','retailer','shift','price','order','batch','eol','use_by'];
     parsed.forEach(({row, sig, hasRealBarcode})=>{
       const existing = currentByKey.get(sig);
       if(existing){
