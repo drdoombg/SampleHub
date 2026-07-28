@@ -732,10 +732,16 @@
      don't get re-edited by accident. Both variants remain click-editable. */
   .entry-export-manual-empty { background:rgba(242,160,61,.18) !important; cursor:text; }
   .entry-export-manual-filled { background:rgba(56,191,138,.14) !important; cursor:text; }
-  /* Excel-style selection outline on the focused cell. Uses inset box-shadow
-     so the border draws inside the cell (no layout shift) and stacks on top
-     of the amber/green background tints. */
-  .entry-export-focused { box-shadow: inset 0 0 0 2px var(--done) !important; position:relative; z-index:2; }
+  /* Focused-cell outline: thin white rounded box, no background change, no
+     tap-highlight ring. First tap selects (this outline appears, keyboard
+     stays closed on mobile), second tap opens the editor (input replaces the
+     cell content, keyboard opens). No blue anywhere. */
+  .entry-export-focused { box-shadow: inset 0 0 0 2px rgba(255,255,255,.9) !important; position:relative; z-index:2; -webkit-tap-highlight-color: transparent; outline:none; }
+  /* 2nd tap on an already-editing cell switches to edit-in-place mode —
+     caret sits inside the text, typing inserts. Blue outline signals the
+     mode change. */
+  .entry-export-edit-mode { box-shadow: inset 0 0 0 2px #5aa0ff !important; }
+  #entryExportTable td { -webkit-tap-highlight-color: transparent; }
   .entry-export-inline-input { width:100%; box-sizing:border-box; font-family:inherit; font-size:11.5px;
     background:var(--panel); color:var(--ink); border:1px solid var(--done); border-radius:4px; padding:4px 6px; }
   .entry-export-scroll .entry-table { border:none; border-radius:0; border-collapse:separate; border-spacing:0; overflow:visible; }
@@ -991,11 +997,11 @@
         <button type="button" class="entry-square" data-square="amber">
           <span class="entry-square-label">Amber</span>
         </button>
-        <button type="button" class="entry-square" data-square="neck">
-          <span class="entry-square-label">Neck</span>
+        <button type="button" class="entry-square" data-square="neck_caeca">
+          <span class="entry-square-label">Neck &amp; Caeca</span>
         </button>
-        <button type="button" class="entry-square" data-square="caeca">
-          <span class="entry-square-label">Caeca</span>
+        <button type="button" class="entry-square" data-square="nutri_sl">
+          <span class="entry-square-label">Nutri &amp; SL</span>
         </button>
       </div>
     </div>
@@ -1150,6 +1156,31 @@
       <div class="sheet-actions">
         <button class="btn ghost" id="entryTimeEditCancel">Cancel</button>
         <button class="btn primary" id="entryTimeEditApply">Save time</button>
+      </div>
+    </div>
+
+    <!-- Amber Skin batch code loop. One card, one keypad input, per-record.
+         Person types 3-4 digits (708 → BE708, 4 → BE4, or full BEnnn) and
+         hits Enter/Save; card advances to the next record until every one
+         in the batch has a batch code. -->
+    <div class="card-like hidden" id="entryBatchLoopCard">
+      <label id="entryBatchLoopLabel">Batch for entry #1 (e.g. 708 → BE708)</label>
+      <input type="text" id="entryBatchLoopInput" inputmode="numeric" placeholder="708" maxlength="6">
+      <div class="entry-hint" style="margin-top:6px;">Type 3-4 digits then Enter. Skip to finish.</div>
+      <div class="sheet-actions" style="margin-top:8px;">
+        <button class="btn ghost" id="entryBatchLoopSkip">Skip this record</button>
+        <button class="btn primary" id="entryBatchLoopSave">Save + next</button>
+      </div>
+    </div>
+
+    <!-- Salmonella Testing product-for-COMMS prompt. One shared value applied
+         to every emitted record's COMMS column (via manualCellOverrides.COMMS). -->
+    <div class="card-like hidden" id="entryCommsPromptCard">
+      <label id="entryCommsPromptLabel">Product (goes into COMMS column)</label>
+      <input type="text" id="entryCommsPromptInput" placeholder="e.g. Thighs">
+      <div class="sheet-actions" style="margin-top:8px;">
+        <button class="btn ghost" id="entryCommsPromptSkip">Skip</button>
+        <button class="btn primary" id="entryCommsPromptSave">Save</button>
       </div>
     </div>
 
@@ -1856,23 +1887,23 @@ const MIMS_SEED = [
  {"barcode": "5055540020327", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Chicken Crown", "descrptn": "Salt & Pepper Crown", "size": "700g", "retailer": "Ocado", "shift": "Daily", "other_id": "Fresh Pack 2", "suite": "2SP180", "price": 1.08, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "5055540020327", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Chicken Crown", "descrptn": "Salt & Pepper Crown", "size": "700g", "retailer": "Ocado", "shift": "Monthly", "other_id": "Fresh Pack 2", "suite": "2SP181", "price": 11.13, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "MIMS_0575", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Raw Portions", "size": "1 Sample", "retailer": "2Sisters", "shift": "Daily", "other_id": "Cutting", "suite": "2SP072", "price": 2.64, "eol": "N", "supplier": "UK", "comms": "Diced Breast", "client": "SIS", "_syn": true},
- {"barcode": "4088600283418", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Breast", "size": "400g", "retailer": "Aldi", "shift": "Daily", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "4088600283418", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Breast", "size": "400g", "retailer": "Aldi", "shift": "Monthly", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "4088600147734", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Breast", "size": "600g", "retailer": "Aldi", "shift": "Daily", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "4088600147734", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Breast", "size": "600g", "retailer": "Aldi", "shift": "Monthly", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "4088600283418", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Breast", "size": "400g", "retailer": "Aldi", "shift": "Daily", "other_id": "", "suite": "", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "4088600283418", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Breast", "size": "400g", "retailer": "Aldi", "shift": "Monthly", "other_id": "", "suite": "", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "4088600147734", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Breast", "size": "600g", "retailer": "Aldi", "shift": "Daily", "other_id": "", "suite": "", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "4088600147734", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Breast", "size": "600g", "retailer": "Aldi", "shift": "Monthly", "other_id": "", "suite": "", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "4088600494821", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Breast", "size": "1.5kg", "retailer": "Aldi", "shift": "Daily", "other_id": "Cutting", "suite": "2SP156", "price": 2.0, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "4088600494821", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Breast", "size": "1.5kg", "retailer": "Aldi", "shift": "Monthly", "other_id": "Cutting", "suite": "2SP158", "price": 12.05, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "5000129365375", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Breast Fillets", "size": "400g", "retailer": "CO-OP", "shift": "Daily", "other_id": "Cutting", "suite": "2SP163", "price": 1.08, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "5000129365375", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Breast Fillets", "size": "400g", "retailer": "CO-OP", "shift": "Weekly", "other_id": "Cutting", "suite": "2SP079", "price": 4.98, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "5000129365375", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Breast Fillets", "size": "400g", "retailer": "CO-OP", "shift": "Monthly", "other_id": "Cutting", "suite": "2SP080", "price": 11.93, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "5057753932916", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Chicken Breast", "size": "400g", "retailer": "Tesco", "shift": "Daily", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "5057753932916", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Chicken Breast", "size": "400g", "retailer": "Tesco", "shift": "Weekly", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "5057753932916", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Chicken Breast", "size": "400g", "retailer": "Tesco", "shift": "Daily", "other_id": "", "suite": "", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "5057753932916", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Chicken Breast", "size": "400g", "retailer": "Tesco", "shift": "Weekly", "other_id": "", "suite": "", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "5057753914028", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Chicken Breast", "size": "650g", "retailer": "Tesco", "shift": "Daily", "other_id": "Cutting", "suite": "2SP020", "price": 1.98, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "5057753914028", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Diced Breast", "descrptn": "Diced Chicken Breast", "size": "650g", "retailer": "Tesco", "shift": "Weekly", "other_id": "Cutting", "suite": "2SP022", "price": 11.03, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "MIMS_0576", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Drum Fillet", "descrptn": "Raw Portions", "size": "1 Sample", "retailer": "2Sisters", "shift": "Daily", "other_id": "Cutting", "suite": "2SP072", "price": 2.64, "eol": "N", "supplier": "UK", "comms": "Drum Fillet", "client": "SIS", "_syn": true},
  {"barcode": "MIMS_0577", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Drumstick", "descrptn": "Raw Portions", "size": "1 Sample", "retailer": "2Sisters", "shift": "Daily", "other_id": "Cutting", "suite": "2SP072", "price": 2.64, "eol": "N", "supplier": "UK", "comms": "Drumstick", "client": "SIS", "_syn": true},
- {"barcode": "MIMS_0578", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Drumstick", "descrptn": "Chicken Drumstick", "size": "1000g", "retailer": "Aldi", "shift": "Daily", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
- {"barcode": "MIMS_0579", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Drumstick", "descrptn": "Chicken Drumstick", "size": "1000g", "retailer": "Aldi", "shift": "Monthly", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
+ {"barcode": "MIMS_0578", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Drumstick", "descrptn": "Chicken Drumstick", "size": "1000g", "retailer": "Aldi", "shift": "Daily", "other_id": "", "suite": "", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
+ {"barcode": "MIMS_0579", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Drumstick", "descrptn": "Chicken Drumstick", "size": "1000g", "retailer": "Aldi", "shift": "Monthly", "other_id": "", "suite": "", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
  {"barcode": "4088600280578", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Drumstick", "descrptn": "Chicken Drumstick", "size": "2kg", "retailer": "Aldi", "shift": "Daily", "other_id": "Cutting", "suite": "2SP156", "price": 2.0, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "4088600280578", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Drumstick", "descrptn": "Chicken Drumstick", "size": "2kg", "retailer": "Aldi", "shift": "Monthly", "other_id": "Cutting", "suite": "2SP158", "price": 12.05, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "5000128996204", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Drumstick", "descrptn": "Chicken Drumstick", "size": "750g", "retailer": "CO-OP", "shift": "Daily", "other_id": "Cutting", "suite": "2SP163", "price": 1.08, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
@@ -1885,17 +1916,17 @@ const MIMS_SEED = [
  {"barcode": "5054269155624", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Drumstick", "descrptn": "Chicken Drumsticks", "size": "1 kg", "retailer": "Tesco", "shift": "Weekly", "other_id": "Cutting", "suite": "2SP022", "price": 11.03, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "MIMS_0580", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Inner Fillets", "descrptn": "Raw Portions", "size": "1 Sample", "retailer": "2Sisters", "shift": "Daily", "other_id": "Cutting", "suite": "2SP072", "price": 2.64, "eol": "N", "supplier": "UK", "comms": "Inner Fillets", "client": "SIS", "_syn": true},
  {"barcode": "MIMS_0581", "product": "Product", "material": "Investigation Product", "rise": "Fresh", "unit": "Meat", "descrptn": "Amber CIP Validation", "size": "Composite Sample", "retailer": "Amber Foods", "shift": ".", "other_id": "", "suite": "2SP012", "price": 2.07, "eol": "N", "supplier": "UK", "client": "SIS", "_syn": true},
- {"barcode": "4088600283364", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini  Fillets", "size": "400g", "retailer": "Aldi", "shift": "Daily", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "4088600283364", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini  Fillets", "size": "400g", "retailer": "Aldi", "shift": "Monthly", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "4088600147482", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini  Fillets", "size": "600g", "retailer": "Aldi", "shift": "Daily", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "4088600147482", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini  Fillets", "size": "600g", "retailer": "Aldi", "shift": "Monthly", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "4088600283364", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini  Fillets", "size": "400g", "retailer": "Aldi", "shift": "Daily", "other_id": "", "suite": "", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "4088600283364", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini  Fillets", "size": "400g", "retailer": "Aldi", "shift": "Monthly", "other_id": "", "suite": "", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "4088600147482", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini  Fillets", "size": "600g", "retailer": "Aldi", "shift": "Daily", "other_id": "", "suite": "", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "4088600147482", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini  Fillets", "size": "600g", "retailer": "Aldi", "shift": "Monthly", "other_id": "", "suite": "", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "MIMS_0582", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini  Fillets", "size": "900g", "retailer": "Aldi", "shift": "Daily", "other_id": "Cutting", "suite": "2SP156", "price": 2.0, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
  {"barcode": "MIMS_0583", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini  Fillets", "size": "900g", "retailer": "Aldi", "shift": "Monthly", "other_id": "Cutting", "suite": "2SP158", "price": 12.05, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
  {"barcode": "5000129365368", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini Chicken Fillets", "size": "400g", "retailer": "CO-OP", "shift": "Daily", "other_id": "Cutting", "suite": "2SP163", "price": 1.08, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "5000129365368", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini Chicken Fillets", "size": "400g", "retailer": "CO-OP", "shift": "Weekly", "other_id": "Cutting", "suite": "2SP079", "price": 4.98, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "5000129365368", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini Chicken Fillets", "size": "400g", "retailer": "CO-OP", "shift": "Monthly", "other_id": "Cutting", "suite": "2SP080", "price": 11.93, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "5057753931001", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini Chicken Fillets", "size": "400g", "retailer": "Tesco", "shift": "Daily", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "5057753931001", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini Chicken Fillets", "size": "400g", "retailer": "Tesco", "shift": "Weekly", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "5057753931001", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini Chicken Fillets", "size": "400g", "retailer": "Tesco", "shift": "Daily", "other_id": "", "suite": "", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "5057753931001", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini Chicken Fillets", "size": "400g", "retailer": "Tesco", "shift": "Weekly", "other_id": "", "suite": "", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "5057753911164", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini Chicken Fillets", "size": "650g", "retailer": "Tesco", "shift": "Daily", "other_id": "Cutting", "suite": "2SP020", "price": 1.98, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "5057753911164", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Mini Fillet", "descrptn": "Mini Chicken Fillets", "size": "650g", "retailer": "Tesco", "shift": "Weekly", "other_id": "Cutting", "suite": "2SP022", "price": 11.03, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "MIMS_0584", "product": "Product", "material": "FP By-products", "rise": "Fresh", "unit": "Non-food", "descrptn": "Chilled Viscera CAT 3", "size": "1 sample", "retailer": "Amber Foods", "shift": "Daily", "line": ".", "other_id": "Amber", "suite": "2SP047C", "price": 14.0, "order": "Amber", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
@@ -1908,16 +1939,16 @@ const MIMS_SEED = [
  {"barcode": "5054268934770", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Oyster Leg", "descrptn": "Chicken Legs", "size": "1000g", "retailer": "Tesco", "shift": "Weekly", "other_id": "Cutting", "suite": "2SP022", "price": 11.03, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "MIMS_0586", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skin On Breast Fillet", "descrptn": "Raw Portions", "size": "1 Sample", "retailer": "2Sisters", "shift": "Daily", "other_id": "Cutting", "suite": "2SP072", "price": 2.64, "eol": "N", "supplier": "UK", "comms": "Skin On Breast Fillet", "client": "SIS", "_syn": true},
  {"barcode": "MIMS_0587", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Raw Portions", "size": "1 Sample", "retailer": "2Sisters", "shift": "Daily", "other_id": "Cutting", "suite": "2SP072", "price": 2.64, "eol": "N", "supplier": "UK", "comms": "Skinless Breast Fillet", "client": "SIS", "_syn": true},
- {"barcode": "4088600146348", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "300g", "retailer": "Aldi", "shift": "Daily", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "4088600146348", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "300g", "retailer": "Aldi", "shift": "Monthly", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "4088600237008", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "650g", "retailer": "Aldi", "shift": "Daily", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "4088600237008", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "650g", "retailer": "Aldi", "shift": "Monthly", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "MIMS_0588", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "850-1000g", "retailer": "Aldi", "shift": "Daily", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
- {"barcode": "MIMS_0589", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "850-1000g", "retailer": "Aldi", "shift": "Monthly", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
- {"barcode": "4088600148144", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "1kg", "retailer": "Aldi", "shift": "Daily", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "4088600148144", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "1kg", "retailer": "Aldi", "shift": "Monthly", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "4088600295411", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "2kg", "retailer": "Aldi", "shift": "Daily", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "4088600295411", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "2kg", "retailer": "Aldi", "shift": "Monthly", "other_id": "25/07/2026", "suite": "25/07/2026", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "4088600146348", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "300g", "retailer": "Aldi", "shift": "Daily", "other_id": "", "suite": "", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "4088600146348", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "300g", "retailer": "Aldi", "shift": "Monthly", "other_id": "", "suite": "", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "4088600237008", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "650g", "retailer": "Aldi", "shift": "Daily", "other_id": "", "suite": "", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "4088600237008", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "650g", "retailer": "Aldi", "shift": "Monthly", "other_id": "", "suite": "", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "MIMS_0588", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "850-1000g", "retailer": "Aldi", "shift": "Daily", "other_id": "", "suite": "", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
+ {"barcode": "MIMS_0589", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "850-1000g", "retailer": "Aldi", "shift": "Monthly", "other_id": "", "suite": "", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
+ {"barcode": "4088600148144", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "1kg", "retailer": "Aldi", "shift": "Daily", "other_id": "", "suite": "", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "4088600148144", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "1kg", "retailer": "Aldi", "shift": "Monthly", "other_id": "", "suite": "", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "4088600295411", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "2kg", "retailer": "Aldi", "shift": "Daily", "other_id": "", "suite": "", "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "4088600295411", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "2kg", "retailer": "Aldi", "shift": "Monthly", "other_id": "", "suite": "", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "MIMS_0590", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "2.5kg", "retailer": "Aldi", "shift": "Daily", "other_id": "Cutting", "suite": "2SP156", "price": 2.0, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
  {"barcode": "MIMS_0591", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Skinless Breast Fillet", "descrptn": "Breast Fillets", "size": "2.5kg", "retailer": "Aldi", "shift": "Monthly", "other_id": "Cutting", "suite": "2SP158", "price": 12.05, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
  {"barcode": "5000129408683", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Drumstick", "descrptn": "Chicken Drumstick", "size": "1.5KG", "retailer": "CO-OP", "shift": "Daily", "other_id": "Cutting", "suite": "2SP163", "price": 1.08, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
@@ -2105,8 +2136,8 @@ const MIMS_SEED = [
  {"barcode": "5063717059681", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "ASDA Piri Piri Spatchcock", "size": "1.128kg", "retailer": "Asda", "shift": "Monthly", "other_id": "Fresh Pack 2", "suite": "2SP192", "price": 6.16, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "MIMS_0657", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "ASDA Medium WB", "size": "Various", "retailer": "Asda", "shift": "Daily", "other_id": "Fresh Pack 1", "suite": "2SP191", "price": 2.98, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
  {"barcode": "MIMS_0658", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "ASDA Medium WB", "size": "Various", "retailer": "Asda", "shift": "Monthly", "other_id": "Fresh Pack 1", "suite": "2SP190", "price": 13.49, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
- {"barcode": "5057162300801", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "ASDA Large WB", "size": "Various", "retailer": "Asda", "shift": "Daily", "other_id": "Fresh Pack 1", "suite": "2SP191", "price": 2.98, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "5057162300801", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "ASDA Large WB", "size": "Various", "retailer": "Asda", "shift": "Monthly", "other_id": "Fresh Pack 1", "suite": "2SP190", "price": 13.49, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "5057172354801", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "ASDA Large WB", "size": "Various", "retailer": "Asda", "shift": "Daily", "other_id": "Fresh Pack 1", "suite": "2SP191", "price": 2.98, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "5057172354801", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "ASDA Large WB", "size": "Various", "retailer": "Asda", "shift": "Monthly", "other_id": "Fresh Pack 1", "suite": "2SP190", "price": 13.49, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "MIMS_0659", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "ASDA Extra Large WB", "size": "Various", "retailer": "Asda", "shift": "Daily", "other_id": "Fresh Pack 1", "suite": "2SP191", "price": 2.98, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
  {"barcode": "MIMS_0660", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "ASDA Extra Large WB", "size": "Various", "retailer": "Asda", "shift": "Monthly", "other_id": "Fresh Pack 1", "suite": "2SP190", "price": 13.49, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
  {"barcode": "5059697733185", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Wing", "descrptn": "Chicken Wings", "size": "1000g", "retailer": "Tesco", "shift": "Daily", "other_id": "Cutting", "suite": "2SP020", "price": 1.98, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
@@ -2138,8 +2169,8 @@ const MIMS_SEED = [
  {"barcode": "MIMS_0684", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": ".", "descrptn": "Rotisserie Wb", "size": "1 Sample", "retailer": "Costco", "shift": "Weekly", "line": "NEW", "other_id": "FP2", "suite": "2SP079", "price": 4.98, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
  {"barcode": "05057008253612", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "Finest-  Chicken Crown PCC Stuffing", "size": "Various", "retailer": "Tesco", "shift": "Daily", "other_id": "Fresh Pack 2", "suite": "2SP020", "price": 1.37, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "05057008253612", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "Finest-  Chicken Crown PCC Stuffing", "size": "Various", "retailer": "Tesco", "shift": "Weekly", "other_id": "Fresh Pack 2", "suite": "2SP025", "price": 12.67, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "2096922004736", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "Medium Plain WB", "size": "Various", "retailer": "Ocado", "shift": "Daily", "other_id": "Fresh Pack 1", "suite": "2SP180", "price": 1.08, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
- {"barcode": "2096922004736", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "Medium Plain WB", "size": "Various", "retailer": "Ocado", "shift": "Monthly", "other_id": "Fresh Pack 1", "suite": "2SP181", "price": 11.13, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "2096922004941", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "Medium Plain WB", "size": "Various", "retailer": "Ocado", "shift": "Daily", "other_id": "Fresh Pack 1", "suite": "2SP180", "price": 1.08, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
+ {"barcode": "2096922004941", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "Medium Plain WB", "size": "Various", "retailer": "Ocado", "shift": "Monthly", "other_id": "Fresh Pack 1", "suite": "2SP181", "price": 11.13, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
  {"barcode": "MIMS_0685", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "British Truffle Whole Chicken", "size": "2.09kg", "retailer": "M&S", "shift": "Daily", "other_id": "Fresh Pack 2", "suite": "2SP015", "price": 6.07, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
  {"barcode": "MIMS_0686", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "British Truffle Whole Chicken", "size": "2.09kg", "retailer": "M&S", "shift": "Monthly", "other_id": "Fresh Pack 2", "suite": "2SP017", "price": 12.79, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
  {"barcode": "05057008253612", "product": "Product", "material": "FP RTC/CIB Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "Finest Ultimate Whole Chicken", "size": "2.2kg", "retailer": "Tesco", "shift": "Daily", "other_id": "Fresh Pack 2", "suite": "2SP020", "price": 1.37, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS"},
@@ -2258,7 +2289,7 @@ const MIMS_SEED = [
  {"barcode": "MIMS_0782", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "Hot cooked Fresh Whole Bird", "size": "Various", "retailer": "Booth", "shift": "Daily", "other_id": "Fresh Pack 1", "suite": "2SP163", "price": 1.08, "eol": "N", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true},
  {"barcode": "MIMS_0783", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "Hot cooked Fresh Whole Bird", "size": "Various", "retailer": "Booth", "shift": "Monthly", "other_id": "Fresh Pack 1", "suite": "2SP080", "price": 11.93, "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true}
 ];const TEMPLATES_SEED = [];
-const LOOKUP_SEED = [{"barcode": "00014649", "name": "Ms rotisserie wb", "cat": "Category 1"}, {"barcode": "00015035", "name": "MS PSO", "cat": "Category 1"}, {"barcode": "00265829", "name": "Ms rotisserie joint", "cat": "Category 1"}, {"barcode": "00404358", "name": "M&S BUTTER BASTED JOINT", "cat": "Category 1"}, {"barcode": "046726353761", "name": "Coop Thighs 600g", "cat": "Category 2"}, {"barcode": "2092417005004", "name": "Ocado large", "cat": "Category 1"}, {"barcode": "2096922004835", "name": "Ocado medium", "cat": "Category 1"}, {"barcode": "2096937006848", "name": "Ocado extra large", "cat": "Category 1"}, {"barcode": "2253889826683", "name": "Asda lemon and herb spatchcock", "cat": "Category 1"}, {"barcode": "280814", "name": "Aldi CW fillets 850-1000g", "cat": "Category 1"}, {"barcode": "29000067", "name": "Ms smokey spatchcock", "cat": "Category 1"}, {"barcode": "29421411", "name": "MS new honey bbq wb", "cat": "Category 1"}, {"barcode": "29421435", "name": "Ms salt&pepper New", "cat": "Category 1"}, {"barcode": "29421442", "name": "MS new garlic wb", "cat": "Category 1"}, {"barcode": "4061459353037", "name": "Aldi drum fillets 600g", "cat": "Category 1"}, {"barcode": "4061461658960", "name": "Aldi Rotisserie Spatchcock", "cat": "Category 5"}, {"barcode": "4061461781248", "name": "Aldi drums fillets 900g", "cat": "Category 1"}, {"barcode": "4061462247859", "name": "Aldi sizzlers 500g", "cat": "Category 1"}, {"barcode": "4061462248085", "name": "Chicken Breast Pieces", "cat": "Category 1"}, {"barcode": "4061462251283", "name": "Fresh Medium Whole Chicken", "cat": "Category 1"}, {"barcode": "4061462255458", "name": "Fresh Large Whole Chicken", "cat": "Category 1"}, {"barcode": "4061462256271", "name": "Aldi Extra Large", "cat": "Category 1"}, {"barcode": "4061462270895", "name": "Raw Portions - Drum Fillets", "cat": "Category 1"}, {"barcode": "4061462273308", "name": "Extra Tasty CIB WB", "cat": "Category 1"}, {"barcode": "4061462874321", "name": "ALDI Chinese SPATCHOCK", "cat": "Category 1"}, {"barcode": "4061463078919", "name": "Aldi drum fillets 900g", "cat": "Category 1"}, {"barcode": "4088600039077", "name": "Aldi garlic spatchcock", "cat": "Category 1"}, {"barcode": "4088600113418", "name": "Aldi wings 1kg", "cat": "Category 1"}, {"barcode": "4088600146348", "name": "Aldi breast 300g", "cat": "Category 1"}, {"barcode": "4088600147017", "name": "Aldi thighs 1kg", "cat": "Category 1"}, {"barcode": "4088600147086", "name": "Raw Portions - Drumstick", "cat": "Category 1"}, {"barcode": "4088600147345", "name": "Aldi legs 1kg", "cat": "Category 1"}, {"barcode": "4088600147482", "name": "Aldi mini fillets 600g", "cat": "Category 1"}, {"barcode": "4088600147734", "name": "Aldi diced 600g", "cat": "Category 1"}, {"barcode": "4088600148144", "name": "Aldi breast 1kg", "cat": "Category 1"}, {"barcode": "4088600176345", "name": "Aldi thighs fillets 600g", "cat": "Category 1"}, {"barcode": "4088600237008", "name": "Aldi fillets 650g", "cat": "Category 1"}, {"barcode": "4088600280578", "name": "Aldi drumstick 2kg", "cat": "Category 1"}, {"barcode": "4088600281421", "name": "Aldi thigh fillets 900g", "cat": "Category 1"}, {"barcode": "4088600283364", "name": "Aldi mini fillets 400g", "cat": "Category 1"}, {"barcode": "4088600283418", "name": "Aldi diced 400g", "cat": "Category 1"}, {"barcode": "4088600295411", "name": "Aldi fillets 2kg", "cat": "Category 1"}, {"barcode": "4088600390826", "name": "Aldi pso wb", "cat": "Category 1"}, {"barcode": "4088600494807", "name": "Raw Portions - Skinless Breast Fillet", "cat": "Category 1"}, {"barcode": "4088600494821", "name": "Aldi big diced 1.5kg", "cat": "Category 1"}, {"barcode": "5000120379098", "name": "Coop Breast Fillet 580g", "cat": "Category 1"}, {"barcode": "5000128744836", "name": "Coop breast fillets 300g", "cat": "Category 1"}, {"barcode": "5000128961318", "name": "Raw Portions - Wing (3 Joint)", "cat": "Category 1"}, {"barcode": "5000129323191", "name": "Co-op breast strips 250g", "cat": "Category 1"}, {"barcode": "5000129333800", "name": "Coop thigh fillets 500g", "cat": "Category 1"}, {"barcode": "5000129334098", "name": "Coop breast fillets 580g", "cat": "Category 1"}, {"barcode": "5000129334180", "name": "Coop breast fillets 850g", "cat": "Category 1"}, {"barcode": "5000129350234", "name": "Coop drum fillets 400g", "cat": "Category 1"}, {"barcode": "5000129350456", "name": "Coop Large", "cat": "Category 1"}, {"barcode": "5000129353761", "name": "Coop thighs 600g", "cat": "Category 1"}, {"barcode": "5000129365283", "name": "Coop drumstick 600", "cat": "Category 1"}, {"barcode": "5000129365306", "name": "Coop wings 600g", "cat": "Category 1"}, {"barcode": "5000129365368", "name": "COOP Mini fillets 400g", "cat": "Category 1"}, {"barcode": "5000129365375", "name": "Co-op diced 400g", "cat": "Category 1"}, {"barcode": "5000129373936", "name": "Coop Rotisserie", "cat": "Category 1"}, {"barcode": "5000129408584", "name": "Raw Portions - Wing", "cat": "Category 1"}, {"barcode": "5000128996204", "name": "Coop Drumsticks 750g", "cat": "Category 2"}, {"barcode": "5010365007625", "name": "Asda cherry drum fillets 400g", "cat": "Category 1"}, {"barcode": "5010365007892", "name": "Asda chery drum fillets 1kg", "cat": "Category 1"}, {"barcode": "5010482564377", "name": "Iceland drumstick 1kg", "cat": "Category 1"}, {"barcode": "5010482564414", "name": "Iceland legs 1kg", "cat": "Category 1"}, {"barcode": "5010482617929", "name": "Iceland extra tasty", "cat": "Category 1"}, {"barcode": "5010482797355", "name": "iceland small", "cat": "Category 1"}, {"barcode": "5054070468654", "name": "Asda Small Extra Tasty", "cat": "Category 1"}, {"barcode": "5054268934725", "name": "Tesco thighs 1kg", "cat": "Category 1"}, {"barcode": "5054269362978", "name": "Tesco thighs fillets 600g", "cat": "Category 1"}, {"barcode": "5054775750283", "name": "Tesco breast fillet 950g", "cat": "Category 1"}, {"barcode": "5055540020327", "name": "Ocado sp crown", "cat": "Category 1"}, {"barcode": "5055540029122", "name": "Ocado extra tasty wb", "cat": "Category 1"}, {"barcode": "5055540059785", "name": "Ocsdo garlic wb", "cat": "Category 1"}, {"barcode": "5057008546325", "name": "Tesco breast fillet 650g", "cat": "Category 1"}, {"barcode": "5057162300801", "name": "Asda Large", "cat": "Category 1"}, {"barcode": "5057172091751", "name": "Asda pso wb", "cat": "Category 1"}, {"barcode": "5057753914028", "name": "Tesco diced 650g", "cat": "Category 1"}, {"barcode": "5057753932916", "name": "Tesco diced 400g", "cat": "Category 1"}, {"barcode": "5057967251896", "name": "Tesco fillets 1.6kg", "cat": "Category 1"}, {"barcode": "5059697733185", "name": "Tesco Wings 1kg", "cat": "Category 1"}, {"barcode": "5063089331828", "name": "Asda drum fillets 600g", "cat": "Category 1"}, {"barcode": "5063089614808", "name": "Asda Drumsticks 1.1kg", "cat": "Category 1"}, {"barcode": "5063089614822", "name": "Asda Diced Chicken", "cat": "Category 1"}, {"barcode": "5063089614839", "name": "Asda Thigh fillets 650", "cat": "Category 1"}, {"barcode": "5063089676967", "name": "ASDA BBQ Spatchcock", "cat": "Category 1"}, {"barcode": "5063089826683", "name": "ASDA Lemon&Herb Spatchcock", "cat": "Category 1"}, {"barcode": "5063445799132", "name": "Tesco Breast fillets 300g", "cat": "Category 1"}, {"barcode": "5063446491592", "name": "Raw Portions - Skinless Breast Fillet", "cat": "Category 1"}, {"barcode": "5063717059681", "name": "ASDA Piri Piri Spatchcock", "cat": "Category 1"}, {"barcode": "5068419353037", "name": "Aldi drum fillets 600g", "cat": "Category 1"}, {"barcode": "8966285000000", "name": "MS Rotisserie joints", "cat": "Category 1"}, {"barcode": "b24182556", "name": "Red canteen probe", "cat": "Category 1"}, {"barcode": "KFC9PIECE", "name": "KFC 9 piece", "cat": "Category 1"}, {"barcode": "KFCDRUM", "name": "KFC DARK MEAT", "cat": "Category 1"}, {"barcode": "KFCWING", "name": "KFC HOT WINGS", "cat": "Category 1"}, {"barcode": "MSBBQ", "name": "MS BBQ", "cat": "Category 1"}, {"barcode": "MSBUTTER", "name": "MS BUTTER", "cat": "Category 1"}, {"barcode": "PMDDOLAV", "name": "PMD Dolav", "cat": "Category 1"}];
+const LOOKUP_SEED = [{"barcode": "280814", "name": "Aldi CW fillets 850-1000g", "cat": "Category 1"}, {"barcode": "29000067", "name": "Ms smokey spatchcock", "cat": "Category 1"}, {"barcode": "29421411", "name": "MS new honey bbq wb", "cat": "Category 1"}, {"barcode": "29421435", "name": "Ms salt&pepper New", "cat": "Category 1"}, {"barcode": "29421442", "name": "MS new garlic wb", "cat": "Category 1"}, {"barcode": "046726353761", "name": "Coop Thighs 600g", "cat": "Category 2"}, {"barcode": "4088600113418", "name": "Aldi wings 1kg", "cat": "Category 1"}, {"barcode": "4088600237008", "name": "Aldi fillets 650g", "cat": "Category 1"}, {"barcode": "00265829", "name": "Ms rotisserie joint", "cat": "Category 1"}, {"barcode": "5063446491592", "name": "Tesco - Skinless Breast Fillet 1kg", "cat": "Category 1"}, {"barcode": "00015035", "name": "MS PSO", "cat": "Category 1"}, {"barcode": "2253889826683", "name": "Asda lemon and herb spatchcock", "cat": "Category 1"}, {"barcode": "5000128996204", "name": "Coop Drumsticks 750g", "cat": "Category 2"}, {"barcode": "MSBUTTER", "name": "MS BUTTER", "cat": "Category 1"}, {"barcode": "5000129353761", "name": "Coop thighs 600g", "cat": "Category 1"}, {"barcode": "4088600147734", "name": "Aldi diced 600g", "cat": "Category 1"}, {"barcode": "4088600147345", "name": "Aldi legs 1kg", "cat": "Category 1"}, {"barcode": "5063445799132", "name": "Tesco Breast fillets 300g", "cat": "Category 1"}, {"barcode": "5057172354801", "name": "Asda Large", "cat": "Category 1"}, {"barcode": "4088600280578", "name": "Aldi drumstick 2kg", "cat": "Category 1"}, {"barcode": "4088600176345", "name": "Aldi thighs fillets 600g", "cat": "Category 1"}, {"barcode": "4061461658960", "name": "Aldi Rotisserie Spatchcock", "cat": "Category 5"}, {"barcode": "5063717059681", "name": "ASDA Piri Piri Spatchcock", "cat": "Category 1"}, {"barcode": "5054269362978", "name": "Tesco thighs fillets 600g", "cat": "Category 1"}, {"barcode": "2005725009459", "name": "Costco Twin pack", "cat": "Category 2"}, {"barcode": "5000129365306", "name": "Coop wings 600g", "cat": "Category 1"}, {"barcode": "5057008546325", "name": "Tesco breast fillet 650g", "cat": "Category 2"}, {"barcode": "4088600147086", "name": "Raw Portions - Drumstick", "cat": "Category 1"}, {"barcode": "5010482564377", "name": "Iceland drumstick 1kg", "cat": "Category 1"}, {"barcode": "5054775750283", "name": "Tesco breast fillet 950g", "cat": "Category 1"}, {"barcode": "4088600147482", "name": "Aldi mini fillets 600g", "cat": "Category 1"}, {"barcode": "5000129334098", "name": "Coop breast fillets 580g", "cat": "Category 1"}, {"barcode": "5000128961318", "name": "coop wings 775", "cat": "Category 2"}, {"barcode": "4088600494821", "name": "Aldi big diced 1.5kg", "cat": "Category 1"}, {"barcode": "4061462256271", "name": "Aldi Extra Large", "cat": "Category 1"}, {"barcode": "5055540029122", "name": "Ocado extra tasty wb", "cat": "Category 1"}, {"barcode": "5063089614822", "name": "Asda Diced Chicken", "cat": "Category 1"}, {"barcode": "5054070468654", "name": "Asda Small Extra Tasty", "cat": "Category 1"}, {"barcode": "5000129408584", "name": "Raw Portions - Wing", "cat": "Category 1"}, {"barcode": "4088600283364", "name": "Aldi mini fillets 400g", "cat": "Category 1"}, {"barcode": "4088600148144", "name": "Aldi breast 1kg", "cat": "Category 1"}, {"barcode": "4061462270895", "name": "aldi - Drum Fillets 900g", "cat": "Category 1"}, {"barcode": "5010482797355", "name": "iceland small", "cat": "Category 1"}, {"barcode": "5010482617929", "name": "Iceland extra tasty", "cat": "Category 1"}, {"barcode": "4088600147017", "name": "Aldi thighs 1kg", "cat": "Category 1"}, {"barcode": "4061459353037", "name": "Aldi drum fillets 600g", "cat": "Category 1"}, {"barcode": "5010365007625", "name": "Asda cherry drum fillets 400g", "cat": "Category 1"}, {"barcode": "2096937006848", "name": "Ocado extra large", "cat": "Category 1"}, {"barcode": "5028440025235", "name": "Booths Medium", "cat": "Category 1"}, {"barcode": "5000129373936", "name": "Coop Rotisserie", "cat": "Category 1"}, {"barcode": "5057753932916", "name": "Tesco diced 400g", "cat": "Category 2"}, {"barcode": "KFCDRUM", "name": "KFC DARK MEAT", "cat": "Category 1"}, {"barcode": "PMDDOLAV", "name": "PMD Dolav", "cat": "Category 1"}, {"barcode": "4088600039077", "name": "Aldi garlic spatchcock", "cat": "Category 1"}, {"barcode": "5000129408683", "name": "Coop Drumsticks 1.5 kg", "cat": "Category 2"}, {"barcode": "5010482593902", "name": "Iceland Large", "cat": "Category 3"}, {"barcode": "KFCWING", "name": "KFC HOT WINGS", "cat": "Category 1"}, {"barcode": "5004026906204", "name": "Coop Drumsticks 750g", "cat": "Category 2"}, {"barcode": "MSBBQ", "name": "MS BBQ 1.8 kg", "cat": "Category 3"}, {"barcode": "5055540054315", "name": "Ocado Pso", "cat": "Category 1"}, {"barcode": "5000129323191", "name": "Co-op breast strips 250g", "cat": "Category 1"}, {"barcode": "4061462248085", "name": "Chicken Breast Pieces", "cat": "Category 1"}, {"barcode": "5000129365283", "name": "Coop drumstick 600", "cat": "Category 1"}, {"barcode": "4088600281421", "name": "Aldi thigh fillets 900g", "cat": "Category 1"}, {"barcode": "5055540020327", "name": "Ocado sp crown", "cat": "Category 1"}, {"barcode": "5000129333800", "name": "Coop thigh fillets 500g", "cat": "Category 2"}, {"barcode": "5010482564414", "name": "Iceland legs 1kg", "cat": "Category 1"}, {"barcode": "5000129365375", "name": "Co-op diced 400g", "cat": "Category 2"}, {"barcode": "5000128744836", "name": "Coop breast fillets 300g", "cat": "Category 1"}, {"barcode": "5055540059785", "name": "Ocsdo garlic wb", "cat": "Category 1"}, {"barcode": "5068419353037", "name": "Aldi drum fillets 600g", "cat": "Category 1"}, {"barcode": "4061462273308", "name": "Aldi Extra Tasty CIB WB", "cat": "Category 1"}, {"barcode": "5063089676967", "name": "ASDA BBQ Spatchcock", "cat": "Category 1"}, {"barcode": "4061462255458", "name": "Fresh Large Whole Chicken", "cat": "Category 1"}, {"barcode": "5000129350234", "name": "Coop drum fillets 400g", "cat": "Category 1"}, {"barcode": "00404358", "name": "M&S BUTTER BASTED JOINT", "cat": "Category 1"}, {"barcode": "5063089331828", "name": "Asda drum fillets 600g", "cat": "Category 1"}, {"barcode": "4061461781248", "name": "Aldi drums fillets 900g", "cat": "Category 1"}, {"barcode": "4061462874321", "name": "ALDI Chinese SPATCHOCK", "cat": "Category 1"}, {"barcode": "5063089614808", "name": "Asda Drumsticks 1.1kg", "cat": "Category 1"}, {"barcode": "5063089826683", "name": "ASDA Lemon&Herb Spatchcock", "cat": "Category 1"}, {"barcode": "5057753914028", "name": "Tesco diced 650g", "cat": "Category 1"}, {"barcode": "5000129350456", "name": "Coop Large", "cat": "Category 1"}, {"barcode": "8966285000000", "name": "MS Rotisserie joints", "cat": "Category 1"}, {"barcode": "5010365007892", "name": "Asda chery drum fillets 1kg", "cat": "Category 1"}, {"barcode": "b24182556", "name": "Red canteen probe", "cat": "Category 1"}, {"barcode": "2096922004941", "name": "Ocado medium", "cat": "Category 1"}, {"barcode": "5054268934725", "name": "Tesco thighs 1kg", "cat": "Category 1"}, {"barcode": "4088600390826", "name": "Aldi pso wb", "cat": "Category 1"}, {"barcode": "KFC9PIECE", "name": "KFC 9 piece", "cat": "Category 1"}, {"barcode": "5059697733185", "name": "Tesco Wings 1kg", "cat": "Category 2"}, {"barcode": "5010482482619", "name": "Iceland Medium", "cat": "Category 1"}, {"barcode": "00014649", "name": "Ms rotisserie wb", "cat": "Category 1"}, {"barcode": "4088600283418", "name": "Aldi diced 400g", "cat": "Category 1"}, {"barcode": "4088600494807", "name": "Raw Portions - Skinless Breast Fillet", "cat": "Category 1"}, {"barcode": "5063089614839", "name": "Asda Thigh fillets 650", "cat": "Category 1"}, {"barcode": "4061462247859", "name": "Aldi sizzlers 500g", "cat": "Category 1"}, {"barcode": "4061462251283", "name": "Fresh Medium Whole Chicken", "cat": "Category 1"}, {"barcode": "5057172091751", "name": "Asda pso wb", "cat": "Category 1"}, {"barcode": "5057967251896", "name": "Tesco fillets 1.6kg", "cat": "Category 1"}, {"barcode": "4088600146348", "name": "Aldi breast 300g", "cat": "Category 1"}, {"barcode": "4088600295411", "name": "Aldi fillets 2kg", "cat": "Category 1"}, {"barcode": "4061463078919", "name": "Aldi drum fillets 900g", "cat": "Category 1"}, {"barcode": "2092417005004", "name": "Ocado large", "cat": "Category 1"}, {"barcode": "5000120379098", "name": "Coop Breast Fillet 580g", "cat": "Category 1"}, {"barcode": "5000129334180", "name": "Coop breast fillets 850g", "cat": "Category 1"}, {"barcode": "5000129365368", "name": "COOP Mini fillets 400g", "cat": "Category 1"}];
 const UB_RULES = [
  {"customer": "Aldi", "product": "Breast Fillet", "weight": "300", "days": 10, "source": "Cutting"},
  {"customer": "Aldi", "product": "Breast Fillet", "weight": "650", "days": 10, "source": "Cutting"},
@@ -3381,17 +3412,12 @@ function schedChipHTML(tab, entry, info){
      Reference  — product lookup table (search-first, add-if-missing)
                   plus the MIMS SAVE FILE upload
    ============================================================ */
-// v5 bump: MIMS row shape now carries SUPPLIER/COMMS/LOCATION/PERIOD/CLIENT
-// (needed for correct export of Meat Prep EOL/SOL rows: SUPPLIER=UK,
-// COMMS=Meat Preparation, PERIOD=FAV Cuts, CLIENT=SIS). Also Category 4/5/6
-// now route to the dedicated 2SL003E/2SL003S MIMS rows.
-// v6 lookup bump: lookup builder now dedups by (barcode, descrptn, size,
-// shift, suite) instead of barcode alone — so multiple MIMS rows with a
-// shared real barcode (e.g. two 1.8kg Butter Basted Hot Deli rows both
-// carrying barcode MSBUTTER, one Daily one Monthly) each surface as a
-// separate lookup entry and become independently findable in search.
+// v7 bump: MIMS re-seeded from a fresh MIMS_SAVE_FILE with the date-shape
+// corruption removed at source (dd/mm/yyyy values were sitting in OTHER_ID
+// and SUITE for ~24 Aldi/Tesco rows; they're now blank). LOOKUP_SEED
+// refreshed from the latest product_lookup.xlsx.
 const LS_ENTRY_RECORDS='unified.entryRecords.v1', LS_ENTRY_TICKS='unified.entryTicks.v1',
-      LS_ENTRY_MIMS='unified.entryMims.v5', LS_ENTRY_LOOKUP='unified.entryLookup.v6',
+      LS_ENTRY_MIMS='unified.entryMims.v7', LS_ENTRY_LOOKUP='unified.entryLookup.v7',
       LS_ENTRY_DELETED='unified.entryDeleted.v1';
 
 let entryRecords = JSON.parse(localStorage.getItem(LS_ENTRY_RECORDS) || '[]');
@@ -3405,6 +3431,25 @@ let entryTicks = JSON.parse(localStorage.getItem(LS_ENTRY_TICKS) || '{}');   // 
 let entryDeleted = JSON.parse(localStorage.getItem(LS_ENTRY_DELETED) || '{}');
 let entryMims = JSON.parse(localStorage.getItem(LS_ENTRY_MIMS) || 'null')
   || (typeof MIMS_SEED!=='undefined' ? MIMS_SEED : []);
+
+// Runtime scrub: the reference MIMS file has cell-shift corruption on
+// ~24 Aldi/Tesco Product rows where a date (25/07/2026) landed in the
+// OTHER_ID and SUITE columns instead of the intended values. Exporting a
+// SAMPCOUNT for one of those rows previously wrote the date verbatim into
+// the OTHER_ID and SUITE cells of the exported .xlsx. Blank them here so
+// the fix applies regardless of whether the MIMS was loaded from seed,
+// localStorage, or the paired Firestore doc.
+(function entryScrubCorruptedMims(){
+  const isDateShape = v => typeof v === 'string' && /^\s*\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\s*$/.test(v);
+  let touched = 0;
+  entryMims.forEach(m => {
+    if(isDateShape(m.other_id)){ m.other_id = ''; touched++; }
+    if(isDateShape(m.suite)){ m.suite = ''; touched++; }
+  });
+  if(touched){
+    try{ localStorage.setItem(LS_ENTRY_MIMS, JSON.stringify(entryMims)); }catch(_e){}
+  }
+})();
 const ENTRY_TEMPLATES = (typeof TEMPLATES_SEED!=='undefined') ? TEMPLATES_SEED : [];
 
 // Mark records as deleted. Called by both the single-record delete button and
@@ -3585,10 +3630,10 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
 // resurrecting things like the two CO-OP "Butter Basted Hot Deli" ghost
 // entries. Purge the old keys once so the current seed is authoritative.
 (function entryPurgeStaleVersionKeys(){
-  const MIGRATION_KEY = 'unified.entryMigration.v6';
+  const MIGRATION_KEY = 'unified.entryMigration.v7';
   if(localStorage.getItem(MIGRATION_KEY)) return;
-  ['unified.entryMims.v1','unified.entryMims.v2','unified.entryMims.v3','unified.entryMims.v4',
-   'unified.entryLookup.v1','unified.entryLookup.v2','unified.entryLookup.v3','unified.entryLookup.v4','unified.entryLookup.v5'
+  ['unified.entryMims.v1','unified.entryMims.v2','unified.entryMims.v3','unified.entryMims.v4','unified.entryMims.v5','unified.entryMims.v6',
+   'unified.entryLookup.v1','unified.entryLookup.v2','unified.entryLookup.v3','unified.entryLookup.v4','unified.entryLookup.v5','unified.entryLookup.v6'
   ].forEach(k => { try{ localStorage.removeItem(k); }catch(_e){} });
   // Also drop scan-added lookup entries whose correlation subtitle points at
   // a MIMS row the current file doesn't have — those are what showed up as
@@ -3715,19 +3760,32 @@ function entryLookupByCurrentSquare(){
     return out;
   }
   if(entryActiveSquare === 'amber'){
-    return entryLookup.filter(p => (p.name||'').toUpperCase().includes('AMBER'));
-  }
-  if(entryActiveSquare === 'neck'){
+    // Whitelist the 9 amber sample types actually collected — filters out
+    // any legacy AMBER-tagged rows that aren't in the current workflow.
+    const wanted = new Set([
+      'amber skin', 'amber - drumsticks skin', 'amber - thighs skin',
+      'amber trim', 'amber meat mix', 'amber back strip',
+      'amber breast skin', 'amber wishbone', 'amber keel bone'
+    ]);
     return entryLookup.filter(p => {
-      const m = entryMimsRowFor(p.mimsBarcode || p.barcode);
-      return m && (m.unit||'').toLowerCase() === 'neck';
+      const n = (p.name||'').toLowerCase().replace(/\s+/g,' ').trim();
+      return wanted.has(n);
     });
   }
-  if(entryActiveSquare === 'caeca'){
+  if(entryActiveSquare === 'neck_caeca'){
+    // Just the two shed-level swabs — neck skin surveillance + caeca testing.
     return entryLookup.filter(p => {
-      const m = entryMimsRowFor(p.mimsBarcode || p.barcode);
-      return m && (m.unit||'').toLowerCase() === 'caeca';
+      const n = (p.name||'').toLowerCase();
+      return n.includes('neck skin surveillance') || n.includes('caeca testing');
     });
+  }
+  if(entryActiveSquare === 'nutri_sl'){
+    // Two synthetic action buttons: Nutritional Bundle + Shelf Life Bundle.
+    // Both open a multi-step wizard (see entryNutritionalOpen, entryShelfLifeOpen).
+    return [
+      { id:'sq_nutri_bundle', name:'Nutritional Bundle', barcode:'', mimsBarcode:'', product:'Product', cat:'Category 1', source:'shortcut', action:'nutritionalBundle', _shortcutLabel:'Nutritional Bundle' },
+      { id:'sq_shelflife_bundle', name:'Shelf Life Bundle', barcode:'', mimsBarcode:'', product:'Product', cat:'Category 1', source:'shortcut', action:'shelfLifeBundle', _shortcutLabel:'Shelf Life Bundle' }
+    ];
   }
   return null;
 }
@@ -3823,26 +3881,43 @@ function entryRetailerColorClass(name){
   return key ? ('line-cust-color-' + key) : '';
 }
 
+// Detect COMMS that's a boilerplate storage instruction rather than a
+// product identifier. Storage instructions get suppressed from the subtitle;
+// anything else (product names in Raw Portions, testing details in
+// Salmonella Testing) shows through so the person can tell rows apart.
+function entryCommsIsBoilerplate(c){
+  if(!c) return true;
+  const s = String(c).toLowerCase();
+  // Skip anything matching the "please follow X COP for storage" family,
+  // plus the fixed "2037, Scunthorpe" note that appears on many rows.
+  if(/please\s+follow\s+.*cop.*storage/i.test(s)) return true;
+  if(/^2037[,\s]+scunthorpe$/i.test(s.trim())) return true;
+  return false;
+}
+
 function entryResultSubtitle(p){
-  // Special-action shortcuts (Swab matrix, Night Hygiene) don't have a MIMS
-  // row behind them — label them as pickers so the person knows one tap
-  // opens a further list, not a confirm card.
   if(p.action === 'swabMatrix') return 'Weekly swab collection · opens picker';
   if(p.action === 'nightHygiene') return 'Environmental swabs by LINE · opens picker';
+  if(p.action === 'nutritionalBundle') return 'Raw / Cooked with turnaround options · opens wizard';
+  if(p.action === 'shelfLifeBundle') return 'K+1 through K+12 sets per retailer · opens wizard';
   const m = entryMimsRowForLookup(p);
   const retailer = (m && m.retailer) || '';
   const suite = (m && m.suite) || '';
   const shift = (m && m.shift) || '';
   const size = (m && m.size) || '';
+  const line = (m && m.line) || '';
+  const other_id = (m && m.other_id) || '';
+  const comms = (m && m.comms) || '';
+  const material = (m && m.material) || '';
   const barcodeText = p.barcode ? p.barcode : '';
   const isDup = entryDupNameSetGet().has((p.name||'').trim().toLowerCase());
-  // Bits, in order: barcode (if any), retailer, shift, size, suite, then
-  // disambiguators only when the name is duplicated across multiple lookup
-  // entries. Shift + size are the two extras — telling apart a Weekly 500g
-  // fillet from a Daily 300g one is the main reason to add them.
-  // Retailer bit is wrapped in the Line Timeline's per-customer color span
-  // (Tesco yellow, Ocado purple, Aldi blue, etc.) so brand recognition is
-  // as fast in the search bar as it is in the timeline.
+  // Bits in order: barcode • retailer • shift • size • suite •
+  //   LINE (for water/env-swab REF codes — the identifying string) •
+  //   OTHER_ID (location like "KFC Fresh Pack 1", "Fresh Pack 2", "Cutting") •
+  //   COMMS (product identifier for Raw Portions: "Diced", "Breast Fillet" —
+  //     and for Salmonella Testing: "Derby" — but NOT boilerplate storage
+  //     notes like "please follow M&S COP for storage").
+  //   MATERIAL / SUITE tail for duplicate names as before.
   const bits = [];
   if(barcodeText) bits.push(esc(barcodeText));
   if(retailer){
@@ -3852,13 +3927,17 @@ function entryResultSubtitle(p){
   if(shift && shift !== '.') bits.push(esc(shift));
   if(size && size !== '.') bits.push(esc(size));
   if(suite) bits.push(esc(suite));
+  // LINE — visible even when it's a REF code (REF9, A12, etc.). Skip the
+  // "." placeholder MIMS uses when a row has no line.
+  if(line && line !== '.') bits.push(esc(line));
+  // OTHER_ID — location. Skip "." placeholder.
+  if(other_id && other_id !== '.') bits.push(esc(other_id));
+  // COMMS — only when it looks like a product/testing identifier, not the
+  // boilerplate storage notes. This is what surfaces "Diced" for a Raw
+  // Portion row and "Derby" for the Salmonella Testing row.
+  if(comms && !entryCommsIsBoilerplate(comms)) bits.push(esc(comms));
   if(isDup && m){
-    // Material is the strongest signal (Hand Swab vs Investigation Swab for
-    // the three Control Swab rows). OTHER_ID next (room / customer). LINE
-    // last, since it's mostly the letter-series stuff.
-    if(m.material) bits.push(esc(m.material));
-    if(m.other_id && m.other_id !== '.') bits.push(esc(m.other_id));
-    if(m.line && !/^\.?$/.test(m.line)) bits.push(esc(m.line));
+    if(material) bits.push(esc(material));
   }
   if(!bits.length) return (p.source==='template' ? 'non-barcode type' : 'no barcode');
   return bits.join(' • ');
@@ -3895,6 +3974,20 @@ document.getElementById('entryResultsAll').addEventListener('click', e=>{
   // single-entry confirm card.
   if(picked.action === 'swabMatrix'){ entrySwabMatrixOpen(); return; }
   if(picked.action === 'nightHygiene'){ entryNightHygieneOpen(); return; }
+  if(picked.action === 'nutritionalBundle'){ entryNutritionalBundleOpen(); return; }
+  if(picked.action === 'shelfLifeBundle'){ entryShelfLifeBundleOpen(); return; }
+  // Quick-add flows: Equipment Swab / Control Swab / Amber (except Amber
+  // Skin) / Neck & Caeca items skip the confirm's category picker and jump
+  // straight to the Entries input with the mobile keyboard open. Category
+  // is auto-suggested from the MIMS SHIFT column.
+  if(entryIsQuickCountPick(picked)){
+    entryOpenConfirm(picked, {
+      quickCount: true,
+      needsBatch: entryIsAmberSkinPick(picked),
+      needsProductComms: entryIsSalmonellaPick(picked)
+    });
+    return;
+  }
   entryOpenConfirm(picked);
 });
 
@@ -4015,6 +4108,10 @@ function entrySwabMatrixGoStage2(){
   document.getElementById('entrySwabMatrixStage1').classList.add('hidden');
   document.getElementById('entrySwabMatrixStage2').classList.remove('hidden');
   document.getElementById('entrySwabMatrixStage3').classList.add('hidden');
+  // Re-scroll so the newly-visible stage 2 buttons are at the bottom of the
+  // viewport (matches the open-behaviour so the person doesn't need to
+  // scroll again to see the newly-relevant options).
+  document.getElementById('entrySwabMatrixCard').scrollIntoView({behavior:'smooth', block:'end'});
 }
 function entrySwabMatrixGoStage3(){
   // Build the full list of items and render a preview
@@ -4053,6 +4150,7 @@ function entrySwabMatrixGoStage3(){
   document.getElementById('entrySwabMatrixStage1').classList.add('hidden');
   document.getElementById('entrySwabMatrixStage2').classList.add('hidden');
   document.getElementById('entrySwabMatrixStage3').classList.remove('hidden');
+  document.getElementById('entrySwabMatrixCard').scrollIntoView({behavior:'smooth', block:'end'});
 }
 
 // Find the MIMS row that best matches an item spec. Score by field
@@ -4240,7 +4338,7 @@ function entryNightHygieneOpen(){
   document.getElementById('entryNightHygieneCard').classList.remove('hidden');
   document.getElementById('entryNightHygieneCard').scrollIntoView({behavior:'smooth', block:'end'});
 }
-let entryNhViewMode = 'list';   // 'list' | 'grid'
+let entryNhViewMode = 'grid';   // 'list' | 'grid' — grid default for rapid tap-through
 let entryNhCurrentLetter = null;
 
 function entryNightHygieneShowLetter(letter){
@@ -4287,6 +4385,9 @@ function entryNightHygieneShowLetter(letter){
   toggleBtn.classList.remove('hidden');
   toggleBtn.textContent = entryNhViewMode === 'grid' ? 'List view' : 'Grid view';
   document.getElementById('entryNightHygieneTitle').textContent = 'Night Hygiene · ' + letter;
+  // Re-scroll so the freshly-loaded swab list sits at the bottom of the
+  // viewport, matching the open-behaviour.
+  document.getElementById('entryNightHygieneCard').scrollIntoView({behavior:'smooth', block:'end'});
 }
 function entryNightHygieneClose(){
   document.getElementById('entryNightHygieneCard').classList.add('hidden');
@@ -4398,7 +4499,40 @@ function entrySuggestCategory(p){
   if(tick) return {cat:'Category 1', tag:'', note:'Already ticked this cycle — defaulting to Daily'};
   return {cat:'Category 1', tag:'', note:''};
 }
-function entryOpenConfirm(p){
+// Quick-count lookup picks: skip the confirm's category picker and go
+// straight to Entries + keypad. Category is auto-suggested from the MIMS
+// SHIFT column. Set:
+//   • Equipment Swab (Live collection)
+//   • Control Swab (Investigation Swab / 2SS002)
+//   • Any Amber item (whitelisted 9 in entryLookupByCurrentSquare)
+//   • Neck skin surveillance + Caeca testing rows
+//   • Salmonella Testing (Derby row)
+function entryIsQuickCountPick(p){
+  if(!p) return false;
+  const n = (p.name||'').toLowerCase();
+  if(n.includes('2s group-3 live collection')) return true;
+  if(n === 'control swab') return true;
+  if(n.startsWith('amber')) return true;
+  if(n.includes('neck skin surveillance')) return true;
+  if(n.includes('caeca testing')) return true;
+  if(n.includes('salmonella testing')) return true;
+  return false;
+}
+// Amber Skin specifically prompts for BE706-style batch codes after commit.
+function entryIsAmberSkinPick(p){
+  if(!p) return false;
+  return (p.name||'').toLowerCase().trim() === 'amber skin';
+}
+// Salmonella Testing prompts for a product name that replaces the COMMS
+// cell of the emitted records (default MIMS COMMS on that row is "Derby",
+// which is a testing family label, not the actual product being tested).
+function entryIsSalmonellaPick(p){
+  if(!p) return false;
+  return (p.name||'').toLowerCase().includes('salmonella testing');
+}
+
+function entryOpenConfirm(p, opts){
+  opts = opts || {};
   const sug=entrySuggestCategory(p);
   // p.barcode is empty for non-barcoded MIMS rows; the internal join key is
   // p.mimsBarcode (real barcode or a synthetic MIMS_NNNN). Carry both.
@@ -4408,6 +4542,7 @@ function entryOpenConfirm(p){
   // uses them to pick the exact MIMS row this lookup entry pointed at.
   // origin='search' — set by everything that goes through the search bar or
   // the four squares (below). Camera path sets origin='camera' directly.
+  // quickCount / needsBatch propagate to the commit path.
   entryPending={
     desc:p.name,
     barcode:p.barcode||'',
@@ -4415,9 +4550,36 @@ function entryOpenConfirm(p){
     mimsSuite: p.mimsSuite || '',
     mimsShift: p.mimsShift || '',
     cat:sug.cat, entries:1, lookupEntry:p,
-    origin:'search'
+    origin:'search',
+    quickCount: !!opts.quickCount,
+    needsBatch: !!opts.needsBatch,
+    needsProductComms: !!opts.needsProductComms
   };
   entryShowConfirm(sug);
+  // Quick-count flow: hide the category picker, focus the Entries input, pop
+  // the mobile keyboard. Everything else on the confirm card stays visible
+  // (Description, Add to sequence button).
+  if(opts.quickCount){
+    const catGrid = document.querySelector('#entryConfirmCard .entry-catgrid');
+    if(catGrid) catGrid.style.display = 'none';
+    const catLabel = document.querySelector('#entryConfirmCard label + .entry-catgrid');
+    // The <label>Category</label> sits right before the grid — hide it too.
+    const labels = document.querySelectorAll('#entryConfirmCard label');
+    labels.forEach(l => { if(l.textContent.trim().toLowerCase()==='category') l.style.display='none'; });
+    const entriesInput = document.getElementById('entryFEntries');
+    if(entriesInput){
+      entriesInput.value = '';
+      // Delay focus one tick so the card is fully painted before we open
+      // the keyboard — otherwise iOS Safari refuses to bring it up.
+      setTimeout(()=>{ entriesInput.focus(); entriesInput.select(); }, 60);
+    }
+  } else {
+    // Normal flow: make sure category picker + label are visible.
+    const catGrid = document.querySelector('#entryConfirmCard .entry-catgrid');
+    if(catGrid) catGrid.style.display = '';
+    const labels = document.querySelectorAll('#entryConfirmCard label');
+    labels.forEach(l => { if(l.textContent.trim().toLowerCase()==='category') l.style.display=''; });
+  }
 }
 
 /* ============================================================
@@ -4800,13 +4962,22 @@ function entryCommit(){
       for(let i=0;i<5;i++) seq.push({row:solRow, cat:'Category 5'});
     }
 
+    // MIMS Product row's descrpton is the authoritative product name for
+    // export (e.g. "Garlic & Herb Spatchcock", not the lookup entry's
+    // "Aldi garlic spatchcock"). Use it for the DESCRIPTN cell across all
+    // 11 records in the bundle — the reference file has the same MIMS name
+    // repeated on every row of a Meat Prep bundle.
+    const authoritativeDesc = (mimsRow && mimsRow.descrptn) ? mimsRow.descrptn : entryPending.desc;
+
     seq.forEach((step,k) => {
       const r = step.row;
       const push = {
         num: n+k,
-        desc: entryPending.desc,
+        desc: authoritativeDesc,
         barcode: entryPending.barcode,
         mimsBarcode: r ? r.barcode : (entryPending.mimsBarcode || entryPending.barcode),
+        mimsSuite: r ? (r.suite||'') : (entryPending.mimsSuite||''),
+        mimsShift: r ? (r.shift||'') : (entryPending.mimsShift||''),
         cat: step.cat,
         time: now.toISOString(),
         source: r ? 'meat-prep' : (mimsRow ? 'mims' : 'lookup'),
@@ -4814,10 +4985,10 @@ function entryCommit(){
         mimsRow: r || mimsRow || null
       };
       // Meat Prep MIMS rows have empty DESCRIPTION in the file — the export
-      // row builder already falls back to r.desc (the scanned product name)
-      // when mimsRow.descrptn is empty, so no explicit override is needed
-      // for the DESCRIPTN column here. Keeping the record's `desc` field
-      // set is what does the work.
+      // row builder falls back to r.desc when mimsRow.descrptn is empty. We
+      // set r.desc to the authoritative product name (from the SCANNED
+      // product's MIMS row), so all 5+1+5 rows in the bundle export with
+      // the same product name — matching how the reference file reads.
       entryRecords.push(push);
       newNums.push(n+k);
     });
@@ -4877,11 +5048,21 @@ function entryCommit(){
   // Capture how this entry was picked BEFORE nulling entryPending — the
   // camera-vs-search decision at the end of the function needs this value.
   const commitOrigin = entryPending.origin || 'search';
+  // Follow-up prompts (Amber Skin batch, Salmonella product-for-COMMS): pull
+  // these BEFORE nulling entryPending so we can trigger the right prompt
+  // after the confirm card closes. The record nums that need the follow-up
+  // are captured in newNums.
+  const followUpBatch = !!entryPending.needsBatch;
+  const followUpComms = !!entryPending.needsProductComms;
   entryPending=null;
   document.getElementById('entryConfirmCard').classList.add('hidden');
   document.getElementById('entrySearchAll').value='';
   document.getElementById('entryResultsAll').innerHTML='';
-  // Caeca/Neck: launch the guided kill date \u2192 pack date \u2192 per-record time+line
+  // Follow-up prompts, checked before the Caeca/Neck wizard (which is a
+  // separate flow entirely for that specific product family).
+  if(followUpBatch){ entryStartBatchLoop(newNums); return; }
+  if(followUpComms){ entryPromptCommsFor(newNums); return; }
+  // Caeca/Neck: launch the guided kill date → pack date → per-record time+line
   // wizard right away, instead of camera/search grabbing focus back.
   const firstNew = entryRecords.find(r=>r.num===newNums[0]);
   if(firstNew && entryIsCaecaNeck(firstNew)){
@@ -4972,6 +5153,114 @@ function entryWizardFinish(){
   document.getElementById('entryWizardOverlay').classList.add('hidden');
   entryWizard=null;
   renderEntryAll();
+}
+
+/* -------- Amber Skin batch code loop --------
+   Walks records one by one, prompts for a 3-4 digit code, expands it to
+   "BE708" (etc.) and stores as manualCellOverrides.BATCH so the export
+   carries it in the BATCH column. Skip button leaves the record's batch
+   blank and moves on. */
+let entryBatchLoop = null;
+function entryStartBatchLoop(nums){
+  entryBatchLoop = { nums, idx: 0 };
+  entryBatchLoopShow();
+}
+function entryBatchLoopShow(){
+  if(!entryBatchLoop || entryBatchLoop.idx >= entryBatchLoop.nums.length){
+    entryBatchLoopFinish();
+    return;
+  }
+  const num = entryBatchLoop.nums[entryBatchLoop.idx];
+  const total = entryBatchLoop.nums.length;
+  document.getElementById('entryBatchLoopLabel').textContent =
+    `Batch for entry #${num} (${entryBatchLoop.idx+1} of ${total}) — e.g. 708 → BE708`;
+  const input = document.getElementById('entryBatchLoopInput');
+  input.value = '';
+  document.getElementById('entryBatchLoopCard').classList.remove('hidden');
+  document.getElementById('entryBatchLoopCard').scrollIntoView({behavior:'smooth', block:'end'});
+  // Slight delay so the card is painted before focus — iOS needs this to
+  // pop the keyboard.
+  setTimeout(()=>{ input.focus(); }, 60);
+}
+function entryBatchLoopCommit(save){
+  if(!entryBatchLoop) return;
+  const num = entryBatchLoop.nums[entryBatchLoop.idx];
+  if(save){
+    const raw = document.getElementById('entryBatchLoopInput').value.trim();
+    if(raw){
+      // Expand "708" → "BE708". If the person already typed a full "BE708",
+      // keep it. Non-digit + non-BE prefixes get passed through as-is.
+      const digits = raw.replace(/[^0-9]/g,'');
+      let value = raw;
+      if(/^BE\d+$/i.test(raw)){ value = raw.toUpperCase(); }
+      else if(digits && digits === raw){ value = 'BE' + digits; }
+      const rec = entryRecords.find(x=>x.num===num);
+      if(rec){
+        if(!rec.manualCellOverrides) rec.manualCellOverrides = {};
+        rec.manualCellOverrides.BATCH = value;
+      }
+    }
+  }
+  entryBatchLoop.idx++;
+  entryBatchLoopShow();
+}
+function entryBatchLoopFinish(){
+  entryBatchLoop = null;
+  document.getElementById('entryBatchLoopCard').classList.add('hidden');
+  entrySaveLocal();
+  renderEntryAll();
+}
+document.getElementById('entryBatchLoopSave').addEventListener('click', ()=> entryBatchLoopCommit(true));
+document.getElementById('entryBatchLoopSkip').addEventListener('click', ()=> entryBatchLoopCommit(false));
+document.getElementById('entryBatchLoopInput').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){ e.preventDefault(); entryBatchLoopCommit(true); }
+});
+
+/* -------- Salmonella Testing product-for-COMMS prompt --------
+   One value (e.g. "Thighs") applied to every record's COMMS column via
+   manualCellOverrides.COMMS. Skip = leave the MIMS COMMS default (usually
+   "Derby" for this row) unchanged. */
+let entryCommsPromptNums = null;
+function entryPromptCommsFor(nums){
+  entryCommsPromptNums = nums;
+  const input = document.getElementById('entryCommsPromptInput');
+  input.value = '';
+  document.getElementById('entryCommsPromptCard').classList.remove('hidden');
+  document.getElementById('entryCommsPromptCard').scrollIntoView({behavior:'smooth', block:'end'});
+  setTimeout(()=>{ input.focus(); }, 60);
+}
+function entryCommsPromptFinish(save){
+  if(!entryCommsPromptNums) return;
+  if(save){
+    const v = document.getElementById('entryCommsPromptInput').value.trim();
+    if(v){
+      entryCommsPromptNums.forEach(num => {
+        const rec = entryRecords.find(x=>x.num===num);
+        if(!rec) return;
+        if(!rec.manualCellOverrides) rec.manualCellOverrides = {};
+        rec.manualCellOverrides.COMMS = v;
+      });
+    }
+  }
+  entryCommsPromptNums = null;
+  document.getElementById('entryCommsPromptCard').classList.add('hidden');
+  entrySaveLocal();
+  renderEntryAll();
+}
+document.getElementById('entryCommsPromptSave').addEventListener('click', ()=> entryCommsPromptFinish(true));
+document.getElementById('entryCommsPromptSkip').addEventListener('click', ()=> entryCommsPromptFinish(false));
+document.getElementById('entryCommsPromptInput').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){ e.preventDefault(); entryCommsPromptFinish(true); }
+});
+
+// Bundle wizards for Nutritionals & Shelf-Life square. Full multi-stage
+// wizards are on the roadmap for the next turn — for now they surface a
+// short toast so the buttons don't throw.
+function entryNutritionalBundleOpen(){
+  entryFlashToast('Nutritional Bundle wizard coming next turn — Raw/Cooked + turnaround + sets');
+}
+function entryShelfLifeBundleOpen(){
+  entryFlashToast('Shelf Life Bundle wizard coming next turn — K+1/3/5/7/8/9/10 × 3 sets per retailer');
 }
 function entryWizardCommitTime(){
   const buf=entryWizard.buffer;
@@ -5577,6 +5866,13 @@ function entryExportEditCell(num, h, initial){
         const nc = Math.max(0, Math.min(grid[nr].length-1, ci + moveDir.dc));
         const t = grid[nr][nc];
         entryExportSetFocus(t.num, t.h);
+        // Auto-re-enter edit mode on the new cell so the person can keep
+        // typing without another tap. This is what makes rapid data entry
+        // work on mobile (keyboard stays open) and matches Excel Mobile.
+        // Skip the auto-edit only if the moved-to cell isn't editable
+        // (shouldn't happen with the current schema — every cell is
+        // editable — but defensive).
+        entryExportEditCell(t.num, t.h);
       }
     } else {
       // Blur / Escape: keep focus on the same cell.
@@ -5604,12 +5900,29 @@ document.getElementById('entryExportTable').addEventListener('click', e=>{
   if(e.target.tagName === 'INPUT') return;
   const num = parseInt(td.dataset.num, 10);
   const h = td.dataset.h;
+  // Excel behaviour:
+  //   • 1st tap on a cell → "type-to-replace" mode. Input opens with the
+  //     whole value selected; typing replaces immediately. Keyboard opens
+  //     on mobile. This is Excel's default cell-select behaviour.
+  //   • 2nd tap on the SAME already-editing cell → "edit-in-place" mode.
+  //     Caret sits at end of text; typing inserts without replacing.
+  //     Outline turns blue to signal the mode change.
+  //   • Tap on a DIFFERENT cell → commit current, open new cell in
+  //     type-to-replace mode.
+  const alreadyEditing = entryExportEditing && entryExportFocus
+    && entryExportFocus.num === num && entryExportFocus.h === h;
+  if(alreadyEditing){
+    // Switch from type-to-replace to edit-in-place. Deselect the input's
+    // selection and add the "edit" class so the outline turns blue.
+    const input = td.querySelector('input');
+    if(input){
+      const l = input.value.length;
+      input.setSelectionRange(l, l);
+      td.classList.add('entry-export-edit-mode');
+    }
+    return;
+  }
   entryExportSetFocus(num, h);
-  // Double-click on a cell should open the editor immediately; a single tap
-  // just focuses. On mobile there's no "double click" convention, so single
-  // tap opens the editor after a short delay to allow drag-to-focus. Given
-  // this is primarily a keyboard-driven flow, we keep it simple: any tap on
-  // a cell opens the editor, and keyboard nav on desktop takes over from there.
   entryExportEditCell(num, h);
 });
 
@@ -7582,6 +7895,25 @@ function lineParseKfcSheet(sheetRows){
 function lineFindSheetName(wb, patterns){
   return wb.SheetNames.find(n=>patterns.some(p=>n.toLowerCase().includes(p)));
 }
+// Version-blind sheet finder: returns EVERY sheet whose name matches the
+// pattern set. When a Foreign Body Detector export contains both "Foreign
+// Body 29" and "Foreign Body 30" (an audit-version rev bumped the tab
+// name, leaving the earlier version alongside the new one), this returns
+// both so we can merge the rows and show a complete timeline instead of
+// only the first match. Also handles a single-match file transparently.
+function lineFindAllSheetNames(wb, patterns){
+  return wb.SheetNames.filter(n => patterns.some(p => n.toLowerCase().includes(p)));
+}
+// Concatenate rows across all matching sheets. Same reader as
+// lineReadSheetRows, just applied to a list of sheet names.
+function lineReadRowsAcrossSheets(wb, sheetNames){
+  const all = [];
+  sheetNames.forEach(n => {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[n], { defval:null, raw:true });
+    rows.forEach(r => all.push(r));
+  });
+  return all;
+}
 function lineReadSheetRows(wb, sheetName){
   return XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval:null, raw:true });
 }
@@ -7697,18 +8029,18 @@ function lineBoothIdentity(productName){
 
 function lineCollectRanProducts(wb){
   const ran=[]; // { roomKey, product, customer }
-  const fbSheetName=lineFindSheetName(wb,['foreign body','metal','detecto']);
-  if(fbSheetName){
-    const rows=lineReadSheetRows(wb,fbSheetName);
+  const fbSheetNames = lineFindAllSheetNames(wb,['foreign body','metal','detecto']);
+  if(fbSheetNames.length){
+    const rows = lineReadRowsAcrossSheets(wb, fbSheetNames);
     lineParseForeignBodySheet(rows).forEach(r=>{
       if(!r.down && r.product) ran.push({ roomKey:r.roomKey==='kfc'?'kfc':r.roomKey, product:r.product, customer:r.customer||'' });
     });
     ran.push(...lineCollectKfcRanEvidence(rows));
     ran.push(...lineCollectBoothRanEvidence(rows));
   }
-  const kfcSheetName=lineFindSheetName(wb,['kfc']);
-  if(kfcSheetName){
-    const rows=lineReadSheetRows(wb,kfcSheetName);
+  const kfcSheetNames = lineFindAllSheetNames(wb,['kfc']);
+  if(kfcSheetNames.length){
+    const rows = lineReadRowsAcrossSheets(wb, kfcSheetNames);
     lineParseKfcSheet(rows).forEach(ev=>{
       if(ev.productType) ran.push({ roomKey:'kfc', product:ev.productType, customer:'KFC' });
     });
@@ -7879,18 +8211,22 @@ function lineHandleFile(file){
   reader.onload=(e)=>{
     try{
       const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
-      const fbSheetName=lineFindSheetName(wb,['foreign body','metal','detecto']);
-      const kfcSheetName=lineFindSheetName(wb,['kfc']);
+      // Version-blind: an audit rev bump can leave "Foreign Body 29" and
+      // "Foreign Body 30" side by side in the same file. Read across all
+      // matching sheets so the timeline reflects the full data, not just
+      // whichever tab happens to come first.
+      const fbSheetNames = lineFindAllSheetNames(wb,['foreign body','metal','detecto']);
+      const kfcSheetNames = lineFindAllSheetNames(wb,['kfc']);
       let roomsData=null, kfcEvents=null;
       let records=[];
-      if(fbSheetName){
-        const rows=lineReadSheetRows(wb,fbSheetName);
-        records=lineParseForeignBodySheet(rows);
+      if(fbSheetNames.length){
+        const rows = lineReadRowsAcrossSheets(wb, fbSheetNames);
+        records = lineParseForeignBodySheet(rows);
       }
-      if(kfcSheetName){
-        const rows=lineReadSheetRows(wb,kfcSheetName);
-        const events=lineParseKfcSheet(rows);
-        if(events.length>0) kfcEvents=events;
+      if(kfcSheetNames.length){
+        const rows = lineReadRowsAcrossSheets(wb, kfcSheetNames);
+        const events = lineParseKfcSheet(rows);
+        if(events.length>0) kfcEvents = events;
       }
       // KFC Line 1's real product identity comes from Start-Up, not the foreign-body
       // sheet (whose KFC rows only ever carry generic "Wholebird" noise, already
