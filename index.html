@@ -5981,9 +5981,10 @@ function entryShelfCommit(){
         time: now.toISOString(),
         source: 'shelf-life-bundle',
         tmpl: null,
-        // shelfSeedRow carries the ODS row for the export builder to read
-        // PRODUCT/MATERIAL/RISE/RETAILER/SHIFT/SUITE/PRICE/SUPPLIER/COMMS/
-        // CLIENT/PERIOD/EOL from directly — no MIMS lookup needed.
+        // retailer is the wizard's chosen customer — goes into RETAILER
+        // column of the export. The seed rows don't carry retailer since
+        // they're partitioned per-retailer already, so we set it here.
+        retailer: s.retailer,
         shelfSeedRow: seedRow,
         noSampCount: true,
         manualCellOverrides: {
@@ -6999,7 +7000,7 @@ function entryBuildSisRow(r){
     row.RISE = sr.rise || 'Fresh';
     row.UNIT = sr.unit || '';
     row.DESCRIPTN = r.desc || sr.descrptn || '';
-    row.RETAILER = sr.retailer || '';
+    row.RETAILER = r.retailer || sr.retailer || '';
     row.SHIFT = sr.shift || 'Annually';
     row.OTHER_ID = sr.other_id || '';
     row.SUITE = sr.suite || '';
@@ -7416,7 +7417,14 @@ function entrySyncApplyRemote(snapshot){
           if(rt > lt) byNum.set(rr.num, rr);
         }
       });
-      entryRecords = [...byNum.values()].sort((a,b)=>a.num-b.num);
+      entryRecords = [...byNum.values()].sort((a,b)=>{
+        // Insertion order — use time field. Shelf-life records have negative
+        // synthetic nums, so sorting by num would put them at the top; sorting
+        // by time keeps them where they were added.
+        const ta = new Date(a.time||0).getTime();
+        const tb = new Date(b.time||0).getTime();
+        return ta - tb;
+      });
     }
     // Tombstones: union both sides, keeping the LATER deletion time for any
     // num present in both. Then drop every record the merged tombstone set
