@@ -1163,27 +1163,6 @@
          Person types 3-4 digits (708 → BE708, 4 → BE4, or full BEnnn) and
          hits Enter/Save; card advances to the next record until every one
          in the batch has a batch code. -->
-    <div class="card-like hidden" id="entryBatchLoopCard">
-      <label id="entryBatchLoopLabel">Batch for entry #1 (e.g. 708 → BE708)</label>
-      <input type="text" id="entryBatchLoopInput" inputmode="numeric" placeholder="708" maxlength="6">
-      <div class="entry-hint" style="margin-top:6px;">Type 3-4 digits then Enter. Skip to finish.</div>
-      <div class="sheet-actions" style="margin-top:8px;">
-        <button class="btn ghost" id="entryBatchLoopSkip">Skip this record</button>
-        <button class="btn primary" id="entryBatchLoopSave">Save + next</button>
-      </div>
-    </div>
-
-    <!-- Salmonella Testing product-for-COMMS prompt. One shared value applied
-         to every emitted record's COMMS column (via manualCellOverrides.COMMS). -->
-    <div class="card-like hidden" id="entryCommsPromptCard">
-      <label id="entryCommsPromptLabel">Product (goes into COMMS column)</label>
-      <input type="text" id="entryCommsPromptInput" placeholder="e.g. Thighs">
-      <div class="sheet-actions" style="margin-top:8px;">
-        <button class="btn ghost" id="entryCommsPromptSkip">Skip</button>
-        <button class="btn primary" id="entryCommsPromptSave">Save</button>
-      </div>
-    </div>
-
     <!-- Export view — the descriptive hint above the table is removed, since the
          table itself is what matters and the label is already "Export view". -->
     <div id="entryExportWrap" class="hidden">
@@ -1221,6 +1200,61 @@
       <div class="sheet-actions" id="entryWizardActions">
         <button class="btn ghost" id="entryWizardSkip">Skip</button>
         <button class="btn primary" id="entryWizardNext">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Amber Skin batch loop — full-screen overlay so it shows up regardless of
+       whichever tab triggered the commit. One record at a time; person types
+       3-4 digits (708) and Save/Enter expands to "BE708" into the BATCH column. -->
+  <div class="entry-ref-overlay hidden" id="entryBatchLoopOverlay">
+    <div class="entry-ref-sheet">
+      <label id="entryBatchLoopLabel">Batch for entry #1 (e.g. 708 → BE708)</label>
+      <input type="text" id="entryBatchLoopInput" inputmode="numeric" placeholder="708" maxlength="6">
+      <div class="entry-hint" style="margin-top:6px;">Type 3-4 digits then Enter. Skip to leave this one blank.</div>
+      <div class="sheet-actions" style="margin-top:8px;">
+        <button class="btn ghost" id="entryBatchLoopSkip">Skip</button>
+        <button class="btn ghost" id="entryBatchLoopDone">Done all</button>
+        <button class="btn primary" id="entryBatchLoopSave">Save + next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Salmonella Testing product-for-COMMS prompt — single value applied to
+       every record in the just-committed batch. -->
+  <div class="entry-ref-overlay hidden" id="entryCommsPromptOverlay">
+    <div class="entry-ref-sheet">
+      <label id="entryCommsPromptLabel">Product (goes into COMMS column)</label>
+      <input type="text" id="entryCommsPromptInput" placeholder="e.g. Thighs">
+      <div class="sheet-actions" style="margin-top:8px;">
+        <button class="btn ghost" id="entryCommsPromptSkip">Skip</button>
+        <button class="btn primary" id="entryCommsPromptSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nutritional Bundle wizard: Raw/Cooked → Turnaround → Sets → Product → Size → commit. -->
+  <div class="entry-ref-overlay hidden" id="entryNutriOverlay">
+    <div class="entry-ref-sheet">
+      <div id="entryNutriStageLabel" class="entry-suggest-badge"></div>
+      <div id="entryNutriBody"></div>
+      <div class="sheet-actions" style="margin-top:12px;">
+        <button class="btn ghost" id="entryNutriBack">Back</button>
+        <button class="btn ghost" id="entryNutriCancel">Cancel</button>
+        <button class="btn primary" id="entryNutriNext">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shelf Life Bundle wizard: Retailer → Product → Size → Unit → Department → commit. -->
+  <div class="entry-ref-overlay hidden" id="entryShelfOverlay">
+    <div class="entry-ref-sheet">
+      <div id="entryShelfStageLabel" class="entry-suggest-badge"></div>
+      <div id="entryShelfBody"></div>
+      <div class="sheet-actions" style="margin-top:12px;">
+        <button class="btn ghost" id="entryShelfBack">Back</button>
+        <button class="btn ghost" id="entryShelfCancel">Cancel</button>
+        <button class="btn primary" id="entryShelfNext">Next</button>
       </div>
     </div>
   </div>
@@ -3675,8 +3709,14 @@ function entrySaveLookup(){
 }
 
 function entryNextNumber(){
-  if(!entryRecords.length) return 1;
-  return Math.max(...entryRecords.map(r=>r.num)) + 1;
+  // Numbered records only — shelf-life records carry either a null num or a
+  // synthetic negative num (see entryShelfCommit); the noSampCount flag is
+  // the authoritative "leave SAMPCOUNT blank" signal. Skip all of those.
+  const nums = entryRecords
+    .filter(r => !r.noSampCount && r.num != null && r.num > 0)
+    .map(r => r.num);
+  if(!nums.length) return 1;
+  return Math.max(...nums) + 1;
 }
 
 /* ============================================================
@@ -3976,10 +4016,17 @@ document.getElementById('entryResultsAll').addEventListener('click', e=>{
   if(picked.action === 'nightHygiene'){ entryNightHygieneOpen(); return; }
   if(picked.action === 'nutritionalBundle'){ entryNutritionalBundleOpen(); return; }
   if(picked.action === 'shelfLifeBundle'){ entryShelfLifeBundleOpen(); return; }
-  // Quick-add flows: Equipment Swab / Control Swab / Amber (except Amber
-  // Skin) / Neck & Caeca items skip the confirm's category picker and jump
-  // straight to the Entries input with the mobile keyboard open. Category
-  // is auto-suggested from the MIMS SHIFT column.
+  // Amber items (except Amber Skin) are "tap and add" — a single tap adds
+  // one record directly to the sequence with no confirm card. Amber Skin
+  // still goes through the quick-count flow so the person can request 4
+  // records and get the batch loop after.
+  if(entryIsAmberTapAddPick(picked)){
+    entryTapAddOne(picked);
+    return;
+  }
+  // Quick-add flows: Equipment Swab / Control Swab / Amber Skin / Neck &
+  // Caeca items / Salmonella Testing skip the confirm's category picker
+  // and jump straight to the Entries input with the mobile keyboard open.
   if(entryIsQuickCountPick(picked)){
     entryOpenConfirm(picked, {
       quickCount: true,
@@ -4529,6 +4576,46 @@ function entryIsAmberSkinPick(p){
 function entryIsSalmonellaPick(p){
   if(!p) return false;
   return (p.name||'').toLowerCase().includes('salmonella testing');
+}
+// Non-AmberSkin amber items — single-tap adds one record directly to the
+// sequence, no confirm card. Amber Skin (which needs the count prompt +
+// batch loop) still goes through the normal quick-count flow.
+function entryIsAmberTapAddPick(p){
+  if(!p) return false;
+  const n = (p.name||'').toLowerCase().trim();
+  if(!n.startsWith('amber')) return false;
+  if(n === 'amber skin') return false;
+  return true;
+}
+
+// One-tap add: push one record straight into the sequence for the picked
+// lookup entry, no confirm card. Category is auto-suggested from the MIMS
+// SHIFT column, same as quick-count would. Used by non-AmberSkin amber
+// items. Green toast confirms the addition so the person knows it landed.
+function entryTapAddOne(p){
+  const sug = entrySuggestCategory(p);
+  const joinKey = p.mimsBarcode || p.barcode || '';
+  const mimsRow = entryMimsRowForLookup(p);
+  const now = new Date();
+  const n = entryNextNumber();
+  entryRecords.push({
+    num: n, desc: p.name,
+    barcode: p.barcode || '',
+    mimsBarcode: joinKey,
+    mimsSuite: p.mimsSuite || '',
+    mimsShift: p.mimsShift || '',
+    cat: sug.cat,
+    time: now.toISOString(),
+    source: mimsRow ? 'mims' : 'lookup',
+    tmpl: p.tmpl || null,
+    mimsRow: mimsRow || null
+  });
+  entrySaveLocal();
+  // Clear the search bar so consecutive taps on different amber items
+  // don't require re-typing. Results list stays scoped to the amber square.
+  document.getElementById('entrySearchAll').value = '';
+  renderEntryAll();
+  try{ entryFlashToast(`Added #${n}: ${p.name}`); }catch(_e){}
 }
 
 function entryOpenConfirm(p, opts){
@@ -5156,10 +5243,10 @@ function entryWizardFinish(){
 }
 
 /* -------- Amber Skin batch code loop --------
-   Walks records one by one, prompts for a 3-4 digit code, expands it to
-   "BE708" (etc.) and stores as manualCellOverrides.BATCH so the export
-   carries it in the BATCH column. Skip button leaves the record's batch
-   blank and moves on. */
+   Walks the just-committed records one by one, prompts for a 3-4 digit code,
+   expands "708" → "BE708" and stores as manualCellOverrides.BATCH so the
+   export writes it into the BATCH column. Full-screen overlay so it's visible
+   regardless of which tab triggered the commit — matches Neck/Caeca wizard. */
 let entryBatchLoop = null;
 function entryStartBatchLoop(nums){
   entryBatchLoop = { nums, idx: 0 };
@@ -5176,9 +5263,8 @@ function entryBatchLoopShow(){
     `Batch for entry #${num} (${entryBatchLoop.idx+1} of ${total}) — e.g. 708 → BE708`;
   const input = document.getElementById('entryBatchLoopInput');
   input.value = '';
-  document.getElementById('entryBatchLoopCard').classList.remove('hidden');
-  document.getElementById('entryBatchLoopCard').scrollIntoView({behavior:'smooth', block:'end'});
-  // Slight delay so the card is painted before focus — iOS needs this to
+  document.getElementById('entryBatchLoopOverlay').classList.remove('hidden');
+  // Slight delay so the overlay is painted before focus — iOS needs this to
   // pop the keyboard.
   setTimeout(()=>{ input.focus(); }, 60);
 }
@@ -5188,8 +5274,6 @@ function entryBatchLoopCommit(save){
   if(save){
     const raw = document.getElementById('entryBatchLoopInput').value.trim();
     if(raw){
-      // Expand "708" → "BE708". If the person already typed a full "BE708",
-      // keep it. Non-digit + non-BE prefixes get passed through as-is.
       const digits = raw.replace(/[^0-9]/g,'');
       let value = raw;
       if(/^BE\d+$/i.test(raw)){ value = raw.toUpperCase(); }
@@ -5206,27 +5290,26 @@ function entryBatchLoopCommit(save){
 }
 function entryBatchLoopFinish(){
   entryBatchLoop = null;
-  document.getElementById('entryBatchLoopCard').classList.add('hidden');
+  document.getElementById('entryBatchLoopOverlay').classList.add('hidden');
   entrySaveLocal();
   renderEntryAll();
 }
 document.getElementById('entryBatchLoopSave').addEventListener('click', ()=> entryBatchLoopCommit(true));
 document.getElementById('entryBatchLoopSkip').addEventListener('click', ()=> entryBatchLoopCommit(false));
+document.getElementById('entryBatchLoopDone').addEventListener('click', ()=> entryBatchLoopFinish());
 document.getElementById('entryBatchLoopInput').addEventListener('keydown', (e)=>{
   if(e.key === 'Enter'){ e.preventDefault(); entryBatchLoopCommit(true); }
 });
 
 /* -------- Salmonella Testing product-for-COMMS prompt --------
-   One value (e.g. "Thighs") applied to every record's COMMS column via
-   manualCellOverrides.COMMS. Skip = leave the MIMS COMMS default (usually
-   "Derby" for this row) unchanged. */
+   One value applied to every record in the just-committed batch. Full-screen
+   overlay for the same reason as the batch loop. */
 let entryCommsPromptNums = null;
 function entryPromptCommsFor(nums){
   entryCommsPromptNums = nums;
   const input = document.getElementById('entryCommsPromptInput');
   input.value = '';
-  document.getElementById('entryCommsPromptCard').classList.remove('hidden');
-  document.getElementById('entryCommsPromptCard').scrollIntoView({behavior:'smooth', block:'end'});
+  document.getElementById('entryCommsPromptOverlay').classList.remove('hidden');
   setTimeout(()=>{ input.focus(); }, 60);
 }
 function entryCommsPromptFinish(save){
@@ -5243,7 +5326,7 @@ function entryCommsPromptFinish(save){
     }
   }
   entryCommsPromptNums = null;
-  document.getElementById('entryCommsPromptCard').classList.add('hidden');
+  document.getElementById('entryCommsPromptOverlay').classList.add('hidden');
   entrySaveLocal();
   renderEntryAll();
 }
@@ -5257,11 +5340,357 @@ document.getElementById('entryCommsPromptInput').addEventListener('keydown', (e)
 // wizards are on the roadmap for the next turn — for now they surface a
 // short toast so the buttons don't throw.
 function entryNutritionalBundleOpen(){
-  entryFlashToast('Nutritional Bundle wizard coming next turn — Raw/Cooked + turnaround + sets');
+  entryNutriState = {
+    stage: 1,
+    types: new Set(),   // 'raw' / 'cooked'
+    turnaround: null,   // '3' / '5' / '10'
+    sets: 1,            // 1 / 2 / 3
+    product: '',
+    size: ''
+  };
+  entryNutriRender();
+  document.getElementById('entryNutriOverlay').classList.remove('hidden');
 }
 function entryShelfLifeBundleOpen(){
-  entryFlashToast('Shelf Life Bundle wizard coming next turn — K+1/3/5/7/8/9/10 × 3 sets per retailer');
+  entryShelfState = {
+    stage: 1,
+    retailer: '',
+    product: '',
+    size: '',
+    unit: '',
+    department: ''
+  };
+  entryShelfRender();
+  document.getElementById('entryShelfOverlay').classList.remove('hidden');
 }
+
+/* ===== Nutritional Bundle Wizard =====
+   Stage 1: Raw / Cooked (multi-select)
+   Stage 2: 3-day / 5-day / 10-day turnaround (single-select — each maps
+            to a specific MIMS SUITE per type)
+   Stage 3: 1 / 2 / 3 sets (single-select; one set = 3 records per type)
+   Stage 4: Product name (goes into DESCRIPTN, replacing [ENTER DESCRIPTION])
+   Stage 5: Size (goes into SIZE column) — Add commits.
+
+   SUITE map (from the reference MIMS):
+     Raw    3d = 2SP001C, 5d = 2SP002C, 10d = 2SP003C
+     Cooked 3d = 2SP007C, 5d = 2SP008C, 10d = 2SP009C
+
+   Records are numbered normally (SAMPCOUNT increments). */
+const ENTRY_NUTRI_SUITES = {
+  raw:    { '3': '2SP001C', '5': '2SP002C', '10': '2SP003C' },
+  cooked: { '3': '2SP007C', '5': '2SP008C', '10': '2SP009C' }
+};
+let entryNutriState = null;
+function entryNutriRender(){
+  if(!entryNutriState) return;
+  const label = document.getElementById('entryNutriStageLabel');
+  const body = document.getElementById('entryNutriBody');
+  const nextBtn = document.getElementById('entryNutriNext');
+  const backBtn = document.getElementById('entryNutriBack');
+  backBtn.style.visibility = entryNutriState.stage === 1 ? 'hidden' : 'visible';
+  nextBtn.textContent = entryNutriState.stage === 5 ? 'Add to sequence' : 'Next';
+  const s = entryNutriState;
+  if(s.stage === 1){
+    label.textContent = 'Nutritional Bundle — Stage 1 of 5';
+    body.innerHTML = `
+      <label style="display:block; margin-bottom:8px;">Type (select one or both)</label>
+      <div class="entry-picker-grid" style="grid-template-columns:1fr 1fr;">
+        <button type="button" class="entry-picker-btn ${s.types.has('raw')?'sel':''}" data-type="raw">Raw<span class="sub">${s.types.has('raw')?'Selected':'Tap to pick'}</span></button>
+        <button type="button" class="entry-picker-btn ${s.types.has('cooked')?'sel':''}" data-type="cooked">Cooked<span class="sub">${s.types.has('cooked')?'Selected':'Tap to pick'}</span></button>
+      </div>`;
+    body.querySelectorAll('[data-type]').forEach(b => b.addEventListener('click', ()=>{
+      const t = b.dataset.type;
+      if(s.types.has(t)) s.types.delete(t); else s.types.add(t);
+      entryNutriRender();
+    }));
+  } else if(s.stage === 2){
+    label.textContent = 'Nutritional Bundle — Stage 2 of 5';
+    body.innerHTML = `
+      <label style="display:block; margin-bottom:8px;">Turnaround (pick one)</label>
+      <div class="entry-picker-grid" style="grid-template-columns:1fr 1fr 1fr;">
+        ${['3','5','10'].map(d => `<button type="button" class="entry-picker-btn ${s.turnaround===d?'sel':''}" data-days="${d}">${d}-day<span class="sub">${[...s.types].map(t=>ENTRY_NUTRI_SUITES[t][d]).join(' / ')||' '}</span></button>`).join('')}
+      </div>`;
+    body.querySelectorAll('[data-days]').forEach(b => b.addEventListener('click', ()=>{
+      s.turnaround = b.dataset.days;
+      entryNutriRender();
+    }));
+  } else if(s.stage === 3){
+    label.textContent = 'Nutritional Bundle — Stage 3 of 5';
+    const perSet = s.types.size * 3;
+    body.innerHTML = `
+      <label style="display:block; margin-bottom:8px;">Sets (each set = 3 records per selected type)</label>
+      <div class="entry-picker-grid" style="grid-template-columns:1fr 1fr 1fr;">
+        ${[1,2,3].map(n => `<button type="button" class="entry-picker-btn ${s.sets===n?'sel':''}" data-sets="${n}">${n} set${n>1?'s':''}<span class="sub">${n*perSet} records</span></button>`).join('')}
+      </div>`;
+    body.querySelectorAll('[data-sets]').forEach(b => b.addEventListener('click', ()=>{
+      s.sets = parseInt(b.dataset.sets,10);
+      entryNutriRender();
+    }));
+  } else if(s.stage === 4){
+    label.textContent = 'Nutritional Bundle — Stage 4 of 5';
+    body.innerHTML = `
+      <label style="display:block; margin-bottom:8px;">Product name (goes into DESCRIPTN, replaces [ENTER DESCRIPTION])</label>
+      <input type="text" id="entryNutriProductInput" value="${esc(s.product)}" placeholder="e.g. Breast Fillet" style="width:100%;">`;
+    const inp = document.getElementById('entryNutriProductInput');
+    inp.addEventListener('input', e => { s.product = e.target.value; });
+    setTimeout(()=>inp.focus(), 60);
+  } else if(s.stage === 5){
+    label.textContent = 'Nutritional Bundle — Stage 5 of 5';
+    body.innerHTML = `
+      <label style="display:block; margin-bottom:8px;">Size (goes into SIZE column)</label>
+      <input type="text" id="entryNutriSizeInput" value="${esc(s.size)}" placeholder="e.g. 2kg or 2000g" style="width:100%;">
+      <div class="entry-hint" style="margin-top:8px;">
+        Ready to add ${s.sets * s.types.size * 3} records —
+        ${[...s.types].map(t=>`${s.sets*3} × ${t} (${ENTRY_NUTRI_SUITES[t][s.turnaround]})`).join(', ')}
+      </div>`;
+    const inp = document.getElementById('entryNutriSizeInput');
+    inp.addEventListener('input', e => { s.size = e.target.value; });
+    setTimeout(()=>inp.focus(), 60);
+  }
+}
+function entryNutriValidateAndAdvance(){
+  const s = entryNutriState;
+  if(s.stage === 1){
+    if(s.types.size === 0){ alert('Pick Raw, Cooked, or both.'); return; }
+  } else if(s.stage === 2){
+    if(!s.turnaround){ alert('Pick a turnaround.'); return; }
+  } else if(s.stage === 3){
+    if(!s.sets){ alert('Pick 1, 2, or 3 sets.'); return; }
+  } else if(s.stage === 4){
+    if(!s.product.trim()){ alert('Enter a product name.'); return; }
+  } else if(s.stage === 5){
+    entryNutriCommit();
+    return;
+  }
+  s.stage++;
+  entryNutriRender();
+}
+function entryNutriCommit(){
+  const s = entryNutriState;
+  // For each set, for each selected type, emit 3 records. Numbering
+  // continues from the current entryNextNumber() forward.
+  let n = entryNextNumber();
+  const now = new Date();
+  const newNums = [];
+  for(let setIdx = 0; setIdx < s.sets; setIdx++){
+    for(const type of s.types){
+      const suite = ENTRY_NUTRI_SUITES[type][s.turnaround];
+      const mimsRow = entryMims.find(m => m.suite === suite);
+      for(let i = 0; i < 3; i++){
+        const rec = {
+          num: n,
+          desc: s.product.trim(),
+          barcode: '',
+          mimsBarcode: mimsRow ? mimsRow.barcode : '',
+          mimsSuite: suite,
+          mimsShift: mimsRow ? mimsRow.shift : 'Annually',
+          cat: 'Category 1',
+          time: now.toISOString(),
+          source: 'nutritional-bundle',
+          tmpl: null,
+          mimsRow: mimsRow || null,
+          manualCellOverrides: {
+            DESCRIPTN: `Nutrition validation ${s.product.trim()} ${type[0].toUpperCase()+type.slice(1)}`,
+            SIZE: s.size.trim() || '.'
+          }
+        };
+        entryRecords.push(rec);
+        newNums.push(n);
+        n++;
+      }
+    }
+  }
+  entrySaveLocal();
+  renderEntryAll();
+  document.getElementById('entryNutriOverlay').classList.add('hidden');
+  entryNutriState = null;
+  try{ entryFlashToast(`Added ${newNums.length} nutritional records`); }catch(_e){}
+}
+document.getElementById('entryNutriNext').addEventListener('click', entryNutriValidateAndAdvance);
+document.getElementById('entryNutriBack').addEventListener('click', ()=>{
+  if(entryNutriState && entryNutriState.stage > 1){ entryNutriState.stage--; entryNutriRender(); }
+});
+document.getElementById('entryNutriCancel').addEventListener('click', ()=>{
+  document.getElementById('entryNutriOverlay').classList.add('hidden');
+  entryNutriState = null;
+});
+
+/* ===== Shelf Life Bundle Wizard =====
+   Stage 1: Retailer
+   Stage 2: Product name (replaces [PRODUCT NAME] in DESCRIPTN)
+   Stage 3: Size (goes into SIZE column)
+   Stage 4: Unit (replaces [Save + ENTER] in UNIT column)
+   Stage 5: Department (goes into OTHER_ID)
+   Stage 6: Confirm + commit — 3 sets × N records per retailer, Set 1/2/3
+            into LINE column, records NOT numbered (SAMPCOUNT stays blank
+            so the sequence numbering doesn't skip).
+
+   Retailer Shelf Life MIMS rows are found by:
+     material === 'Investigation Product' AND unit-placeholder AND
+     descrpton starts with 'Shelf Life' AND retailer === chosen. */
+let entryShelfState = null;
+function entryShelfFindRowsForRetailer(retailer){
+  const norm = s => String(s||'').toLowerCase().trim();
+  const r = norm(retailer);
+  return entryMims.filter(m => {
+    if(norm(m.material) !== 'investigation product') return false;
+    if(norm(m.retailer) !== r) return false;
+    const d = norm(m.descrptn);
+    if(!d.startsWith('shelf life') && !d.startsWith('open shelf') && !d.startsWith('defrost shelf')) return false;
+    return true;
+  });
+}
+function entryShelfAllRetailers(){
+  const set = new Set();
+  entryMims.forEach(m => {
+    if(String(m.material||'').toLowerCase().trim() !== 'investigation product') return;
+    const d = String(m.descrptn||'').toLowerCase().trim();
+    if(!d.startsWith('shelf life') && !d.startsWith('open shelf') && !d.startsWith('defrost shelf')) return;
+    if(m.retailer) set.add(m.retailer);
+  });
+  return [...set].sort();
+}
+function entryShelfRender(){
+  if(!entryShelfState) return;
+  const label = document.getElementById('entryShelfStageLabel');
+  const body = document.getElementById('entryShelfBody');
+  const nextBtn = document.getElementById('entryShelfNext');
+  const backBtn = document.getElementById('entryShelfBack');
+  backBtn.style.visibility = entryShelfState.stage === 1 ? 'hidden' : 'visible';
+  const s = entryShelfState;
+  const totalStages = 6;
+  nextBtn.textContent = s.stage === totalStages ? 'Add to sequence' : 'Next';
+  if(s.stage === 1){
+    label.textContent = `Shelf Life Bundle — Stage 1 of ${totalStages}`;
+    const retailers = entryShelfAllRetailers();
+    body.innerHTML = `
+      <label style="display:block; margin-bottom:8px;">Retailer</label>
+      <div class="entry-picker-grid" style="grid-template-columns:1fr 1fr;">
+        ${retailers.map(r => {
+          const count = entryShelfFindRowsForRetailer(r).length;
+          return `<button type="button" class="entry-picker-btn ${s.retailer===r?'sel':''}" data-retailer="${esc(r)}">${esc(r)}<span class="sub">${count} shelf-life rows</span></button>`;
+        }).join('')}
+      </div>`;
+    body.querySelectorAll('[data-retailer]').forEach(b => b.addEventListener('click', ()=>{
+      s.retailer = b.dataset.retailer;
+      entryShelfRender();
+    }));
+  } else if(s.stage === 2){
+    label.textContent = `Shelf Life Bundle — Stage 2 of ${totalStages}`;
+    body.innerHTML = `
+      <label style="display:block; margin-bottom:8px;">Product name (replaces [PRODUCT NAME] in DESCRIPTN)</label>
+      <input type="text" id="entryShelfProductInput" value="${esc(s.product)}" placeholder="e.g. Butter Basted Hot Deli" style="width:100%;">`;
+    const inp = document.getElementById('entryShelfProductInput');
+    inp.addEventListener('input', e => { s.product = e.target.value; });
+    setTimeout(()=>inp.focus(), 60);
+  } else if(s.stage === 3){
+    label.textContent = `Shelf Life Bundle — Stage 3 of ${totalStages}`;
+    body.innerHTML = `
+      <label style="display:block; margin-bottom:8px;">Size (goes into SIZE column, e.g. 1.8kg)</label>
+      <input type="text" id="entryShelfSizeInput" value="${esc(s.size)}" placeholder="1.8kg" style="width:100%;">`;
+    const inp = document.getElementById('entryShelfSizeInput');
+    inp.addEventListener('input', e => { s.size = e.target.value; });
+    setTimeout(()=>inp.focus(), 60);
+  } else if(s.stage === 4){
+    label.textContent = `Shelf Life Bundle — Stage 4 of ${totalStages}`;
+    body.innerHTML = `
+      <label style="display:block; margin-bottom:8px;">Unit (replaces [Save + ENTER] in UNIT column, e.g. Wholebird)</label>
+      <input type="text" id="entryShelfUnitInput" value="${esc(s.unit)}" placeholder="Wholebird" style="width:100%;">`;
+    const inp = document.getElementById('entryShelfUnitInput');
+    inp.addEventListener('input', e => { s.unit = e.target.value; });
+    setTimeout(()=>inp.focus(), 60);
+  } else if(s.stage === 5){
+    label.textContent = `Shelf Life Bundle — Stage 5 of ${totalStages}`;
+    body.innerHTML = `
+      <label style="display:block; margin-bottom:8px;">Department (goes into OTHER_ID column, e.g. Fresh Pack 2)</label>
+      <input type="text" id="entryShelfDeptInput" value="${esc(s.department)}" placeholder="Fresh Pack 2" style="width:100%;">`;
+    const inp = document.getElementById('entryShelfDeptInput');
+    inp.addEventListener('input', e => { s.department = e.target.value; });
+    setTimeout(()=>inp.focus(), 60);
+  } else if(s.stage === 6){
+    label.textContent = `Shelf Life Bundle — Stage 6 of ${totalStages}`;
+    const rows = entryShelfFindRowsForRetailer(s.retailer);
+    body.innerHTML = `
+      <div class="entry-hint" style="line-height:1.5;">
+        Ready to add <b>${rows.length * 3}</b> records —<br>
+        Retailer: <b>${esc(s.retailer)}</b><br>
+        Product: <b>${esc(s.product)}</b><br>
+        Size: <b>${esc(s.size)}</b> · Unit: <b>${esc(s.unit)}</b> · Dept: <b>${esc(s.department)}</b><br>
+        <br>
+        <b>Set 1</b>: ${rows.length} records · <b>Set 2</b>: ${rows.length} records · <b>Set 3</b>: ${rows.length} records<br>
+        <br>
+        These will <b>not</b> take SAMPCOUNT numbers — the sequence keeps
+        counting through them.
+      </div>`;
+  }
+}
+function entryShelfValidateAndAdvance(){
+  const s = entryShelfState;
+  if(s.stage === 1){
+    if(!s.retailer){ alert('Pick a retailer.'); return; }
+  } else if(s.stage === 2){
+    if(!s.product.trim()){ alert('Enter a product name.'); return; }
+  } else if(s.stage === 6){
+    entryShelfCommit();
+    return;
+  }
+  s.stage++;
+  entryShelfRender();
+}
+function entryShelfCommit(){
+  const s = entryShelfState;
+  const rows = entryShelfFindRowsForRetailer(s.retailer);
+  if(!rows.length){ alert('No Shelf Life rows in MIMS for this retailer.'); return; }
+  const now = new Date();
+  const newRecs = [];
+  // Synthetic ID for unnumbered records — starts below any real SAMPCOUNT
+  // and decrements. Only used for DOM/state identity (focus, delete). The
+  // export builder still writes blank SAMPCOUNT because noSampCount is set.
+  const synBase = -Date.now(); // millisecond timestamp, negated → unique
+  let synIdx = 0;
+  for(let setIdx = 1; setIdx <= 3; setIdx++){
+    rows.forEach(mimsRow => {
+      const desc = String(mimsRow.descrptn||'').replace(/\[\s*PRODUCT\s*NAME\s*\]/gi, s.product.trim());
+      const rec = {
+        num: synBase - synIdx++,   // synthetic unique — negative, never conflicts with real nums
+        desc: desc,
+        barcode: '',
+        mimsBarcode: mimsRow.barcode,
+        mimsSuite: mimsRow.suite||'',
+        mimsShift: mimsRow.shift||'Annually',
+        cat: 'Category 1',
+        time: now.toISOString(),
+        source: 'shelf-life-bundle',
+        tmpl: null,
+        mimsRow: mimsRow,
+        noSampCount: true,   // signal to export builder: leave SAMPCOUNT blank
+        manualCellOverrides: {
+          DESCRIPTN: desc,
+          SIZE: s.size.trim() || '.',
+          UNIT: s.unit.trim() || '.',
+          OTHER_ID: s.department.trim() || '.',
+          LINE: 'Set ' + setIdx
+        }
+      };
+      entryRecords.push(rec);
+      newRecs.push(rec);
+    });
+  }
+  entrySaveLocal();
+  renderEntryAll();
+  document.getElementById('entryShelfOverlay').classList.add('hidden');
+  entryShelfState = null;
+  try{ entryFlashToast(`Added ${newRecs.length} shelf life records (unnumbered)`); }catch(_e){}
+}
+document.getElementById('entryShelfNext').addEventListener('click', entryShelfValidateAndAdvance);
+document.getElementById('entryShelfBack').addEventListener('click', ()=>{
+  if(entryShelfState && entryShelfState.stage > 1){ entryShelfState.stage--; entryShelfRender(); }
+});
+document.getElementById('entryShelfCancel').addEventListener('click', ()=>{
+  document.getElementById('entryShelfOverlay').classList.add('hidden');
+  entryShelfState = null;
+});
 function entryWizardCommitTime(){
   const buf=entryWizard.buffer;
   const num=entryWizard.nums[entryWizard.idx];
@@ -5462,8 +5891,11 @@ function entryRenderSimplifiedRow(r){
   const timeLabel = r.timeOverride ? r.timeOverride : entryFmtTime(r.time);
   const timeEditable = `<button type="button" class="entry-time-btn" data-entrytimeedit="${r.num}">${esc(timeLabel)}</button>`;
   const selected = entrySelectedNums.has(r.num);
+  // Unnumbered records (shelf-life bundle) — show em-dash instead of the
+  // synthetic negative num used internally.
+  const numLabel = (r.noSampCount || r.num == null || r.num < 0) ? '—' : r.num;
   return `<tr class="${selected?'entry-row-selected':''}" data-entrynum="${r.num}">
-    <td class="mono">${r.num}</td>
+    <td class="mono">${numLabel}</td>
     <td class="mono">${esc(r.barcode||'—')}</td>
     <td>${esc(r.desc)}</td>
     <td>${(r.cat||'').replace('Category ','C')}</td>
@@ -5474,7 +5906,12 @@ function entryRenderSimplifiedRow(r){
 }
 
 function renderEntrySimplified(){
-  const sorted=[...entryRecords].sort((a,b)=>a.num-b.num);
+  // Sort: numbered records ascending, then unnumbered (shelf-life bundle)
+  // records after. Within the unnumbered group, keep insertion order.
+  const isUnnumbered = r => r.noSampCount || r.num == null || r.num < 0;
+  const numbered = entryRecords.filter(r => !isUnnumbered(r)).sort((a,b)=>a.num-b.num);
+  const unnumbered = entryRecords.filter(isUnnumbered);
+  const sorted = [...numbered, ...unnumbered];
   document.getElementById('entryEmpty').style.display=sorted.length?'none':'block';
   document.getElementById('entryTbody').innerHTML=sorted.map(entryRenderSimplifiedRow).join('');
   entryUpdateBulkBar();
@@ -5701,7 +6138,13 @@ document.getElementById('entryBtnWipe').addEventListener('click', ()=>{
 /* ---------- Export view: same row-builder the actual export uses,
    rendered as an on-screen table so it's checkable before exporting. ---------- */
 function renderEntryExportView(){
-  const sorted=[...entryRecords].sort((a,b)=>a.num-b.num);
+  // Numbered records first (SAMPCOUNT ascending), then unnumbered
+  // shelf-life records after — matches the visual order and the actual
+  // export ordering.
+  const isUnnumbered = r => r.noSampCount || r.num == null || r.num < 0;
+  const numbered = entryRecords.filter(r => !isUnnumbered(r)).sort((a,b)=>a.num-b.num);
+  const unnumbered = entryRecords.filter(isUnnumbered);
+  const sorted = [...numbered, ...unnumbered];
   const table=document.getElementById('entryExportTable');
   if(!sorted.length){ table.innerHTML='<tr><td>No records yet.</td></tr>'; return; }
   const rows=sorted.map(entryBuildSisRow);
@@ -5897,29 +6340,32 @@ function entryExportEditCell(num, h, initial){
 document.getElementById('entryExportTable').addEventListener('click', e=>{
   const td = e.target.closest('td[data-num]');
   if(!td) return;
-  if(e.target.tagName === 'INPUT') return;
   const num = parseInt(td.dataset.num, 10);
   const h = td.dataset.h;
+  const isInput = e.target.tagName === 'INPUT';
   // Excel behaviour:
-  //   • 1st tap on a cell → "type-to-replace" mode. Input opens with the
-  //     whole value selected; typing replaces immediately. Keyboard opens
-  //     on mobile. This is Excel's default cell-select behaviour.
-  //   • 2nd tap on the SAME already-editing cell → "edit-in-place" mode.
-  //     Caret sits at end of text; typing inserts without replacing.
-  //     Outline turns blue to signal the mode change.
-  //   • Tap on a DIFFERENT cell → commit current, open new cell in
-  //     type-to-replace mode.
+  //   • 1st tap on a cell → type-to-replace mode. Input opens with the
+  //     whole value selected; typing replaces immediately. Keyboard opens.
+  //   • 2nd tap on the SAME already-editing cell → edit-in-place mode.
+  //     The browser's native click behaviour positions the caret where the
+  //     person tapped (deselecting the previously-selected text), and we
+  //     add the .entry-export-edit-mode class to flip the outline blue.
   const alreadyEditing = entryExportEditing && entryExportFocus
     && entryExportFocus.num === num && entryExportFocus.h === h;
   if(alreadyEditing){
-    // Switch from type-to-replace to edit-in-place. Deselect the input's
-    // selection and add the "edit" class so the outline turns blue.
-    const input = td.querySelector('input');
-    if(input){
-      const l = input.value.length;
-      input.setSelectionRange(l, l);
+    if(!td.classList.contains('entry-export-edit-mode')){
       td.classList.add('entry-export-edit-mode');
+      // Native click positions the caret at the tap point, deselecting the
+      // pre-selected text — which is exactly edit-in-place mode.
     }
+    return;
+  }
+  // Guard: if the click somehow landed on an existing input but the cell
+  // isn't the currently-editing one (shouldn't happen but defensive), open
+  // the editor cleanly rather than double-instantiating.
+  if(isInput){
+    entryExportSetFocus(num, h);
+    entryExportEditCell(num, h);
     return;
   }
   entryExportSetFocus(num, h);
@@ -6295,7 +6741,12 @@ function entryBuildSisRow(r){
     row.MANUFTIME = isCN ? entryFmtHHMMColon(now) : entryFmtHHMM(now);
   }
   if(r.line) row.LINE = r.line;
-  row.ORDER=r.cat; row.SAMPCOUNT=String(r.num); row.SAMDATE=entryFmtDateUK(new Date());
+  row.ORDER=r.cat;
+  // SAMPCOUNT: shelf-life records are explicitly unnumbered — the sequence
+  // keeps counting through them so the surrounding numbered records don't
+  // get displaced. r.num is null and noSampCount is set for those.
+  row.SAMPCOUNT = (r.noSampCount || r.num == null) ? '' : String(r.num);
+  row.SAMDATE=entryFmtDateUK(new Date());
   row.SAMBY = localStorage.getItem('unified.samplerName') || 'Sampler';
   row.CLIENT='SIS'; row.MANUFDATE=row.KILLDATE;
   // Per-record retailer override — currently used by the Swab-Matrix customer
@@ -6382,7 +6833,10 @@ function entryExportStamp(){
 
 function entryExportSis(){
   if(!entryRecords.length){ alert('Nothing to export yet.'); return; }
-  const sorted=[...entryRecords].sort((a,b)=>a.num-b.num);
+  const isUnnumbered = r => r.noSampCount || r.num == null || r.num < 0;
+  const numbered = entryRecords.filter(r => !isUnnumbered(r)).sort((a,b)=>a.num-b.num);
+  const unnumbered = entryRecords.filter(isUnnumbered);
+  const sorted = [...numbered, ...unnumbered];
   const rows=sorted.map(entryBuildSisRow);
   const aoa=[ENTRY_SIS_HEADERS, ...rows.map(r=>ENTRY_SIS_HEADERS.map(h=>r[h]))];
   entryStyleAndWriteSisSheet(aoa, `SIS_Micro_Sub_${entryExportStamp()}.xlsx`);
