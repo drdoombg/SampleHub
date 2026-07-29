@@ -1103,8 +1103,19 @@
 
   <!-- ===== RECORDS sub-tab — Simplified / Export toggle ===== -->
   <div id="entryPaneRecords" class="hidden">
-    <!-- Simplified: today's count is now the little pill on the # column header,
-         instead of the removed "Today's sequence" line above the table. -->
+    <!-- Global view toggle for the Records pane. Sits ABOVE both the
+         simplified and export sub-panes so it stays visible when you're
+         in Export view — previously it was buried inside the simplified
+         wrap and vanished on switch. -->
+    <div class="entry-viewtoggle" style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+      <button id="entryViewSimplified" class="on" title="Simplified list">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>
+      </button>
+      <button id="entryViewExport" title="Export table">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"></rect><path d="M3.5 9.5h17M9 9.5V19.5"></path></svg>
+      </button>
+    </div>
+
     <div id="entrySimplifiedWrap">
       <div class="entry-select-bar">
         <button class="entry-select-toggle" id="entryBtnSelectMode">Select</button>
@@ -1114,16 +1125,6 @@
           <button class="btn ghost" id="entryBtnBulkTimeAll" style="padding:6px 12px; font-size:12px;">Edit TIME (All)</button>
           <button class="btn ghost" id="entryBtnBulkTime" style="padding:6px 12px; font-size:12px;">Edit TIME (Each)</button>
           <button class="btn ghost" id="entryBtnBulkDelete" style="padding:6px 12px; font-size:12px; color:#ff9b9b;">Delete</button>
-        </div>
-        <!-- View toggle sits on the right of the select bar (same row) so the
-             layout reads Select — bulk actions — View icons left-to-right. -->
-        <div class="entry-viewtoggle" style="margin-left:auto;">
-          <button id="entryViewSimplified" class="on" title="Simplified list">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>
-          </button>
-          <button id="entryViewExport" title="Export table">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"></rect><path d="M3.5 9.5h17M9 9.5V19.5"></path></svg>
-          </button>
         </div>
       </div>
       <div id="entryRecordsWrap" class="entry-table-scroll">
@@ -1259,6 +1260,50 @@
         <button class="btn ghost" id="entryShelfBack">Back</button>
         <button class="btn ghost" id="entryShelfCancel">Cancel</button>
         <button class="btn primary" id="entryShelfNext">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generic per-record prompt loop overlay — used by:
+       • PMD Wholebirds Color (writes to BATCH column)
+       • Control Swab rename (writes to DESCRIPTN column)
+       • Equipment Swab Line (writes to LINE column)
+       Text input; walks records one at a time.  -->
+  <div class="entry-ref-overlay hidden" id="entryPromptLoopOverlay">
+    <div class="entry-ref-sheet">
+      <label id="entryPromptLoopLabel">Enter value</label>
+      <input type="text" id="entryPromptLoopInput" placeholder="">
+      <div class="entry-hint" id="entryPromptLoopHint" style="margin-top:6px;"></div>
+      <div class="sheet-actions" style="margin-top:8px;">
+        <button class="btn ghost" id="entryPromptLoopSkip">Skip</button>
+        <button class="btn ghost" id="entryPromptLoopDone">Done all</button>
+        <button class="btn primary" id="entryPromptLoopSave">Save + next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Two-button choice per record — used by Equipment Swab Other ID (TB/MIS). -->
+  <div class="entry-ref-overlay hidden" id="entryChoiceLoopOverlay">
+    <div class="entry-ref-sheet">
+      <label id="entryChoiceLoopLabel">Choose</label>
+      <div class="entry-hint" id="entryChoiceLoopHint" style="margin-bottom:8px;"></div>
+      <div class="entry-picker-grid" id="entryChoiceLoopButtons" style="grid-template-columns:1fr 1fr;"></div>
+      <div class="sheet-actions" style="margin-top:8px;">
+        <button class="btn ghost" id="entryChoiceLoopSkip">Skip</button>
+        <button class="btn ghost" id="entryChoiceLoopDone">Done all</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared date prompt for a batch — used by Equipment Swab (one date → both
+       KILLDATE and PACKDATE on all records). -->
+  <div class="entry-ref-overlay hidden" id="entrySharedDateOverlay">
+    <div class="entry-ref-sheet">
+      <label id="entrySharedDateLabel">Date (applies to all)</label>
+      <input type="date" id="entrySharedDateInput">
+      <div class="sheet-actions" style="margin-top:8px;">
+        <button class="btn ghost" id="entrySharedDateSkip">Skip</button>
+        <button class="btn primary" id="entrySharedDateSave">Apply</button>
       </div>
     </div>
   </div>
@@ -2328,6 +2373,7 @@ const MIMS_SEED = [
  {"barcode": "MIMS_0783", "product": "Product", "material": "FP Primary Poultry", "rise": "Fresh", "unit": "Wholebird", "descrptn": "Hot cooked Fresh Whole Bird", "size": "Various", "retailer": "Booth", "shift": "Monthly", "other_id": "Fresh Pack 1", "suite": "2SP080", "price": 11.93, "use_by": "8 D", "eol": "Y", "supplier": "UK", "comms": "2037, Scunthorpe", "client": "SIS", "_syn": true}
 ];const TEMPLATES_SEED = [];
 const LOOKUP_SEED = [{"barcode": "280814", "name": "Aldi CW fillets 850-1000g", "cat": "Category 1"}, {"barcode": "29000067", "name": "Ms smokey spatchcock", "cat": "Category 1"}, {"barcode": "29421411", "name": "MS new honey bbq wb", "cat": "Category 1"}, {"barcode": "29421435", "name": "Ms salt&pepper New", "cat": "Category 1"}, {"barcode": "29421442", "name": "MS new garlic wb", "cat": "Category 1"}, {"barcode": "5000129353761", "name": "Coop Thighs 600g", "cat": "Category 2"}, {"barcode": "4088600113418", "name": "Aldi wings 1kg", "cat": "Category 1"}, {"barcode": "4088600237008", "name": "Aldi fillets 650g", "cat": "Category 1"}, {"barcode": "00265829", "name": "Ms rotisserie joint", "cat": "Category 1"}, {"barcode": "5063446491592", "name": "Tesco - Skinless Breast Fillet 1kg", "cat": "Category 1"}, {"barcode": "00015035", "name": "MS PSO", "cat": "Category 1"}, {"barcode": "2253889826683", "name": "Asda lemon and herb spatchcock", "cat": "Category 1"}, {"barcode": "5000128996204", "name": "Coop Drumsticks 750g", "cat": "Category 2"}, {"barcode": "MSBUTTER", "name": "MS BUTTER", "cat": "Category 1"}, {"barcode": "5000129353761", "name": "Coop thighs 600g", "cat": "Category 1"}, {"barcode": "4088600147734", "name": "Aldi diced 600g", "cat": "Category 1"}, {"barcode": "4088600147345", "name": "Aldi legs 1kg", "cat": "Category 1"}, {"barcode": "5063445799132", "name": "Tesco Breast fillets 300g", "cat": "Category 1"}, {"barcode": "5057172354801", "name": "Asda Large", "cat": "Category 1"}, {"barcode": "4088600280578", "name": "Aldi drumstick 2kg", "cat": "Category 1"}, {"barcode": "4088600176345", "name": "Aldi thighs fillets 600g", "cat": "Category 1"}, {"barcode": "4061461658960", "name": "Aldi Rotisserie Spatchcock", "cat": "Category 5"}, {"barcode": "5063717059681", "name": "ASDA Piri Piri Spatchcock", "cat": "Category 1"}, {"barcode": "5054269362978", "name": "Tesco thighs fillets 600g", "cat": "Category 1"}, {"barcode": "2005725009459", "name": "Costco Twin pack", "cat": "Category 2"}, {"barcode": "5000129365306", "name": "Coop wings 600g", "cat": "Category 1"}, {"barcode": "5057008546325", "name": "Tesco breast fillet 650g", "cat": "Category 2"}, {"barcode": "4088600147086", "name": "Raw Portions - Drumstick", "cat": "Category 1"}, {"barcode": "5010482564377", "name": "Iceland drumstick 1kg", "cat": "Category 1"}, {"barcode": "5054775750283", "name": "Tesco breast fillet 950g", "cat": "Category 1"}, {"barcode": "4088600147482", "name": "Aldi mini fillets 600g", "cat": "Category 1"}, {"barcode": "5000129334098", "name": "Coop breast fillets 580g", "cat": "Category 1"}, {"barcode": "5000128961318", "name": "coop wings 775", "cat": "Category 2"}, {"barcode": "4088600494821", "name": "Aldi big diced 1.5kg", "cat": "Category 1"}, {"barcode": "4061462256271", "name": "Aldi Extra Large", "cat": "Category 1"}, {"barcode": "5055540029122", "name": "Ocado extra tasty wb", "cat": "Category 1"}, {"barcode": "5063089614822", "name": "Asda Diced Chicken", "cat": "Category 1"}, {"barcode": "5054070468654", "name": "Asda Small Extra Tasty", "cat": "Category 1"}, {"barcode": "5000129408584", "name": "Raw Portions - Wing", "cat": "Category 1"}, {"barcode": "4088600283364", "name": "Aldi mini fillets 400g", "cat": "Category 1"}, {"barcode": "4088600148144", "name": "Aldi breast 1kg", "cat": "Category 1"}, {"barcode": "4061462270895", "name": "aldi - Drum Fillets 900g", "cat": "Category 1"}, {"barcode": "5010482797355", "name": "iceland small", "cat": "Category 1"}, {"barcode": "5010482617929", "name": "Iceland extra tasty", "cat": "Category 1"}, {"barcode": "4088600147017", "name": "Aldi thighs 1kg", "cat": "Category 1"}, {"barcode": "4061459353037", "name": "Aldi drum fillets 600g", "cat": "Category 1"}, {"barcode": "5010365007625", "name": "Asda cherry drum fillets 400g", "cat": "Category 1"}, {"barcode": "2096937006381", "name": "Ocado extra large", "cat": "Category 1"}, {"barcode": "5028440025235", "name": "Booths Medium", "cat": "Category 1"}, {"barcode": "5000129373936", "name": "Coop Rotisserie", "cat": "Category 1"}, {"barcode": "5057753932916", "name": "Tesco diced 400g", "cat": "Category 2"}, {"barcode": "KFCDRUM", "name": "KFC DARK MEAT", "cat": "Category 1"}, {"barcode": "PMDDOLAV", "name": "PMD Dolav", "cat": "Category 1"}, {"barcode": "4088600039077", "name": "Aldi garlic spatchcock", "cat": "Category 1"}, {"barcode": "5000129408683", "name": "Coop Drumsticks 1.5 kg", "cat": "Category 2"}, {"barcode": "5010482593902", "name": "Iceland Large", "cat": "Category 3"}, {"barcode": "KFCWING", "name": "KFC HOT WINGS", "cat": "Category 1"}, {"barcode": "5004026906204", "name": "Coop Drumsticks 750g", "cat": "Category 2"}, {"barcode": "MSBBQ", "name": "MS BBQ 1.8 kg", "cat": "Category 3"}, {"barcode": "5055540054315", "name": "Ocado Pso", "cat": "Category 1"}, {"barcode": "5000129323191", "name": "Co-op breast strips 250g", "cat": "Category 1"}, {"barcode": "4061462248085", "name": "Chicken Breast Pieces", "cat": "Category 1"}, {"barcode": "5000129365283", "name": "Coop drumstick 600", "cat": "Category 1"}, {"barcode": "4088600281421", "name": "Aldi thigh fillets 900g", "cat": "Category 1"}, {"barcode": "5055540020327", "name": "Ocado sp crown", "cat": "Category 1"}, {"barcode": "5000129333800", "name": "Coop thigh fillets 500g", "cat": "Category 2"}, {"barcode": "5010482564414", "name": "Iceland legs 1kg", "cat": "Category 1"}, {"barcode": "5000129365375", "name": "Co-op diced 400g", "cat": "Category 2"}, {"barcode": "5000128744836", "name": "Coop breast fillets 300g", "cat": "Category 1"}, {"barcode": "5055540059785", "name": "Ocsdo garlic wb", "cat": "Category 1"}, {"barcode": "5068419353037", "name": "Aldi drum fillets 600g", "cat": "Category 1"}, {"barcode": "4061462273308", "name": "Aldi Extra Tasty CIB WB", "cat": "Category 1"}, {"barcode": "5063089676967", "name": "ASDA BBQ Spatchcock", "cat": "Category 1"}, {"barcode": "4061462255458", "name": "Fresh Large Whole Chicken", "cat": "Category 1"}, {"barcode": "5000129350234", "name": "Coop drum fillets 400g", "cat": "Category 1"}, {"barcode": "00404358", "name": "M&S BUTTER BASTED JOINT", "cat": "Category 1"}, {"barcode": "5063089331828", "name": "Asda drum fillets 600g", "cat": "Category 1"}, {"barcode": "4061461781248", "name": "Aldi drums fillets 900g", "cat": "Category 1"}, {"barcode": "4061462874321", "name": "ALDI Chinese SPATCHOCK", "cat": "Category 1"}, {"barcode": "5063089614808", "name": "Asda Drumsticks 1.1kg", "cat": "Category 1"}, {"barcode": "5063089826683", "name": "ASDA Lemon&Herb Spatchcock", "cat": "Category 1"}, {"barcode": "5057753914028", "name": "Tesco diced 650g", "cat": "Category 1"}, {"barcode": "5000129350456", "name": "Coop Large", "cat": "Category 1"}, {"barcode": "8966285000000", "name": "MS Rotisserie joints", "cat": "Category 1"}, {"barcode": "5010365007892", "name": "Asda chery drum fillets 1kg", "cat": "Category 1"}, {"barcode": "b24182556", "name": "Red canteen probe", "cat": "Category 1"}, {"barcode": "2096922004743", "name": "Ocado medium", "cat": "Category 1"}, {"barcode": "5054268934725", "name": "Tesco thighs 1kg", "cat": "Category 1"}, {"barcode": "4088600390826", "name": "Aldi pso wb", "cat": "Category 1"}, {"barcode": "KFC9PIECE", "name": "KFC 9 piece", "cat": "Category 1"}, {"barcode": "5059697733185", "name": "Tesco Wings 1kg", "cat": "Category 2"}, {"barcode": "5010482482619", "name": "Iceland Medium", "cat": "Category 1"}, {"barcode": "00014649", "name": "Ms rotisserie wb", "cat": "Category 1"}, {"barcode": "4088600283418", "name": "Aldi diced 400g", "cat": "Category 1"}, {"barcode": "4088600494807", "name": "Raw Portions - Skinless Breast Fillet", "cat": "Category 1"}, {"barcode": "5063089614839", "name": "Asda Thigh fillets 650", "cat": "Category 1"}, {"barcode": "4061462247859", "name": "Aldi sizzlers 500g", "cat": "Category 1"}, {"barcode": "4061462251283", "name": "Fresh Medium Whole Chicken", "cat": "Category 1"}, {"barcode": "5057172091751", "name": "Asda pso wb", "cat": "Category 1"}, {"barcode": "5057967251896", "name": "Tesco fillets 1.6kg", "cat": "Category 1"}, {"barcode": "4088600146348", "name": "Aldi breast 300g", "cat": "Category 1"}, {"barcode": "4088600295411", "name": "Aldi fillets 2kg", "cat": "Category 1"}, {"barcode": "4061463078919", "name": "Aldi drum fillets 900g", "cat": "Category 1"}, {"barcode": "2092417005004", "name": "Ocado large", "cat": "Category 1"}, {"barcode": "5000120379098", "name": "Coop Breast Fillet 580g", "cat": "Category 1"}, {"barcode": "5000129334180", "name": "Coop breast fillets 850g", "cat": "Category 1"}, {"barcode": "5000129365368", "name": "COOP Mini fillets 400g", "cat": "Category 1"}];
+const SHELF_LIFE_SEED = {"M&S": [{"descrptn": "Shelf Life [PRODUCT NAME] k+1", "suite": "2SP017", "price": 12.79, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D1"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+3", "suite": "2SP015", "price": 6.07, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D3"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+5", "suite": "2SP015", "price": 6.07, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D5"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+7", "suite": "2SP015", "price": 6.07, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+8", "suite": "2SP015", "price": 6.07, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D8"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+9", "suite": "2SP015", "price": 6.07, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+10", "suite": "2SP017", "price": 12.79, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+11", "suite": "2SP015", "price": 6.07, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D11"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+12", "suite": "2SP015", "price": 6.07, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D12"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP208", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP114", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP015", "price": 6.07, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP208", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP115", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP015", "price": 6.07, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D10"}], "Aldi": [{"descrptn": "Shelf Life [PRODUCT NAME] k+1", "suite": "2SP159", "price": 12.05, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D1"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+3", "suite": "2SP156", "price": 2.0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D3"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+5", "suite": "2SP156", "price": 2.0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D5"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+7", "suite": "2SP156", "price": 2.0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+8", "suite": "2SP156", "price": 2.0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D8"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+9", "suite": "2SP156", "price": 2.0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+10", "suite": "2SP159", "price": 12.05, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+11", "suite": "2SP156", "price": 2.0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D11"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+12", "suite": "2SP156", "price": 2.0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D12"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP208", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP114", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP156", "price": 2.0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP208", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP115", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP156", "price": 2.0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D10"}], "Tesco": [{"descrptn": "Shelf Life [PRODUCT NAME] k+1", "suite": "2SP022", "price": 11.82, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Tesco COP for storage", "client": "SIS", "eol": "N", "period": "D1"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+3", "suite": "2SP020", "price": 1.37, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Tesco COP for storage", "client": "SIS", "eol": "N", "period": "D3"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+5", "suite": "2SP020", "price": 1.37, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Tesco COP for storage", "client": "SIS", "eol": "N", "period": "D5"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+7", "suite": "2SP020", "price": 1.37, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Tesco COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+8", "suite": "2SP020", "price": 1.37, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Tesco COP for storage", "client": "SIS", "eol": "N", "period": "D8"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+9", "suite": "2SP020", "price": 1.37, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Tesco COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+10", "suite": "2SP022", "price": 11.82, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Tesco COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+11", "suite": "2SP020", "price": 1.37, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Tesco COP for storage", "client": "SIS", "eol": "N", "period": "D11"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+12", "suite": "2SP020", "price": 1.37, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Tesco COP for storage", "client": "SIS", "eol": "N", "period": "D12"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP208", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Tesco COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP114", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Tesco COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP020", "price": 1.37, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Tesco COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP208", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Tesco COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP115", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Tesco COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP020", "price": 1.37, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Tesco COP for storage", "client": "SIS", "eol": "N", "period": "D10"}], "Asda": [{"descrptn": "Shelf Life [PRODUCT NAME] k+1", "suite": "2SP190", "price": 13.49, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D1"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+3", "suite": "2SP191", "price": 2.98, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D3"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+5", "suite": "2SP191", "price": 2.98, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D5"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+7", "suite": "2SP191", "price": 2.98, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+8", "suite": "2SP191", "price": 2.98, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D8"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+9", "suite": "2SP191", "price": 2.98, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+10", "suite": "2SP190", "price": 13.49, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+11", "suite": "2SP191", "price": 2.98, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D11"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+12", "suite": "2SP191", "price": 2.98, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D12"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP208", "price": 0, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP114", "price": 0, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP191", "price": 2.98, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP208", "price": 0, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP115", "price": 0, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP191", "price": 2.98, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D10"}], "CO-OP": [{"descrptn": "Shelf Life [PRODUCT NAME] k+1", "suite": "2SP080", "price": 11.93, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow CO-OP COP for storage", "client": "SIS", "eol": "N", "period": "D1"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+3", "suite": "2SP163", "price": 1.16, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow CO-OP COP for storage", "client": "SIS", "eol": "N", "period": "D3"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+5", "suite": "2SP163", "price": 1.16, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow CO-OP COP for storage", "client": "SIS", "eol": "N", "period": "D5"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+7", "suite": "2SP163", "price": 1.16, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow CO-OP COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+8", "suite": "2SP163", "price": 1.16, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow CO-OP COP for storage", "client": "SIS", "eol": "N", "period": "D8"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+9", "suite": "2SP163", "price": 1.16, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow CO-OP COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+10", "suite": "2SP080", "price": 11.93, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow CO-OP COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+11", "suite": "2SP163", "price": 1.16, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow CO-OP COP for storage", "client": "SIS", "eol": "N", "period": "D11"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+12", "suite": "2SP163", "price": 1.16, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow CO-OP COP for storage", "client": "SIS", "eol": "N", "period": "D12"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP208", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow CO-OP COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP114", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow CO-OP COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP163", "price": 1.16, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow CO-OP COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP208", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "", "comms": "please follow CO-OP COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP115", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "", "comms": "please follow CO-OP COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP163", "price": 1.16, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow CO-OP COP for storage", "client": "SIS", "eol": "N", "period": "D10"}], "Ocado": [{"descrptn": "Shelf Life [PRODUCT NAME] k+1", "suite": "2SP181", "price": 11.13, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D1"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+3", "suite": "2SP180", "price": 1.08, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D3"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+5", "suite": "2SP180", "price": 1.08, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D5"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+7", "suite": "2SP180", "price": 1.08, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+8", "suite": "2SP180", "price": 1.08, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D8"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+9", "suite": "2SP180", "price": 1.08, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+10", "suite": "2SP181", "price": 11.13, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+11", "suite": "2SP180", "price": 1.08, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D11"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+12", "suite": "2SP180", "price": 1.08, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D12"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP208", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP114", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP180", "price": 1.08, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP208", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP115", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP180", "price": 1.08, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow M&S COP for storage", "client": "SIS", "eol": "N", "period": "D10"}], "KFC": [{"descrptn": "Shelf Life [PRODUCT NAME] k+1", "suite": "2SP149", "price": 9.99, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D1"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+3", "suite": "2SP149", "price": 15.37, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D3"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+5", "suite": "2SP149", "price": 15.37, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D5"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+7", "suite": "2SP149", "price": 15.37, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+8", "suite": "2SP149", "price": 15.37, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D8"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+9", "suite": "2SP149", "price": 15.37, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+10", "suite": "2SP149", "price": 15.37, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+11", "suite": "2SP149", "price": 15.37, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D11"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP208", "price": 0, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D3"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP114", "price": 0, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D6"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP149", "price": 15.37, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP208", "price": 0, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D3"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP115", "price": 0, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D6"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP149", "price": 15.37, "unit": "Wholebird", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D7"}], "Iceland": [{"descrptn": "Shelf Life [PRODUCT NAME] k+1", "suite": "2SP058", "price": 15.63, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D1"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+3", "suite": "2SP057", "price": 1.96, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D3"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+5", "suite": "2SP057", "price": 1.96, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D5"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+7", "suite": "2SP057", "price": 1.96, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+8", "suite": "2SP057", "price": 1.96, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D8"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+9", "suite": "2SP057", "price": 1.96, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+10", "suite": "2SP058", "price": 15.63, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+11", "suite": "2SP057", "price": 1.96, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D11"}, {"descrptn": "Shelf Life [PRODUCT NAME] k+12", "suite": "2SP057", "price": 1.96, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D12"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP208", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP114", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP057", "price": 1.96, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP208", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP115", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP057", "price": 1.96, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP208", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP114", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "OPEN Shelf life ", "suite": "2SP057", "price": 1.96, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Iceland COP for storage", "client": "SIS", "eol": "N", "period": "D11"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP208", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "Open pack on 'use by' date. Retain open for 24h then test", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP115", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "Open pack on 'use by' date. Retain open for 24h then test", "client": "SIS", "eol": "N", "period": "D10"}, {"descrptn": "DEFROST Shelf life [ PRODUCT NAME ]", "suite": "2SP057", "price": 1.96, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "Freeze pack on 'use by' date defrost then test", "client": "SIS", "eol": "N", "period": "D11"}], "Amber Foods": [{"descrptn": "Shelf Life [ Amber - ]", "suite": "2SP206", "price": 0, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": ""}], "2Sisters": [{"descrptn": "Shelf Life [BULK - PRODUCT NAME] k+1", "suite": "2SP201", "price": 2.03, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D1"}, {"descrptn": "Shelf Life [BULK - PRODUCT NAME] k+3", "suite": "2SP201", "price": 2.03, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D3"}, {"descrptn": "Shelf Life [BULK - PRODUCT NAME] k+5", "suite": "2SP201", "price": 2.03, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D5"}, {"descrptn": "Shelf Life [ BULK - PRODUCT NAME] k+7", "suite": "2SP203", "price": 2.03, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D7"}, {"descrptn": "Shelf Life [ BULK - PRODUCT NAME] k+8", "suite": "2SP203", "price": 2.03, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D8"}, {"descrptn": "Shelf Life [ BULK - PRODUCT NAME] k+9", "suite": "2SP203", "price": 2.03, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D9"}, {"descrptn": "Shelf Life [ BULK - PRODUCT NAME] k+10", "suite": "2SP203", "price": 2.03, "unit": "[Save + ENTER]", "material": "Investigation Product", "rise": "Fresh", "product": "Product", "other_id": "", "shift": "Annually", "supplier": "UK", "comms": "please follow Campden COP for storage", "client": "SIS", "eol": "N", "period": "D10"}]};
 const UB_RULES = [
  {"customer": "Aldi", "product": "Breast Fillet", "weight": "300", "days": 10, "source": "Cutting"},
  {"customer": "Aldi", "product": "Breast Fillet", "weight": "650", "days": 10, "source": "Cutting"},
@@ -4039,7 +4085,10 @@ document.getElementById('entryResultsAll').addEventListener('click', e=>{
     entryOpenConfirm(picked, {
       quickCount: true,
       needsBatch: entryIsAmberSkinPick(picked),
-      needsProductComms: entryIsSalmonellaPick(picked)
+      needsProductComms: entryIsSalmonellaPick(picked),
+      needsPmdColor: entryIsPmdPick(picked),
+      needsControlSwabFlow: entryIsControlSwabPick(picked),
+      needsEquipmentSwabFlow: entryIsEquipmentSwabPick(picked)
     });
     return;
   }
@@ -4571,6 +4620,7 @@ function entryIsQuickCountPick(p){
   if(n.includes('neck skin surveillance')) return true;
   if(n.includes('caeca testing')) return true;
   if(n.includes('salmonella testing')) return true;
+  if(n === 'pmd wholebirds') return true;
   return false;
 }
 // Amber Skin specifically prompts for BE706-style batch codes after commit.
@@ -4584,6 +4634,25 @@ function entryIsAmberSkinPick(p){
 function entryIsSalmonellaPick(p){
   if(!p) return false;
   return (p.name||'').toLowerCase().includes('salmonella testing');
+}
+// PMD Wholebirds — prompts for a Color per entry (goes into BATCH column).
+function entryIsPmdPick(p){
+  if(!p) return false;
+  return (p.name||'').toLowerCase().trim() === 'pmd wholebirds';
+}
+// Control Swab (Trial) — after add, walks records renaming DESCRIPTN, then
+// per-record time, then one Other ID applied to all, then one Comments
+// applied to all.
+function entryIsControlSwabPick(p){
+  if(!p) return false;
+  return (p.name||'').toLowerCase().trim() === 'control swab';
+}
+// 2S Group-3 Live collection equipment swabs — after add, shared date
+// (KILLDATE + PACKDATE), per-record time, per-record LINE, per-record
+// Other ID (TB/MIS two-button).
+function entryIsEquipmentSwabPick(p){
+  if(!p) return false;
+  return (p.name||'').toLowerCase().includes('2s group-3 live collection');
 }
 // Non-AmberSkin amber items — single-tap adds one record directly to the
 // sequence, no confirm card. Amber Skin (which needs the count prompt +
@@ -4648,7 +4717,10 @@ function entryOpenConfirm(p, opts){
     origin:'search',
     quickCount: !!opts.quickCount,
     needsBatch: !!opts.needsBatch,
-    needsProductComms: !!opts.needsProductComms
+    needsProductComms: !!opts.needsProductComms,
+    needsPmdColor: !!opts.needsPmdColor,
+    needsControlSwabFlow: !!opts.needsControlSwabFlow,
+    needsEquipmentSwabFlow: !!opts.needsEquipmentSwabFlow
   };
   entryShowConfirm(sug);
   // Quick-count flow: hide the category picker, focus the Entries input, pop
@@ -5148,20 +5220,91 @@ function entryCommit(){
   // Capture how this entry was picked BEFORE nulling entryPending — the
   // camera-vs-search decision at the end of the function needs this value.
   const commitOrigin = entryPending.origin || 'search';
-  // Follow-up prompts (Amber Skin batch, Salmonella product-for-COMMS): pull
-  // these BEFORE nulling entryPending so we can trigger the right prompt
-  // after the confirm card closes. The record nums that need the follow-up
-  // are captured in newNums.
   const followUpBatch = !!entryPending.needsBatch;
   const followUpComms = !!entryPending.needsProductComms;
+  const followUpPmdColor = !!entryPending.needsPmdColor;
+  const followUpControlSwab = !!entryPending.needsControlSwabFlow;
+  const followUpEquipmentSwab = !!entryPending.needsEquipmentSwabFlow;
   entryPending=null;
   document.getElementById('entryConfirmCard').classList.add('hidden');
   document.getElementById('entrySearchAll').value='';
   document.getElementById('entryResultsAll').innerHTML='';
-  // Follow-up prompts, checked before the Caeca/Neck wizard (which is a
-  // separate flow entirely for that specific product family).
   if(followUpBatch){ entryStartBatchLoop(newNums); return; }
   if(followUpComms){ entryPromptCommsFor(newNums); return; }
+  if(followUpPmdColor){
+    entryStartPromptLoop(newNums, {
+      title: 'Color',
+      column: 'BATCH',
+      placeholder: 'e.g. Yellow',
+      hint: 'Color for this bird'
+    });
+    return;
+  }
+  if(followUpControlSwab){
+    // Multi-stage: rename each DESCRIPTN → then set one TIME → then one
+    // OTHER_ID → then one COMMS, all applied to the whole batch.
+    entryStartPromptLoop(newNums, {
+      title: 'Name this swab',
+      column: 'DESCRIPTN',
+      placeholder: 'e.g. Blue Conveyer',
+      hint: 'Renames Control Swab'
+    }, ()=>{
+      // Stage 2: one time value for all (uses the existing "set all times"
+      // helper flow — we just prompt via the shared date pattern but for
+      // time. Simpler: skip forward to per-record time via the existing
+      // wizard-style keypad.) For now, ask via a promptLoop-style single
+      // input applied to each (walk each so per-record times can differ).
+      entryStartPromptLoop(newNums, {
+        title: 'Time',
+        column: 'MANUFTIME',
+        placeholder: '1452',
+        hint: 'HHMM'
+      }, ()=>{
+        // Stage 3: one OTHER_ID applied to all (walk each so per-record
+        // OTHER_ID can differ if wanted).
+        entryStartPromptLoop(newNums, {
+          title: 'Other ID',
+          column: 'OTHER_ID',
+          placeholder: 'e.g. Line 1 EV corridor',
+          hint: 'Location / room'
+        }, ()=>{
+          // Stage 4: one COMMS.
+          entryStartPromptLoop(newNums, {
+            title: 'Comments',
+            column: 'COMMS',
+            placeholder: 'Notes',
+            hint: 'Free text'
+          });
+        });
+      });
+    });
+    return;
+  }
+  if(followUpEquipmentSwab){
+    // Multi-stage: shared date (KILLDATE + PACKDATE) → per-record time →
+    // per-record LINE → per-record OTHER_ID (TB/MIS two-button).
+    entryStartSharedDate(newNums, ()=>{
+      entryStartPromptLoop(newNums, {
+        title: 'Time',
+        column: 'MANUFTIME',
+        placeholder: '1452',
+        hint: 'HHMM'
+      }, ()=>{
+        entryStartPromptLoop(newNums, {
+          title: 'Line',
+          column: 'LINE',
+          placeholder: 'e.g. 1 or 2'
+        }, ()=>{
+          entryStartChoiceLoop(newNums, {
+            title: 'Other ID',
+            column: 'OTHER_ID',
+            choices: ['TB', 'MIS']
+          });
+        });
+      });
+    });
+    return;
+  }
   // Caeca/Neck: launch the guided kill date → pack date → per-record time+line
   // wizard right away, instead of camera/search grabbing focus back.
   const firstNew = entryRecords.find(r=>r.num===newNums[0]);
@@ -5348,6 +5491,167 @@ document.getElementById('entryCommsPromptSkip').addEventListener('click', ()=> e
 document.getElementById('entryCommsPromptInput').addEventListener('keydown', (e)=>{
   if(e.key === 'Enter'){ e.preventDefault(); entryCommsPromptFinish(true); }
 });
+
+/* -------- Generic per-record prompt loop --------
+   Walks a batch of records asking one text question each. The answer is
+   written into the record's manualCellOverrides for the configured column.
+   Used by:
+     • PMD Wholebirds Color → BATCH
+     • Control Swab rename → DESCRIPTN
+     • Equipment Swab Line → LINE
+*/
+let entryPromptLoop = null;
+function entryStartPromptLoop(nums, config, onFinish){
+  entryPromptLoop = { nums, idx: 0, config, onFinish };
+  entryPromptLoopShow();
+}
+function entryPromptLoopShow(){
+  if(!entryPromptLoop || entryPromptLoop.idx >= entryPromptLoop.nums.length){
+    entryPromptLoopFinish();
+    return;
+  }
+  const st = entryPromptLoop;
+  const num = st.nums[st.idx];
+  const total = st.nums.length;
+  const rec = entryRecords.find(x => x.num === num);
+  const desc = rec ? rec.desc : '';
+  document.getElementById('entryPromptLoopLabel').textContent =
+    `${st.config.title} — #${num} (${st.idx+1} of ${total})`;
+  document.getElementById('entryPromptLoopHint').textContent =
+    st.config.hint ? `${st.config.hint} · ${desc}` : desc;
+  const input = document.getElementById('entryPromptLoopInput');
+  input.value = '';
+  input.placeholder = st.config.placeholder || '';
+  document.getElementById('entryPromptLoopOverlay').classList.remove('hidden');
+  setTimeout(()=>{ input.focus(); }, 60);
+}
+function entryPromptLoopCommit(save){
+  if(!entryPromptLoop) return;
+  const st = entryPromptLoop;
+  const num = st.nums[st.idx];
+  if(save){
+    const v = document.getElementById('entryPromptLoopInput').value.trim();
+    if(v){
+      const rec = entryRecords.find(x => x.num === num);
+      if(rec){
+        if(!rec.manualCellOverrides) rec.manualCellOverrides = {};
+        rec.manualCellOverrides[st.config.column] = v;
+        // Description column also updates the record's desc field so the
+        // Simplified table shows the renamed value, not "Control Swab".
+        if(st.config.column === 'DESCRIPTN') rec.desc = v;
+      }
+    }
+  }
+  st.idx++;
+  entryPromptLoopShow();
+}
+function entryPromptLoopFinish(){
+  const cb = entryPromptLoop && entryPromptLoop.onFinish;
+  entryPromptLoop = null;
+  document.getElementById('entryPromptLoopOverlay').classList.add('hidden');
+  entrySaveLocal();
+  renderEntryAll();
+  if(cb) cb();
+}
+document.getElementById('entryPromptLoopSave').addEventListener('click', ()=> entryPromptLoopCommit(true));
+document.getElementById('entryPromptLoopSkip').addEventListener('click', ()=> entryPromptLoopCommit(false));
+document.getElementById('entryPromptLoopDone').addEventListener('click', ()=> entryPromptLoopFinish());
+document.getElementById('entryPromptLoopInput').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){ e.preventDefault(); entryPromptLoopCommit(true); }
+});
+
+/* -------- Per-record choice loop --------
+   Same shape as the prompt loop but presents 2 buttons instead of a text
+   input. Used by Equipment Swab's Other ID stage (TB / MIS). */
+let entryChoiceLoop = null;
+function entryStartChoiceLoop(nums, config, onFinish){
+  entryChoiceLoop = { nums, idx: 0, config, onFinish };
+  entryChoiceLoopShow();
+}
+function entryChoiceLoopShow(){
+  if(!entryChoiceLoop || entryChoiceLoop.idx >= entryChoiceLoop.nums.length){
+    entryChoiceLoopFinish();
+    return;
+  }
+  const st = entryChoiceLoop;
+  const num = st.nums[st.idx];
+  const total = st.nums.length;
+  const rec = entryRecords.find(x => x.num === num);
+  const desc = rec ? rec.desc : '';
+  document.getElementById('entryChoiceLoopLabel').textContent =
+    `${st.config.title} — #${num} (${st.idx+1} of ${total})`;
+  document.getElementById('entryChoiceLoopHint').textContent = desc;
+  const btnWrap = document.getElementById('entryChoiceLoopButtons');
+  btnWrap.innerHTML = st.config.choices.map(c =>
+    `<button type="button" class="entry-picker-btn" data-choice="${esc(c)}">${esc(c)}</button>`).join('');
+  btnWrap.querySelectorAll('[data-choice]').forEach(b => b.addEventListener('click', ()=>{
+    const v = b.dataset.choice;
+    const rec2 = entryRecords.find(x => x.num === num);
+    if(rec2){
+      if(!rec2.manualCellOverrides) rec2.manualCellOverrides = {};
+      rec2.manualCellOverrides[st.config.column] = v;
+    }
+    st.idx++;
+    entryChoiceLoopShow();
+  }));
+  document.getElementById('entryChoiceLoopOverlay').classList.remove('hidden');
+}
+function entryChoiceLoopFinish(){
+  const cb = entryChoiceLoop && entryChoiceLoop.onFinish;
+  entryChoiceLoop = null;
+  document.getElementById('entryChoiceLoopOverlay').classList.add('hidden');
+  entrySaveLocal();
+  renderEntryAll();
+  if(cb) cb();
+}
+document.getElementById('entryChoiceLoopSkip').addEventListener('click', ()=>{
+  if(!entryChoiceLoop) return;
+  entryChoiceLoop.idx++;
+  entryChoiceLoopShow();
+});
+document.getElementById('entryChoiceLoopDone').addEventListener('click', ()=> entryChoiceLoopFinish());
+
+/* -------- Shared date prompt --------
+   One date applied to KILLDATE + PACKDATE of every record in the batch.
+   Used by Equipment Swab post-add.  */
+let entrySharedDateNums = null;
+let entrySharedDateOnFinish = null;
+function entryStartSharedDate(nums, onFinish){
+  entrySharedDateNums = nums;
+  entrySharedDateOnFinish = onFinish || null;
+  const inp = document.getElementById('entrySharedDateInput');
+  // Default to today (yyyy-mm-dd for <input type=date>)
+  const d = new Date();
+  inp.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('entrySharedDateOverlay').classList.remove('hidden');
+  setTimeout(()=>{
+    try{ inp.focus(); if(typeof inp.showPicker === 'function') inp.showPicker(); }catch(_e){}
+  }, 80);
+}
+function entrySharedDateFinish(save){
+  if(!entrySharedDateNums) return;
+  const cb = entrySharedDateOnFinish;
+  const nums = entrySharedDateNums;
+  if(save){
+    const v = document.getElementById('entrySharedDateInput').value;
+    if(v){
+      nums.forEach(num => {
+        const rec = entryRecords.find(x => x.num === num);
+        if(!rec) return;
+        rec.kdate = v + 'T00:00:00';
+        rec.pdate = v + 'T00:00:00';
+      });
+    }
+  }
+  entrySharedDateNums = null;
+  entrySharedDateOnFinish = null;
+  document.getElementById('entrySharedDateOverlay').classList.add('hidden');
+  entrySaveLocal();
+  renderEntryAll();
+  if(cb) cb(nums);
+}
+document.getElementById('entrySharedDateSave').addEventListener('click', ()=> entrySharedDateFinish(true));
+document.getElementById('entrySharedDateSkip').addEventListener('click', ()=> entrySharedDateFinish(false));
 
 // Bundle wizards for Nutritionals & Shelf-Life square. Full multi-stage
 // wizards are on the roadmap for the next turn — for now they surface a
@@ -5548,40 +5852,22 @@ document.getElementById('entryNutriCancel').addEventListener('click', ()=>{
      descrpton starts with 'Shelf Life' AND retailer === chosen. */
 let entryShelfState = null;
 function entryShelfFindRowsForRetailer(retailer){
-  const norm = s => String(s||'').toLowerCase().trim();
-  const r = norm(retailer);
-  const rows = entryMims.filter(m => {
-    if(norm(m.material) !== 'investigation product') return false;
-    if(norm(m.retailer) !== r) return false;
-    const d = norm(m.descrptn);
-    if(!d.startsWith('shelf life') && !d.startsWith('open shelf') && !d.startsWith('defrost shelf')) return false;
-    return true;
-  });
-  // Natural order — K+1, K+3, K+5, K+7 ... then OPEN Shelf life ... then
-  // DEFROST Shelf life. Score each row: K+N gets 100 + N; OPEN gets 900;
-  // DEFROST gets 1000. Any tie broken by SUITE alphabetical.
-  const scoreOf = m => {
-    const d = String(m.descrptn||'').toLowerCase();
-    if(d.startsWith('defrost shelf')) return 1000;
-    if(d.startsWith('open shelf')) return 900;
-    const km = d.match(/k\s*\+\s*(\d+)/i);
-    return km ? 100 + parseInt(km[1],10) : 500;
-  };
-  return rows.sort((a,b) => {
-    const sa = scoreOf(a), sb = scoreOf(b);
-    if(sa !== sb) return sa - sb;
-    return String(a.suite||'').localeCompare(String(b.suite||''));
-  });
+  // The authoritative source for shelf life rows is now SHELF_LIFE_SEED —
+  // baked in from the per-retailer ODS files you uploaded. The MIMS_SAVE_FILE
+  // rows are ignored for shelf life since the ODS files carry different
+  // (and correct) SUITE codes, prices, and ordering per retailer.
+  if(typeof SHELF_LIFE_SEED === 'undefined') return [];
+  // Try exact match first, then case-insensitive.
+  if(SHELF_LIFE_SEED[retailer]) return SHELF_LIFE_SEED[retailer];
+  const rL = String(retailer||'').toLowerCase();
+  for(const k of Object.keys(SHELF_LIFE_SEED)){
+    if(k.toLowerCase() === rL) return SHELF_LIFE_SEED[k];
+  }
+  return [];
 }
 function entryShelfAllRetailers(){
-  const set = new Set();
-  entryMims.forEach(m => {
-    if(String(m.material||'').toLowerCase().trim() !== 'investigation product') return;
-    const d = String(m.descrptn||'').toLowerCase().trim();
-    if(!d.startsWith('shelf life') && !d.startsWith('open shelf') && !d.startsWith('defrost shelf')) return;
-    if(m.retailer) set.add(m.retailer);
-  });
-  return [...set].sort();
+  if(typeof SHELF_LIFE_SEED === 'undefined') return [];
+  return Object.keys(SHELF_LIFE_SEED);
 }
 function entryShelfRender(){
   if(!entryShelfState) return;
@@ -5673,35 +5959,38 @@ function entryShelfValidateAndAdvance(){
 function entryShelfCommit(){
   const s = entryShelfState;
   const rows = entryShelfFindRowsForRetailer(s.retailer);
-  if(!rows.length){ alert('No Shelf Life rows in MIMS for this retailer.'); return; }
+  if(!rows.length){ alert('No Shelf Life rows for this retailer.'); return; }
   const now = new Date();
   const newRecs = [];
   // Synthetic ID for unnumbered records — starts below any real SAMPCOUNT
-  // and decrements. Only used for DOM/state identity (focus, delete). The
-  // export builder still writes blank SAMPCOUNT because noSampCount is set.
-  const synBase = -Date.now(); // millisecond timestamp, negated → unique
+  // and decrements. Only used for DOM/state identity (focus, delete).
+  const synBase = -Date.now();
   let synIdx = 0;
   for(let setIdx = 1; setIdx <= 3; setIdx++){
-    rows.forEach(mimsRow => {
-      const desc = String(mimsRow.descrptn||'').replace(/\[\s*PRODUCT\s*NAME\s*\]/gi, s.product.trim());
+    // Preserve the ODS file's row order — K+1, K+3, K+5, K+7, K+8, K+9,
+    // K+10, K+11, K+12, then OPEN Shelf life, then DEFROST Shelf life.
+    rows.forEach(seedRow => {
+      // Replace [PRODUCT NAME] and [BULK - PRODUCT NAME] etc. tokens with
+      // the entered product name.
+      const desc = String(seedRow.descrptn||'').replace(/\[[^\]]*PRODUCT\s*NAME[^\]]*\]/gi, s.product.trim());
       const rec = {
-        num: synBase - synIdx++,   // synthetic unique — negative, never conflicts with real nums
+        num: synBase - synIdx++,
         desc: desc,
         barcode: '',
-        mimsBarcode: mimsRow.barcode,
-        mimsSuite: mimsRow.suite||'',
-        mimsShift: mimsRow.shift||'Annually',
         cat: 'Category 1',
         time: now.toISOString(),
         source: 'shelf-life-bundle',
         tmpl: null,
-        mimsRow: mimsRow,
-        noSampCount: true,   // signal to export builder: leave SAMPCOUNT blank
+        // shelfSeedRow carries the ODS row for the export builder to read
+        // PRODUCT/MATERIAL/RISE/RETAILER/SHIFT/SUITE/PRICE/SUPPLIER/COMMS/
+        // CLIENT/PERIOD/EOL from directly — no MIMS lookup needed.
+        shelfSeedRow: seedRow,
+        noSampCount: true,
         manualCellOverrides: {
           DESCRIPTN: desc,
-          SIZE: s.size.trim() || '.',
-          UNIT: s.unit.trim() || '.',
-          OTHER_ID: s.department.trim() || '.',
+          SIZE: s.size.trim() || '',
+          UNIT: s.unit.trim() || (seedRow.unit || ''),
+          OTHER_ID: s.department.trim() || (seedRow.other_id || ''),
           LINE: 'Set ' + setIdx
         }
       };
@@ -6699,16 +6988,44 @@ function entryComputeUseByDays(r, mimsRow){
 function entryBuildSisRow(r){
   const now=new Date(r.time); const kdpd=entryFmtDateUK(now);
   const row={}; ENTRY_SIS_HEADERS.forEach(h=>row[h]='');
-  // Correlate against the CURRENT MIMS data at render/export time (not just
-  // whatever was resolved at commit time), so uploading a fresher MIMS file
-  // after scanning still improves the export. Join by the internal id
-  // (mimsBarcode) rather than the user-facing barcode, so non-barcoded MIMS
-  // rows still resolve. Old records (pre-mimsBarcode) fall back to barcode
-  // then to the frozen r.mimsRow.
+  // Shelf-life records: read directly from the ODS-baked seed row. No MIMS
+  // lookup because the seed carries every column the export needs. This is
+  // what makes M&S 15 rows / Aldi 15 / Tesco 15 etc. export correctly with
+  // your ODS-specified SUITE codes and prices instead of MIMS defaults.
+  if(r.source === 'shelf-life-bundle' && r.shelfSeedRow){
+    const sr = r.shelfSeedRow;
+    row.PRODUCT = sr.product || 'Product';
+    row.MATERIAL = sr.material || 'Investigation Product';
+    row.RISE = sr.rise || 'Fresh';
+    row.UNIT = sr.unit || '';
+    row.DESCRIPTN = r.desc || sr.descrptn || '';
+    row.RETAILER = sr.retailer || '';
+    row.SHIFT = sr.shift || 'Annually';
+    row.OTHER_ID = sr.other_id || '';
+    row.SUITE = sr.suite || '';
+    row.PRICE = sr.price || '';
+    row.EOL = sr.eol || 'N';
+    row.SUPPLIER = sr.supplier || 'UK';
+    row.COMMS = sr.comms || '';
+    row.CLIENT = sr.client || 'SIS';
+    row.PERIOD = sr.period || '';
+    // KILLDATE / PACKDATE from manual override or current time (shelf life
+    // isn't tied to a specific kill date — the person sets it in Records).
+    row.KILLDATE = r.kdate ? entryFmtDateUK(r.kdate) : kdpd;
+    row.PACKDATE = r.pdate ? entryFmtDateUK(r.pdate) : kdpd;
+    row.SAMPCOUNT = '';   // never numbered
+    row.SAMDATE = entryFmtDateUK(new Date());
+    row.SAMBY = localStorage.getItem('unified.samplerName') || 'Sampler';
+    row.MANUFDATE = row.KILLDATE;
+    row.ORDER = r.cat;
+    // Manual overrides (SIZE / UNIT / OTHER_ID / LINE from the wizard,
+    // DESCRIPTN with the product name filled in) win last.
+    if(r.manualCellOverrides){
+      Object.keys(r.manualCellOverrides).forEach(h => { row[h] = r.manualCellOverrides[h]; });
+    }
+    return row;
+  }
   const joinKey = r.mimsBarcode || r.barcode;
-  // Disambiguate when multiple MIMS rows share a barcode (Daily vs Monthly
-  // variants of the same product). Falls back to first-match if the record
-  // has no suite/shift hints (older records from before this shape existed).
   let mimsRow = joinKey ? entryMimsRowForLookup({
     mimsBarcode: joinKey,
     mimsSuite: r.mimsSuite,
