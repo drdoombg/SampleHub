@@ -5241,40 +5241,19 @@ function entryCommit(){
     return;
   }
   if(followUpControlSwab){
-    // Multi-stage: rename each DESCRIPTN → then set one TIME → then one
-    // OTHER_ID → then one COMMS, all applied to the whole batch.
+    // Stage 1: rename each swab (per-record DESCRIPTN)
     entryStartPromptLoop(newNums, {
       title: 'Name this swab',
       column: 'DESCRIPTN',
       placeholder: 'e.g. Blue Conveyer',
       hint: 'Renames Control Swab'
     }, ()=>{
-      // Stage 2: one time value for all (uses the existing "set all times"
-      // helper flow — we just prompt via the shared date pattern but for
-      // time. Simpler: skip forward to per-record time via the existing
-      // wizard-style keypad.) For now, ask via a promptLoop-style single
-      // input applied to each (walk each so per-record times can differ).
-      entryStartPromptLoop(newNums, {
-        title: 'Time',
-        column: 'MANUFTIME',
-        placeholder: '1452',
-        hint: 'HHMM'
-      }, ()=>{
-        // Stage 3: one OTHER_ID applied to all (walk each so per-record
-        // OTHER_ID can differ if wanted).
-        entryStartPromptLoop(newNums, {
-          title: 'Other ID',
-          column: 'OTHER_ID',
-          placeholder: 'e.g. Line 1 EV corridor',
-          hint: 'Location / room'
-        }, ()=>{
-          // Stage 4: one COMMS.
-          entryStartPromptLoop(newNums, {
-            title: 'Comments',
-            column: 'COMMS',
-            placeholder: 'Notes',
-            hint: 'Free text'
-          });
+      // Stage 2: ONE time applied to all records
+      entryPromptSharedValue(newNums, 'Time (applies to all)', 'MANUFTIME', '1452', ()=>{
+        // Stage 3: ONE Other ID applied to all
+        entryPromptSharedValue(newNums, 'Other ID (applies to all)', 'OTHER_ID', 'e.g. Line 1 EV corridor', ()=>{
+          // Stage 4: ONE Comments applied to all
+          entryPromptSharedValue(newNums, 'Comments (applies to all)', 'COMMS', 'Notes');
         });
       });
     });
@@ -5524,6 +5503,82 @@ function entryPromptLoopShow(){
   input.placeholder = st.config.placeholder || '';
   document.getElementById('entryPromptLoopOverlay').classList.remove('hidden');
   setTimeout(()=>{ input.focus(); }, 60);
+  setTimeout(()=>{
+    document.getElementById('entryPromptLoopSave').scrollIntoView({block:'nearest', behavior:'smooth'});
+  }, 500);
+}
+
+// Shared-value prompt: one value written to all records in the batch under
+// the configured column. Reuses the promptLoop overlay so we don't need a
+// second UI. Skip clears the field, Save writes to every record.
+function entryPromptSharedValue(nums, title, column, placeholder, onFinish){
+  const overlay = document.getElementById('entryPromptLoopOverlay');
+  document.getElementById('entryPromptLoopLabel').textContent = title;
+  document.getElementById('entryPromptLoopHint').textContent = `Applies to all ${nums.length} records`;
+  const input = document.getElementById('entryPromptLoopInput');
+  input.value = '';
+  input.placeholder = placeholder || '';
+  overlay.classList.remove('hidden');
+  setTimeout(()=>{
+    input.focus();
+    input.scrollIntoView({block:'center', behavior:'smooth'});
+  }, 60);
+  // Rebind Save/Skip/Done/Enter to write shared, not walk.
+  const save = document.getElementById('entryPromptLoopSave').cloneNode(true);
+  document.getElementById('entryPromptLoopSave').replaceWith(save);
+  const skip = document.getElementById('entryPromptLoopSkip').cloneNode(true);
+  document.getElementById('entryPromptLoopSkip').replaceWith(skip);
+  const done = document.getElementById('entryPromptLoopDone').cloneNode(true);
+  document.getElementById('entryPromptLoopDone').replaceWith(done);
+  const inp2 = document.getElementById('entryPromptLoopInput').cloneNode(true);
+  document.getElementById('entryPromptLoopInput').replaceWith(inp2);
+  const finish = (writeValue) => {
+    if(writeValue){
+      const v = document.getElementById('entryPromptLoopInput').value.trim();
+      if(v){
+        nums.forEach(num => {
+          const r = entryRecords.find(x => x.num === num);
+          if(!r) return;
+          if(!r.manualCellOverrides) r.manualCellOverrides = {};
+          r.manualCellOverrides[column] = v;
+          if(column === 'DESCRIPTN') r.desc = v;
+        });
+      }
+    }
+    overlay.classList.add('hidden');
+    entrySaveLocal();
+    renderEntryAll();
+    // Rebind original walking handlers so next promptLoop still works.
+    entryRebindPromptLoopHandlers();
+    if(onFinish) onFinish();
+  };
+  document.getElementById('entryPromptLoopSave').addEventListener('click', ()=>finish(true));
+  document.getElementById('entryPromptLoopSkip').addEventListener('click', ()=>finish(false));
+  document.getElementById('entryPromptLoopDone').addEventListener('click', ()=>finish(false));
+  document.getElementById('entryPromptLoopInput').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){ e.preventDefault(); finish(true); }
+    else{ setTimeout(()=>document.getElementById('entryPromptLoopInput').scrollIntoView({block:'center'}), 20); }
+  });
+  // Also make sure input stays focused on tap
+  document.getElementById('entryPromptLoopInput').focus();
+}
+// Rebinds the original walking handlers after a shared-value session
+// swapped them out. Called from entryPromptSharedValue's finish handler.
+function entryRebindPromptLoopHandlers(){
+  const save = document.getElementById('entryPromptLoopSave').cloneNode(true);
+  document.getElementById('entryPromptLoopSave').replaceWith(save);
+  const skip = document.getElementById('entryPromptLoopSkip').cloneNode(true);
+  document.getElementById('entryPromptLoopSkip').replaceWith(skip);
+  const done = document.getElementById('entryPromptLoopDone').cloneNode(true);
+  document.getElementById('entryPromptLoopDone').replaceWith(done);
+  const inp = document.getElementById('entryPromptLoopInput').cloneNode(true);
+  document.getElementById('entryPromptLoopInput').replaceWith(inp);
+  document.getElementById('entryPromptLoopSave').addEventListener('click', ()=> entryPromptLoopCommit(true));
+  document.getElementById('entryPromptLoopSkip').addEventListener('click', ()=> entryPromptLoopCommit(false));
+  document.getElementById('entryPromptLoopDone').addEventListener('click', ()=> entryPromptLoopFinish());
+  document.getElementById('entryPromptLoopInput').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){ e.preventDefault(); entryPromptLoopCommit(true); }
+  });
 }
 function entryPromptLoopCommit(save){
   if(!entryPromptLoop) return;
