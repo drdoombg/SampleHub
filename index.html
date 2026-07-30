@@ -4092,6 +4092,12 @@ document.getElementById('entryResultsAll').addEventListener('click', e=>{
     });
     return;
   }
+  // Meat Content — normal confirm card (categories visible), post-commit
+  // prompts for description ([ENTER DESCRIPTION] replacement) and Use By days.
+  if(entryIsMeatContentPick(picked)){
+    entryOpenConfirm(picked, { needsMeatContentFlow: true });
+    return;
+  }
   entryOpenConfirm(picked);
 });
 
@@ -4577,29 +4583,24 @@ function entryMimsRowForLookup(p){
   return candidates[0];
 }
 function entrySuggestCategory(p){
-  // Look up the MIMS row by the internal join key, not the user-visible
-  // barcode. A non-barcoded MIMS row has an empty barcode field but a real
-  // MIMS row behind it, and the auto-suggest needs to see that row's SHIFT
-  // value to fire (Weekly/Monthly/Annually etc.).
   const mimsRow = entryMimsRowFor(p.mimsBarcode || p.barcode);
-  // The MIMS file carries the frequency in the SHIFT column (Weekly / Monthly
-  // / Daily / Annually / Bi Annual / etc.), not in ORDER — ORDER is only used
-  // for the AMBER-tagged rows. Normalise SHIFT into one of our five categories
-  // so the confirm card lights up the right button by default. The person can
-  // still change it; this is only a suggestion.
-  const shift = (mimsRow && mimsRow.shift || '').trim().toLowerCase();
+  const shiftRaw = (mimsRow && mimsRow.shift || '').trim();
+  const shift = shiftRaw.toLowerCase();
   let suggested = null;
   if(shift==='weekly') suggested = 'Category 2';
   else if(shift==='monthly') suggested = 'Category 3';
   else if(shift==='daily') suggested = 'Category 1';
-  // Annually / Bi Annual / Quarterly / Various / trial / month-name and
-  // similar sparse values keep the current default of Daily as a safe pick.
+  // Annually / Bi Annual / Trial / Various etc. default to Category 1 but
+  // note the actual SHIFT so the person knows the export column will carry
+  // that literal value instead of "Daily".
   const tick = (p.barcode || p.mimsBarcode) ? entryTicks[p.barcode || p.mimsBarcode] : null;
   const doneThisWeek = tick && tick.freq==='weekly' && tick.period===weekKey();
   const doneThisMonth = tick && tick.freq==='monthly' && tick.period===monthKey();
   if(suggested==='Category 2' && !doneThisWeek) return {cat:'Category 2', tag:'wk', note:'Suggested: Weekly — first time this cycle'};
   if(suggested==='Category 3' && !doneThisMonth) return {cat:'Category 3', tag:'mo', note:'Suggested: Monthly — first time this cycle'};
   if(suggested==='Category 1') return {cat:'Category 1', tag:'', note:''};
+  // Non-Daily/Weekly/Monthly shift — default Cat 1, hint the actual value.
+  if(shiftRaw && !suggested) return {cat:'Category 1', tag:'', note:`SHIFT column will be "${shiftRaw}"`};
   if(tick) return {cat:'Category 1', tag:'', note:'Already ticked this cycle — defaulting to Daily'};
   return {cat:'Category 1', tag:'', note:''};
 }
@@ -4646,6 +4647,14 @@ function entryIsPmdPick(p){
 function entryIsControlSwabPick(p){
   if(!p) return false;
   return (p.name||'').toLowerCase().trim() === 'control swab';
+}
+// Meat Content — MIMS DESCRIPTN "Meat content [ENTER DESCRIPTION]",
+// SUITE 2SP015C. Uses the normal confirm card (categories visible), then
+// after commit prompts: (1) description to replace [ENTER DESCRIPTION],
+// (2) Use By days number → USE_BY column.
+function entryIsMeatContentPick(p){
+  if(!p) return false;
+  return (p.name||'').toLowerCase().includes('meat content');
 }
 // 2S Group-3 Live collection equipment swabs — after add, shared date
 // (KILLDATE + PACKDATE), per-record time, per-record LINE, per-record
@@ -4720,7 +4729,8 @@ function entryOpenConfirm(p, opts){
     needsProductComms: !!opts.needsProductComms,
     needsPmdColor: !!opts.needsPmdColor,
     needsControlSwabFlow: !!opts.needsControlSwabFlow,
-    needsEquipmentSwabFlow: !!opts.needsEquipmentSwabFlow
+    needsEquipmentSwabFlow: !!opts.needsEquipmentSwabFlow,
+    needsMeatContentFlow: !!opts.needsMeatContentFlow
   };
   entryShowConfirm(sug);
   // Quick-count flow: hide the category picker, focus the Entries input, pop
@@ -5092,16 +5102,26 @@ function entryCommit(){
   // resolver just picked whichever came first — usually Daily — so scans
   // committed as Weekly or Monthly exported with Daily's SUITE and PRICE.
   const catToShift = {
-    'Category 1': 'Daily',
     'Category 2': 'Weekly',
     'Category 3': 'Monthly'
   };
-  const forcedShift = catToShift[entryPending.cat] || entryPending.mimsShift || '';
+  // Only Categories 2 and 3 force the SHIFT (the user explicitly picked
+  // Weekly or Monthly). Category 1 keeps whatever the MIMS row's SHIFT
+  // says (Daily, Annually, Trial, Various, Bi Annual, etc.) so the export
+  // preserves the actual frequency label. This matters because MIMS rows
+  // like Nutritional/Shelf-Life carry SHIFT=Annually and Control Swab
+  // carries SHIFT=Trial — those must survive to the export.
+  let forcedShift = catToShift[entryPending.cat] || '';
   const mimsRow = entryMimsRowForLookup({
     mimsBarcode: joinKey,
     mimsSuite: entryPending.mimsSuite,
-    mimsShift: forcedShift
+    mimsShift: forcedShift || entryPending.mimsShift
   });
+  // If no explicit force, use the MIMS row's actual shift (Annually, Trial,
+  // Bi Annual, etc.) so the export column is authentic.
+  if(!forcedShift && mimsRow && mimsRow.shift){
+    forcedShift = mimsRow.shift;
+  }
   const newNums=[];
 
   // Category 4 (EOL) / Category 5 (SOL) / Category 6 (Prep bundle) are Meat
@@ -5225,6 +5245,7 @@ function entryCommit(){
   const followUpPmdColor = !!entryPending.needsPmdColor;
   const followUpControlSwab = !!entryPending.needsControlSwabFlow;
   const followUpEquipmentSwab = !!entryPending.needsEquipmentSwabFlow;
+  const followUpMeatContent = !!entryPending.needsMeatContentFlow;
   entryPending=null;
   document.getElementById('entryConfirmCard').classList.add('hidden');
   document.getElementById('entrySearchAll').value='';
@@ -5280,6 +5301,28 @@ function entryCommit(){
             choices: ['TB', 'MIS']
           });
         });
+      });
+    });
+    return;
+  }
+  if(followUpMeatContent){
+    // Stage 1: description replaces [ENTER DESCRIPTION] in DESCRIPTN
+    // Stage 2: Use By days (numeric) → useByOverride
+    entryPromptSharedValue(newNums, 'Description (replaces [ENTER DESCRIPTION])', 'DESCRIPTN', 'e.g. Breast Fillet', ()=>{
+      entryPromptSharedValue(newNums, 'Use By (days after Kill date)', 'USE_BY_DAYS', 'e.g. 10', ()=>{
+        // Value was written under USE_BY_DAYS as a bookkeeping key; move it
+        // to useByOverride on each record so the export computes KILLDATE + N.
+        newNums.forEach(num => {
+          const rec = entryRecords.find(x => x.num === num);
+          if(!rec) return;
+          if(rec.manualCellOverrides && rec.manualCellOverrides.USE_BY_DAYS){
+            const days = parseInt(String(rec.manualCellOverrides.USE_BY_DAYS).replace(/[^0-9]/g,''), 10);
+            if(!Number.isNaN(days)) rec.useByOverride = days;
+            delete rec.manualCellOverrides.USE_BY_DAYS;
+          }
+        });
+        entrySaveLocal();
+        renderEntryAll();
       });
     });
     return;
@@ -5521,7 +5564,7 @@ function entryPromptSharedValue(nums, title, column, placeholder, onFinish){
   const input = document.getElementById('entryPromptLoopInput');
   input.value = '';
   input.placeholder = placeholder || '';
-  const isNumeric = column === 'MANUFTIME' || column === 'BATCH' || column === 'USE_BY';
+  const isNumeric = column === 'MANUFTIME' || column === 'BATCH' || column === 'USE_BY' || column === 'USE_BY_DAYS';
   input.setAttribute('inputmode', isNumeric ? 'numeric' : 'text');
   overlay.classList.remove('hidden');
   setTimeout(()=>{
@@ -7027,11 +7070,6 @@ function entryComputeUseByDays(r, mimsRow){
   if(r && r.useByOverride !== undefined && r.useByOverride !== null && r.useByOverride !== ''){
     const n = parseInt(String(r.useByOverride).replace(/[^0-9]/g,''), 10);
     if(!Number.isNaN(n)) return n;
-  }
-  // Meat Prep EOL / SOL rows (2SL003E, 2SL003S) — always +10 days. MIMS
-  // leaves their use_by blank because the workflow uses a fixed 10 days.
-  if(mimsRow && (mimsRow.suite === '2SL003E' || mimsRow.suite === '2SL003S')){
-    return 10;
   }
   // 2. MIMS USE_BY column. New format:
   //    "N D"   → +N days
