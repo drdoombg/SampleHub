@@ -5160,6 +5160,12 @@ function entryCommit(){
     // 11 records in the bundle — the reference file has the same MIMS name
     // repeated on every row of a Meat Prep bundle.
     const authoritativeDesc = (mimsRow && mimsRow.descrptn) ? mimsRow.descrptn : entryPending.desc;
+    // Meat prep 5E+1D+5S — the middle daily row uses the scanned product's
+    // own MIMS row (so its USE_BY resolves normally). The EOL / SOL rows
+    // point at 2SL003E / 2SL003S which have blank use_by in MIMS. Apply the
+    // SCANNED product's use_by days as an override to all 11 records so
+    // they all show the same USE_BY date on export.
+    const scannedUseByDays = mimsRow ? entryComputeUseByDays(null, mimsRow) : null;
 
     seq.forEach((step,k) => {
       const r = step.row;
@@ -5174,13 +5180,12 @@ function entryCommit(){
         time: now.toISOString(),
         source: r ? 'meat-prep' : (mimsRow ? 'mims' : 'lookup'),
         tmpl: (lookupEntry && lookupEntry.tmpl) || null,
-        mimsRow: r || mimsRow || null
+        mimsRow: r || mimsRow || null,
+        // Force USE_BY days on all rows to match the scanned product — EOL
+        // and SOL MIMS rows have blank use_by; without this override only
+        // the middle 1D would show a USE_BY date.
+        useByOverride: (scannedUseByDays !== null) ? scannedUseByDays : undefined
       };
-      // Meat Prep MIMS rows have empty DESCRIPTION in the file — the export
-      // row builder falls back to r.desc when mimsRow.descrptn is empty. We
-      // set r.desc to the authoritative product name (from the SCANNED
-      // product's MIMS row), so all 5+1+5 rows in the bundle export with
-      // the same product name — matching how the reference file reads.
       entryRecords.push(push);
       newNums.push(n+k);
     });
@@ -5306,12 +5311,25 @@ function entryCommit(){
     return;
   }
   if(followUpMeatContent){
-    // Stage 1: description replaces [ENTER DESCRIPTION] in DESCRIPTN
-    // Stage 2: Use By days (numeric) → useByOverride
-    entryPromptSharedValue(newNums, 'Description (replaces [ENTER DESCRIPTION])', 'DESCRIPTN', 'e.g. Breast Fillet', ()=>{
+    entryPromptSharedValue(newNums, 'Description (replaces [ENTER DESCRIPTION])', 'MEAT_CONTENT_DESC', 'e.g. Breast Fillets', ()=>{
+      // Substitute user's text into the [ENTER DESCRIPTION] bracket of each
+      // record's DESCRIPTN, keeping the "Meat content " prefix intact.
+      newNums.forEach(num => {
+        const rec = entryRecords.find(x => x.num === num);
+        if(!rec || !rec.manualCellOverrides) return;
+        const userDesc = rec.manualCellOverrides.MEAT_CONTENT_DESC;
+        if(userDesc){
+          // Base descrpton from the MIMS row (has the [ENTER DESCRIPTION] token)
+          const baseDesc = (rec.mimsRow && rec.mimsRow.descrptn) || rec.desc || '';
+          const filled = baseDesc.replace(/\[[^\]]*ENTER\s*DESCRIPTION[^\]]*\]/gi, userDesc);
+          rec.manualCellOverrides.DESCRIPTN = filled;
+          rec.desc = filled;
+        }
+        delete rec.manualCellOverrides.MEAT_CONTENT_DESC;
+      });
+      entrySaveLocal();
+      renderEntryAll();
       entryPromptSharedValue(newNums, 'Use By (days after Kill date)', 'USE_BY_DAYS', 'e.g. 10', ()=>{
-        // Value was written under USE_BY_DAYS as a bookkeeping key; move it
-        // to useByOverride on each record so the export computes KILLDATE + N.
         newNums.forEach(num => {
           const rec = entryRecords.find(x => x.num === num);
           if(!rec) return;
