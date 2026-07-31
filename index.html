@@ -5262,7 +5262,8 @@ function entryCommit(){
       title: 'Color',
       column: 'BATCH',
       placeholder: 'e.g. Yellow',
-      hint: 'Color for this bird'
+      hint: 'Color for this bird',
+      numeric: false   // color name is text, not a number
     });
     return;
   }
@@ -5286,19 +5287,19 @@ function entryCommit(){
     return;
   }
   if(followUpEquipmentSwab){
-    // Multi-stage: shared date (KILLDATE + PACKDATE) → per-record time →
-    // per-record LINE → per-record OTHER_ID (TB/MIS two-button).
     entryStartSharedDate(newNums, ()=>{
       entryStartPromptLoop(newNums, {
         title: 'Time',
         column: 'MANUFTIME',
         placeholder: '1452',
-        hint: 'HHMM'
+        hint: 'HHMM',
+        numeric: true
       }, ()=>{
         entryStartPromptLoop(newNums, {
           title: 'Line',
           column: 'LINE',
-          placeholder: 'e.g. 1 or 2'
+          placeholder: 'e.g. 1 or 2',
+          numeric: true   // line numbers use keypad
         }, ()=>{
           entryStartChoiceLoop(newNums, {
             title: 'Other ID',
@@ -5563,7 +5564,8 @@ function entryPromptLoopShow(){
   input.value = '';
   input.placeholder = st.config.placeholder || '';
   // Numeric keypad for numeric columns (time HHMM, batch codes, use-by days)
-  const isNumeric = st.config.column === 'MANUFTIME' || st.config.column === 'BATCH' || st.config.numeric === true;
+  const isNumeric = (st.config.numeric === true)
+    || (st.config.numeric !== false && (st.config.column === 'MANUFTIME' || st.config.column === 'BATCH'));
   input.setAttribute('inputmode', isNumeric ? 'numeric' : 'text');
   document.getElementById('entryPromptLoopOverlay').classList.remove('hidden');
   setTimeout(()=>{ input.focus(); }, 60);
