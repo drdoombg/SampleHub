@@ -938,6 +938,7 @@
     <h2>Menu</h2>
     <button class="btn ghost" id="editToggle" style="width:100%">Toggle edit mode (delete products)</button>
     <button class="btn ghost" id="sortToggle" style="width:100%; margin-top:10px;">Toggle sort mode (reorder within room)</button>
+    <button class="btn ghost" id="barcodesBtn" style="width:100%; margin-top:10px;">🔢 Manage barcodes</button>
 
     <div class="divider"></div>
     <h2 style="font-size:15px">Customers &amp; frequencies</h2>
@@ -974,6 +975,24 @@
     </div>
 
     <div class="sheet-actions"><button class="btn primary" id="closeMenu">Done</button></div>
+  </div>
+</div>
+
+<!-- Barcodes management sheet. One numerical identity per Routine product.
+     Grouped by customer → room. Saves on blur so mobile-friendly. Delisted
+     products hidden by default (togglable) to keep the list focused. -->
+<div class="backdrop" id="barcodesSheet">
+  <div class="sheet">
+    <h2>Manage barcodes</h2>
+    <p class="hint">Give each Routine product a numerical identity. Type a barcode and tap away to save. Leave blank to clear.</p>
+    <div style="display:flex; gap:8px; align-items:center; margin:8px 0 4px;">
+      <input id="barcodeSearch" placeholder="Search product or barcode" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true" style="flex:1;">
+      <label style="display:flex; gap:6px; align-items:center; font-size:13px; white-space:nowrap;">
+        <input type="checkbox" id="barcodeShowDelisted"> Show delisted
+      </label>
+    </div>
+    <div id="barcodesList" style="max-height:60vh; overflow:auto; margin-top:8px;"></div>
+    <div class="sheet-actions"><button class="btn primary" id="closeBarcodes">Done</button></div>
   </div>
 </div>
 
@@ -2492,6 +2511,115 @@ function roomOrder(key){
 // Customers with no room concept
 function hasRooms(custName){ return custName!=='KFC'; }
 
+// Hardcoded routine product list. Seeded on every load() for missing IDs so
+// the list is baked-in — fresh installs get it, and any accidental delete
+// is restored on next reload. Users can still delist via the app.
+const SEED_ROUTINE_PRODUCTS = [
+  {"id": "mrautec9s5jv", "customer": "Aldi", "room": "fp1", "name": "Medium"},
+  {"id": "mrautleqa9q6", "customer": "Aldi", "room": "fp1", "name": "Large"},
+  {"id": "mrautppo49am", "customer": "Aldi", "room": "fp1", "name": "Extra Large"},
+  {"id": "mrautzv4444v", "customer": "Aldi", "room": "fp2", "name": "Extra Tasty"},
+  {"id": "mrauu6gcsxgt", "customer": "Aldi", "room": "fp2", "name": "PSO"},
+  {"id": "mrauuj3ynowj", "customer": "Aldi", "room": "fp2", "name": "Rotisserie Spatchcock"},
+  {"id": "mrauushp3k1m", "customer": "Aldi", "room": "fp2", "name": "Garlic and Herb Spatchcock"},
+  {"id": "mrauve719mio", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 300g"},
+  {"id": "mrauvsad2zzx", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 650g"},
+  {"id": "mrauw6p3fpnb", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 1000g"},
+  {"id": "mraux8vwlazk", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 2000g"},
+  {"id": "mrauxto6r7n0", "customer": "Aldi", "room": "cut", "name": "Diced Breast 600g"},
+  {"id": "mrav1qfk6bvu", "customer": "Aldi", "room": "cut", "name": "Thigh 1kg"},
+  {"id": "mrav20vw23cv", "customer": "Aldi", "room": "cut", "name": "Thigh Fillet 900g"},
+  {"id": "mrav2fl2h5zv", "customer": "Aldi", "room": "cut", "name": "Drumsticks 1kg"},
+  {"id": "mrav2qt7rpr5", "customer": "Aldi", "room": "cut", "name": "Drumsticks 2kg"},
+  {"id": "mrav34otn3d8", "customer": "Aldi", "room": "cut", "name": "Legs 1kg"},
+  {"id": "mrav48lhch5p", "customer": "Asda", "room": "fp1", "name": "Medium"},
+  {"id": "mrav4ltqv4wx", "customer": "Asda", "room": "fp1", "name": "Large"},
+  {"id": "mrav52fnmtej", "customer": "Asda", "room": "fp1", "name": "Extra Large"},
+  {"id": "mrav5fl65vzh", "customer": "Asda", "room": "fp2", "name": "Extra Tasty Small"},
+  {"id": "mrav5q3k7uku", "customer": "Asda", "room": "fp2", "name": "Piri Piri Spatchcock"},
+  {"id": "mrav69s8kp4g", "customer": "Asda", "room": "fp2", "name": "Lemon & Herb Spatchcock"},
+  {"id": "mrav6ias0307", "customer": "Asda", "room": "fp2", "name": "BBQ Spatchcock", "delisted": true},
+  {"id": "mrav6swv67kp", "customer": "Asda", "room": "fp2", "name": "PSO"},
+  {"id": "mrav823xgint", "customer": "Asda", "room": "fp2", "name": "Salt and Pepper", "delisted": true},
+  {"id": "mrav8tavtq75", "customer": "Asda", "room": "cut", "name": "Breast Fillet 600g", "delisted": true},
+  {"id": "mrav9d1smxw7", "customer": "Asda", "room": "cut", "name": "Mini Fillet 400g", "delisted": true},
+  {"id": "mravatwj7z0b", "customer": "Asda", "room": "cut", "name": "Diced Breast 400g", "delisted": true},
+  {"id": "mravo9lls7iy", "customer": "Asda", "room": "cut", "name": "Drumsticks 1.1 kg", "delisted": true},
+  {"id": "mravo9llk9kx", "customer": "Asda", "room": "cut", "name": "Thigh Fillets 650g", "delisted": true},
+  {"id": "mravputqauas", "customer": "Asda", "room": "deb", "name": "Drum Fillet 400g", "delisted": true},
+  {"id": "mravputqzzvx", "customer": "Asda", "room": "deb", "name": "Drum Fillet 600g", "delisted": true},
+  {"id": "mravqpq0n17a", "customer": "Co-op", "room": "fp1", "name": "Large"},
+  {"id": "mravqpq0tvmf", "customer": "Co-op", "room": "fp1", "name": "Extra Large"},
+  {"id": "mravrcpja18h", "customer": "Co-op", "room": "fp2", "name": "Rotisserie"},
+  {"id": "mravvgb6vtgo", "customer": "Co-op", "room": "cut", "name": "Breast Fillet 300g"},
+  {"id": "mravvgb62g6v", "customer": "Co-op", "room": "cut", "name": "Breast Fillet 580g"},
+  {"id": "mravvgb68k8i", "customer": "Co-op", "room": "cut", "name": "Breast Fillet 850g"},
+  {"id": "mravvgb6cknz", "customer": "Co-op", "room": "cut", "name": "Mini Fillet 400g"},
+  {"id": "mravvgb633jf", "customer": "Co-op", "room": "cut", "name": "Diced Breast 400g"},
+  {"id": "mravvgb6nqpy", "customer": "Co-op", "room": "cut", "name": "Breast Strips 250g"},
+  {"id": "mrj3rz6ulst9", "customer": "Co-op", "room": "cut", "name": "Thighs 600g"},
+  {"id": "mravvgb6b399", "customer": "Co-op", "room": "cut", "name": "Thigh Fillet 500g"},
+  {"id": "mravvgb6bf3d", "customer": "Co-op", "room": "cut", "name": "Drumsticks 750g"},
+  {"id": "mravxvoo7flk", "customer": "M&S", "room": "fp1", "name": "Butter Basted Joints  452g"},
+  {"id": "mravxvool3z9", "customer": "M&S", "room": "fp1", "name": "Rotisserie Joints 490g"},
+  {"id": "mraw0g0p48d4", "customer": "M&S", "room": "fp2", "name": "Butter Basted Deli 1.1"},
+  {"id": "mraw0g0ptnfx", "customer": "M&S", "room": "fp2", "name": "Butter Basted Deli 1.8"},
+  {"id": "mraw0g0pxufm", "customer": "M&S", "room": "fp2", "name": "BBQ Deli 1.1"},
+  {"id": "mraw0g0pms7e", "customer": "M&S", "room": "fp2", "name": "BBQ Deli 1.8"},
+  {"id": "mraw0g0pz91r", "customer": "M&S", "room": "fp2", "name": "Sweet and Smokey Spatchcock"},
+  {"id": "mraw0g0pimzk", "customer": "M&S", "room": "fp2", "name": "AYR Rotisserie"},
+  {"id": "mraw0g0pl3pf", "customer": "M&S", "room": "fp2", "name": "Garlic and Herb"},
+  {"id": "mraw0g0p9zrq", "customer": "M&S", "room": "fp2", "name": "Salt and Pepper BDF"},
+  {"id": "mraw0g0poq46", "customer": "M&S", "room": "fp2", "name": "Hot Honey BDF"},
+  {"id": "mraw0g0pr6t1", "customer": "M&S", "room": "fp2", "name": "PSO"},
+  {"id": "mraw10j54xkc", "customer": "KFC", "room": "none", "name": "9 Piece"},
+  {"id": "mraw10j5k6z8", "customer": "KFC", "room": "none", "name": "Dark Meat"},
+  {"id": "mraw10j51y59", "customer": "KFC", "room": "none", "name": "Hot Wings"},
+  {"id": "mraw2atywlna", "customer": "Booth", "room": "fp1", "name": "Fresh Whole Bird"},
+  {"id": "mraw2atyvjgt", "customer": "Booth", "room": "fp1", "name": "Hot Cooked Fresh Whole Bird"},
+  {"id": "mraw2vslrcw4", "customer": "Iceland", "room": "fp1", "name": "Small"},
+  {"id": "mraw2vslwrm0", "customer": "Iceland", "room": "fp1", "name": "Medium"},
+  {"id": "mraw2vsl4cvx", "customer": "Iceland", "room": "fp1", "name": "Large"},
+  {"id": "mraw392ky28v", "customer": "Iceland", "room": "fp2", "name": "Extra Tasty"},
+  {"id": "mraw4zz6h8xg", "customer": "Iceland", "room": "cut", "name": "Drumsticks"},
+  {"id": "mraw4zz63xuk", "customer": "Iceland", "room": "cut", "name": "Legs 1kg"},
+  {"id": "mrm8dox37mkl", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 320g"},
+  {"id": "mrm8dox310bq", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 650g"},
+  {"id": "mraw868hwg8x", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 1kg"},
+  {"id": "mraw868hxw2d", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 1.6kg"},
+  {"id": "mraw868ho2d0", "customer": "Tesco", "room": "cut", "name": "Diced Breast 400g"},
+  {"id": "mraw868hns0l", "customer": "Tesco", "room": "cut", "name": "Diced Breast 650g"},
+  {"id": "mraw9q1eqprh", "customer": "Ocado", "room": "fp1", "name": "Medium"},
+  {"id": "mraw9q1e1cco", "customer": "Ocado", "room": "fp1", "name": "Large"},
+  {"id": "mraw9q1eimfn", "customer": "Ocado", "room": "fp1", "name": "Extra Large"},
+  {"id": "mrawawns58f1", "customer": "Ocado", "room": "fp2", "name": "Extra Tasty"},
+  {"id": "mrawawnsedah", "customer": "Ocado", "room": "fp2", "name": "PSO"},
+  {"id": "mrawawnsybe1", "customer": "Ocado", "room": "fp2", "name": "Garlic and Herb"},
+  {"id": "mrawawnspx8o", "customer": "Ocado", "room": "fp2", "name": "Salt & Pepper CROWN"},
+  {"id": "mrawcz7mmidz", "customer": "Other", "room": "none", "name": "Water Testing as per schedule", "freq": "monthly"},
+  {"id": "mrdkg2sh956z", "customer": "Other", "room": "none", "name": "Nutritional x3 - Fat Validation - Breast Fillet - 2SP035C", "freq": "monthly"},
+  {"id": "mrca7ibml4cl", "customer": "Other", "room": "cut", "name": "External Bulk - Intercompany", "freq": "weekly"},
+  {"id": "mrcalr9hofl0", "customer": "Other", "room": "cut", "name": "Salmonella", "freq": "weekly"},
+  {"id": "mrku0ab1chth", "customer": "Other", "room": "none", "name": "Swab Matrix", "freq": "weekly"},
+  {"id": "mrdqdr1nw66f", "customer": "Other", "room": "fp1", "name": "Costco Twin Pack", "freq": "weekly"},
+  {"id": "mravvgb6hbs9", "customer": "Co-op", "room": "cut", "name": "Wings 775g"},
+  {"id": "mrj3m1f70qcn", "customer": "Co-op", "room": "cut", "name": "Wings 1500g"},
+  {"id": "mrjbvbrkutgf", "customer": "Co-op", "room": "deb", "name": "Drumsticks Fillet 400g"},
+  {"id": "mrjbxki8v9c7", "customer": "Aldi", "room": "deb", "name": "Drumsticks Fillet 600g"},
+  {"id": "mrjbxki8jo4n", "customer": "Aldi", "room": "deb", "name": "Drumsticks Fillet 900g"},
+  {"id": "mrkumr2wb12a", "customer": "Other", "room": "none", "name": "Weekly Report x4", "freq": "weekly"},
+  {"id": "mrnejoos66ln", "customer": "Other", "room": "none", "name": "Water Samples", "freq": "monthly"},
+  {"id": "mraw868hfzxx", "customer": "Tesco", "room": "cut", "name": "Thighs 1kg"},
+  {"id": "mraw868hhbvx", "customer": "Tesco", "room": "cut", "name": "Wings 1kg"},
+  {"id": "mrnsqpmuc2eu", "customer": "Other", "room": "none", "name": "Line Assembly - Copies/Scan", "freq": "monthly"},
+  {"id": "mrnsrruhs4tq", "customer": "Other", "room": "none", "name": "Clearing the Archive", "freq": "monthly"},
+  {"id": "mrawcz7mdkxs", "customer": "Other", "room": "none", "name": "PSO - Gluten Testing for Product", "freq": "monthly"},
+  {"id": "ms77m5oy2juw", "customer": "Other", "room": "none", "name": "PSO ISTUF133", "freq": "monthly"},
+  {"id": "ms77m5oy2vqb", "customer": "Other", "room": "none", "name": "PSO ISTUF141", "freq": "monthly"},
+  {"id": "ms77m5oyo2gs", "customer": "Other", "room": "none", "name": "PSO ISTUF143", "freq": "monthly"},
+  {"id": "ms78ofb9m4ak", "customer": "Other", "room": "none", "name": "Milk Sponge Swabs", "freq": "monthly"},
+];
+
 let state = load();
 let editing = false;
 let sorting = false;
@@ -2531,6 +2659,7 @@ function weekKey(d=new Date()){
 }
 function monthKey(d=new Date()){ return d.getFullYear()+'-'+(d.getMonth()+1); }
 
+
 // The app's built-in structure. Bump/adjust here when the app changes.
 function defaultState(){
   return {
@@ -2542,7 +2671,7 @@ function defaultState(){
       {name:'Ocado',freqs:['monthly']},
       {name:'Other',freqs:['weekly','monthly'],other:true}
     ],
-    products:[], ticks:{}, tickDates:{},
+    products: SEED_ROUTINE_PRODUCTS.map(p=>({...p})), ticks:{}, tickDates:{},
     // schedule entries: { id, pid?, name, customer, month:0-11, doneYear?, doneDate? }
     nutri:[], shelf:[]
   };
@@ -2566,6 +2695,15 @@ function load(){
       Object.keys(s.ticks||{}).forEach(k=>{
         if(s.ticks[k] && !s.tickDates[k]) s.tickDates[k]=todayStr;
       });
+      // Hardcoded routine list: on every load, ensure every seed product
+      // (by id) exists in state.products. Missing ones are appended. This is
+      // what makes the list "baked-in" — if it got deleted, it comes back.
+      // User-added products (non-seed ids) are left completely alone.
+      if(!Array.isArray(s.products)) s.products=[];
+      const haveIds = new Set(s.products.map(p=>p.id));
+      for(const seed of SEED_ROUTINE_PRODUCTS){
+        if(!haveIds.has(seed.id)) s.products.push({...seed});
+      }
       return s;
     }
   }catch(e){}
@@ -8287,7 +8425,88 @@ document.getElementById('menuBtn').addEventListener('click',()=>{ renderCustList
 document.getElementById('closeMenu').addEventListener('click',()=>menuSheet.classList.remove('show'));
 document.getElementById('editToggle').addEventListener('click',()=>{ editing=!editing; if(editing) sorting=false; menuSheet.classList.remove('show'); render(); });
 document.getElementById('sortToggle').addEventListener('click',()=>{ sorting=!sorting; if(sorting) editing=false; menuSheet.classList.remove('show'); render(); });
-[addSheet,menuSheet].forEach(s=>s.addEventListener('click',e=>{ if(e.target===s) s.classList.remove('show'); }));
+
+// ---- Barcodes management ----------------------------------------------
+// Assign a numerical identity (barcode) to each Routine product. Stored as
+// product.barcode. Separate from MIMS_ barcodes on the Entry lookup table —
+// this is the user's own numbering scheme for their checklist products.
+const barcodesSheet = document.getElementById('barcodesSheet');
+const barcodesList  = document.getElementById('barcodesList');
+const barcodeSearch = document.getElementById('barcodeSearch');
+const barcodeShowDelisted = document.getElementById('barcodeShowDelisted');
+
+const ROOM_LABEL = { fp1:'FP1', fp2:'FP2', cut:'Cutting', deb:'Deboning', none:'—' };
+
+function renderBarcodesList(){
+  const q = (barcodeSearch.value||'').trim().toLowerCase();
+  const showDel = barcodeShowDelisted.checked;
+  // Order: preserve the customer order from state, then group by room within.
+  const custOrder = state.customers.map(c=>c.name);
+  const buckets = {}; // custName -> roomKey -> [products]
+  for(const p of state.products){
+    if(p.delisted && !showDel) continue;
+    if(q){
+      const hay = (p.name+' '+(p.barcode||'')).toLowerCase();
+      if(!hay.includes(q)) continue;
+    }
+    const cust = p.customer || 'Other';
+    const room = p.room || 'none';
+    if(!buckets[cust]) buckets[cust] = {};
+    if(!buckets[cust][room]) buckets[cust][room] = [];
+    buckets[cust][room].push(p);
+  }
+  const parts = [];
+  for(const cust of custOrder){
+    if(!buckets[cust]) continue;
+    parts.push(`<div style="margin-top:14px; font-weight:700; font-size:14px; color:var(--fg, #111);">${esc(cust)}</div>`);
+    // room order: fp1, fp2, cut, deb, none, then any others
+    const roomKeys = Object.keys(buckets[cust]);
+    const preferred = ['fp1','fp2','cut','deb','none'];
+    roomKeys.sort((a,b)=>{
+      const ia = preferred.indexOf(a), ib = preferred.indexOf(b);
+      return (ia<0?99:ia) - (ib<0?99:ib);
+    });
+    for(const room of roomKeys){
+      parts.push(`<div style="margin:6px 0 2px; font-size:12px; color:#666;">${esc(ROOM_LABEL[room]||room)}</div>`);
+      for(const p of buckets[cust][room]){
+        const val = esc(p.barcode||'');
+        const delTag = p.delisted ? ' <span style="color:#a00; font-size:11px;">(delisted)</span>' : '';
+        parts.push(
+          `<div style="display:flex; gap:8px; align-items:center; padding:4px 0;">`+
+          `<div style="flex:1; font-size:14px;">${esc(p.name)}${delTag}</div>`+
+          `<input class="bc-input" data-pid="${esc(p.id)}" value="${val}" placeholder="barcode" `+
+          `style="width:140px; font-family:monospace; padding:6px 8px;" `+
+          `autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true">`+
+          `</div>`
+        );
+      }
+    }
+  }
+  if(!parts.length) parts.push('<div style="padding:20px; text-align:center; color:#888;">No products match.</div>');
+  barcodesList.innerHTML = parts.join('');
+}
+
+barcodesList.addEventListener('change', e=>{
+  const inp = e.target.closest('.bc-input'); if(!inp) return;
+  const pid = inp.getAttribute('data-pid');
+  const p = state.products.find(x=>x.id===pid); if(!p) return;
+  const v = (inp.value||'').trim();
+  if(v) p.barcode = v; else delete p.barcode;
+  save();
+});
+barcodeSearch.addEventListener('input', renderBarcodesList);
+barcodeShowDelisted.addEventListener('change', renderBarcodesList);
+
+document.getElementById('barcodesBtn').addEventListener('click', ()=>{
+  menuSheet.classList.remove('show');
+  barcodeSearch.value=''; barcodeShowDelisted.checked=false;
+  renderBarcodesList();
+  barcodesSheet.classList.add('show');
+});
+document.getElementById('closeBarcodes').addEventListener('click', ()=>barcodesSheet.classList.remove('show'));
+// ---- end barcodes ------------------------------------------------------
+
+[addSheet,menuSheet,barcodesSheet].forEach(s=>s.addEventListener('click',e=>{ if(e.target===s) s.classList.remove('show'); }));
 
 document.getElementById('exportBtn').addEventListener('click',()=>{
   const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
