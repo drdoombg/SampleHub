@@ -736,7 +736,7 @@
      tint so the person can spot everything that still needs a manual fill
      at a glance. Once filled, the tint switches to a "done" green so they
      don't get re-edited by accident. Both variants remain click-editable. */
-  .entry-export-manual-empty { background:rgba(255,235,59,.45) !important; cursor:text; }
+  .entry-export-manual-empty { background:rgba(255,213,0,.75) !important; color:#111 !important; cursor:text; }
   .entry-export-manual-filled { background:rgba(56,191,138,.14) !important; cursor:text; }
   /* Focused-cell outline: thin white rounded box, no background change, no
      tap-highlight ring. First tap selects (this outline appears, keyboard
@@ -2513,35 +2513,34 @@ function roomOrder(key){
 // Customers with no room concept
 function hasRooms(custName){ return custName!=='KFC'; }
 
-// Hardcoded routine product list. Seeded on every load() for missing IDs so
-// the list is baked-in — fresh installs get it, and any accidental delete
-// is restored on next reload. Users can still delist via the app.
+// Hardcoded routine product list, including any assigned barcode.
+// Seeded on every load() for missing IDs so the list is baked-in.
 const SEED_ROUTINE_PRODUCTS = [
-  {"id": "mrautec9s5jv", "customer": "Aldi", "room": "fp1", "name": "Medium"},
-  {"id": "mrautleqa9q6", "customer": "Aldi", "room": "fp1", "name": "Large"},
-  {"id": "mrautppo49am", "customer": "Aldi", "room": "fp1", "name": "Extra Large"},
-  {"id": "mrautzv4444v", "customer": "Aldi", "room": "fp2", "name": "Extra Tasty"},
-  {"id": "mrauu6gcsxgt", "customer": "Aldi", "room": "fp2", "name": "PSO"},
-  {"id": "mrauuj3ynowj", "customer": "Aldi", "room": "fp2", "name": "Rotisserie Spatchcock"},
-  {"id": "mrauushp3k1m", "customer": "Aldi", "room": "fp2", "name": "Garlic and Herb Spatchcock"},
-  {"id": "mrauve719mio", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 300g"},
-  {"id": "mrauvsad2zzx", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 650g"},
-  {"id": "mrauw6p3fpnb", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 1000g"},
-  {"id": "mraux8vwlazk", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 2000g"},
-  {"id": "mrauxto6r7n0", "customer": "Aldi", "room": "cut", "name": "Diced Breast 600g"},
-  {"id": "mrav1qfk6bvu", "customer": "Aldi", "room": "cut", "name": "Thigh 1kg"},
-  {"id": "mrav20vw23cv", "customer": "Aldi", "room": "cut", "name": "Thigh Fillet 900g"},
-  {"id": "mrav2fl2h5zv", "customer": "Aldi", "room": "cut", "name": "Drumsticks 1kg"},
-  {"id": "mrav2qt7rpr5", "customer": "Aldi", "room": "cut", "name": "Drumsticks 2kg"},
-  {"id": "mrav34otn3d8", "customer": "Aldi", "room": "cut", "name": "Legs 1kg"},
-  {"id": "mrav48lhch5p", "customer": "Asda", "room": "fp1", "name": "Medium"},
-  {"id": "mrav4ltqv4wx", "customer": "Asda", "room": "fp1", "name": "Large"},
-  {"id": "mrav52fnmtej", "customer": "Asda", "room": "fp1", "name": "Extra Large"},
-  {"id": "mrav5fl65vzh", "customer": "Asda", "room": "fp2", "name": "Extra Tasty Small"},
-  {"id": "mrav5q3k7uku", "customer": "Asda", "room": "fp2", "name": "Piri Piri Spatchcock"},
-  {"id": "mrav69s8kp4g", "customer": "Asda", "room": "fp2", "name": "Lemon & Herb Spatchcock"},
-  {"id": "mrav6ias0307", "customer": "Asda", "room": "fp2", "name": "BBQ Spatchcock", "delisted": true},
-  {"id": "mrav6swv67kp", "customer": "Asda", "room": "fp2", "name": "PSO"},
+  {"id": "mrautec9s5jv", "customer": "Aldi", "room": "fp1", "name": "Medium", "barcode": "4061462251283"},
+  {"id": "mrautleqa9q6", "customer": "Aldi", "room": "fp1", "name": "Large", "barcode": "4061462255458"},
+  {"id": "mrautppo49am", "customer": "Aldi", "room": "fp1", "name": "Extra Large", "barcode": "4061462256271"},
+  {"id": "mrautzv4444v", "customer": "Aldi", "room": "fp2", "name": "Extra Tasty", "barcode": "4061462273308"},
+  {"id": "mrauu6gcsxgt", "customer": "Aldi", "room": "fp2", "name": "PSO", "barcode": "4088600390826"},
+  {"id": "mrauuj3ynowj", "customer": "Aldi", "room": "fp2", "name": "Rotisserie Spatchcock", "barcode": "4061461658960"},
+  {"id": "mrauushp3k1m", "customer": "Aldi", "room": "fp2", "name": "Garlic and Herb Spatchcock", "barcode": "4088600039077"},
+  {"id": "mrauve719mio", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 300g", "barcode": "4088600146348"},
+  {"id": "mrauvsad2zzx", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 650g", "barcode": "4088600237008"},
+  {"id": "mrauw6p3fpnb", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 1000g", "barcode": "4088600148144"},
+  {"id": "mraux8vwlazk", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 2000g", "barcode": "4088600295411"},
+  {"id": "mrauxto6r7n0", "customer": "Aldi", "room": "cut", "name": "Diced Breast 600g", "barcode": "4088600147734"},
+  {"id": "mrav1qfk6bvu", "customer": "Aldi", "room": "cut", "name": "Thigh 1kg", "barcode": "4088600147017"},
+  {"id": "mrav20vw23cv", "customer": "Aldi", "room": "cut", "name": "Thigh Fillet 900g", "barcode": "4088600281421"},
+  {"id": "mrav2fl2h5zv", "customer": "Aldi", "room": "cut", "name": "Drumsticks 1kg", "barcode": "4088600280578"},
+  {"id": "mrav2qt7rpr5", "customer": "Aldi", "room": "cut", "name": "Drumsticks 2kg", "barcode": "4088600280578"},
+  {"id": "mrav34otn3d8", "customer": "Aldi", "room": "cut", "name": "Legs 1kg", "barcode": "4088600147345"},
+  {"id": "mrav48lhch5p", "customer": "Asda", "room": "fp1", "name": "Medium", "barcode": "5063717285769"},
+  {"id": "mrav4ltqv4wx", "customer": "Asda", "room": "fp1", "name": "Large", "barcode": "5057172354801"},
+  {"id": "mrav52fnmtej", "customer": "Asda", "room": "fp1", "name": "Extra Large", "barcode": "5063717285783"},
+  {"id": "mrav5fl65vzh", "customer": "Asda", "room": "fp2", "name": "Extra Tasty Small", "barcode": "5054070468654"},
+  {"id": "mrav5q3k7uku", "customer": "Asda", "room": "fp2", "name": "Piri Piri Spatchcock", "barcode": "5063717059681"},
+  {"id": "mrav69s8kp4g", "customer": "Asda", "room": "fp2", "name": "Lemon & Herb Spatchcock", "barcode": "5063089826683"},
+  {"id": "mrav6ias0307", "customer": "Asda", "room": "fp2", "name": "BBQ Spatchcock", "delisted": true, "barcode": "5063089676967"},
+  {"id": "mrav6swv67kp", "customer": "Asda", "room": "fp2", "name": "PSO", "barcode": "5057172091751"},
   {"id": "mrav823xgint", "customer": "Asda", "room": "fp2", "name": "Salt and Pepper", "delisted": true},
   {"id": "mrav8tavtq75", "customer": "Asda", "room": "cut", "name": "Breast Fillet 600g", "delisted": true},
   {"id": "mrav9d1smxw7", "customer": "Asda", "room": "cut", "name": "Mini Fillet 400g", "delisted": true},
@@ -2550,69 +2549,69 @@ const SEED_ROUTINE_PRODUCTS = [
   {"id": "mravo9llk9kx", "customer": "Asda", "room": "cut", "name": "Thigh Fillets 650g", "delisted": true},
   {"id": "mravputqauas", "customer": "Asda", "room": "deb", "name": "Drum Fillet 400g", "delisted": true},
   {"id": "mravputqzzvx", "customer": "Asda", "room": "deb", "name": "Drum Fillet 600g", "delisted": true},
-  {"id": "mravqpq0n17a", "customer": "Co-op", "room": "fp1", "name": "Large"},
-  {"id": "mravqpq0tvmf", "customer": "Co-op", "room": "fp1", "name": "Extra Large"},
-  {"id": "mravrcpja18h", "customer": "Co-op", "room": "fp2", "name": "Rotisserie"},
-  {"id": "mravvgb6vtgo", "customer": "Co-op", "room": "cut", "name": "Breast Fillet 300g"},
-  {"id": "mravvgb62g6v", "customer": "Co-op", "room": "cut", "name": "Breast Fillet 580g"},
-  {"id": "mravvgb68k8i", "customer": "Co-op", "room": "cut", "name": "Breast Fillet 850g"},
-  {"id": "mravvgb6cknz", "customer": "Co-op", "room": "cut", "name": "Mini Fillet 400g"},
-  {"id": "mravvgb633jf", "customer": "Co-op", "room": "cut", "name": "Diced Breast 400g"},
-  {"id": "mravvgb6nqpy", "customer": "Co-op", "room": "cut", "name": "Breast Strips 250g"},
-  {"id": "mrj3rz6ulst9", "customer": "Co-op", "room": "cut", "name": "Thighs 600g"},
-  {"id": "mravvgb6b399", "customer": "Co-op", "room": "cut", "name": "Thigh Fillet 500g"},
-  {"id": "mravvgb6bf3d", "customer": "Co-op", "room": "cut", "name": "Drumsticks 750g"},
-  {"id": "mravxvoo7flk", "customer": "M&S", "room": "fp1", "name": "Butter Basted Joints  452g"},
-  {"id": "mravxvool3z9", "customer": "M&S", "room": "fp1", "name": "Rotisserie Joints 490g"},
+  {"id": "mravqpq0n17a", "customer": "Co-op", "room": "fp1", "name": "Large", "barcode": "5000129350456"},
+  {"id": "mravqpq0tvmf", "customer": "Co-op", "room": "fp1", "name": "Extra Large", "barcode": "5000129355628"},
+  {"id": "mravrcpja18h", "customer": "Co-op", "room": "fp2", "name": "Rotisserie", "barcode": "5000129373936"},
+  {"id": "mravvgb6vtgo", "customer": "Co-op", "room": "cut", "name": "Breast Fillet 300g", "barcode": "5000128744836"},
+  {"id": "mravvgb62g6v", "customer": "Co-op", "room": "cut", "name": "Breast Fillet 580g", "barcode": "5000129334098"},
+  {"id": "mravvgb68k8i", "customer": "Co-op", "room": "cut", "name": "Breast Fillet 850g", "barcode": "5000129334180"},
+  {"id": "mravvgb6cknz", "customer": "Co-op", "room": "cut", "name": "Mini Fillet 400g", "barcode": "5000129365368"},
+  {"id": "mravvgb633jf", "customer": "Co-op", "room": "cut", "name": "Diced Breast 400g", "barcode": "5000129365375"},
+  {"id": "mravvgb6nqpy", "customer": "Co-op", "room": "cut", "name": "Breast Strips 250g", "barcode": "5000129323191"},
+  {"id": "mrj3rz6ulst9", "customer": "Co-op", "room": "cut", "name": "Thighs 600g", "barcode": "5000129353761"},
+  {"id": "mravvgb6b399", "customer": "Co-op", "room": "cut", "name": "Thigh Fillet 500g", "barcode": "5000129333800"},
+  {"id": "mravvgb6bf3d", "customer": "Co-op", "room": "cut", "name": "Drumsticks 750g", "barcode": "5000128996204"},
+  {"id": "mravxvoo7flk", "customer": "M&S", "room": "fp1", "name": "Butter Basted Joints  452g", "barcode": "00404358"},
+  {"id": "mravxvool3z9", "customer": "M&S", "room": "fp1", "name": "Rotisserie Joints 490g", "barcode": "00265829"},
   {"id": "mraw0g0p48d4", "customer": "M&S", "room": "fp2", "name": "Butter Basted Deli 1.1"},
   {"id": "mraw0g0ptnfx", "customer": "M&S", "room": "fp2", "name": "Butter Basted Deli 1.8"},
   {"id": "mraw0g0pxufm", "customer": "M&S", "room": "fp2", "name": "BBQ Deli 1.1"},
   {"id": "mraw0g0pms7e", "customer": "M&S", "room": "fp2", "name": "BBQ Deli 1.8"},
-  {"id": "mraw0g0pz91r", "customer": "M&S", "room": "fp2", "name": "Sweet and Smokey Spatchcock"},
-  {"id": "mraw0g0pimzk", "customer": "M&S", "room": "fp2", "name": "AYR Rotisserie"},
-  {"id": "mraw0g0pl3pf", "customer": "M&S", "room": "fp2", "name": "Garlic and Herb"},
-  {"id": "mraw0g0p9zrq", "customer": "M&S", "room": "fp2", "name": "Salt and Pepper BDF"},
-  {"id": "mraw0g0poq46", "customer": "M&S", "room": "fp2", "name": "Hot Honey BDF"},
-  {"id": "mraw0g0pr6t1", "customer": "M&S", "room": "fp2", "name": "PSO"},
+  {"id": "mraw0g0pz91r", "customer": "M&S", "room": "fp2", "name": "Sweet and Smokey Spatchcock", "barcode": "29000067"},
+  {"id": "mraw0g0pimzk", "customer": "M&S", "room": "fp2", "name": "AYR Rotisserie", "barcode": "00014649"},
+  {"id": "mraw0g0pl3pf", "customer": "M&S", "room": "fp2", "name": "Garlic and Herb", "barcode": "29421442"},
+  {"id": "mraw0g0p9zrq", "customer": "M&S", "room": "fp2", "name": "Salt and Pepper BDF", "barcode": "29421435"},
+  {"id": "mraw0g0poq46", "customer": "M&S", "room": "fp2", "name": "Hot Honey BDF", "barcode": "29421411"},
+  {"id": "mraw0g0pr6t1", "customer": "M&S", "room": "fp2", "name": "PSO", "barcode": "00015035"},
   {"id": "mraw10j54xkc", "customer": "KFC", "room": "none", "name": "9 Piece"},
   {"id": "mraw10j5k6z8", "customer": "KFC", "room": "none", "name": "Dark Meat"},
   {"id": "mraw10j51y59", "customer": "KFC", "room": "none", "name": "Hot Wings"},
-  {"id": "mraw2atywlna", "customer": "Booth", "room": "fp1", "name": "Fresh Whole Bird"},
+  {"id": "mraw2atywlna", "customer": "Booth", "room": "fp1", "name": "Fresh Whole Bird", "barcode": "5028440025235"},
   {"id": "mraw2atyvjgt", "customer": "Booth", "room": "fp1", "name": "Hot Cooked Fresh Whole Bird"},
-  {"id": "mraw2vslrcw4", "customer": "Iceland", "room": "fp1", "name": "Small"},
-  {"id": "mraw2vslwrm0", "customer": "Iceland", "room": "fp1", "name": "Medium"},
-  {"id": "mraw2vsl4cvx", "customer": "Iceland", "room": "fp1", "name": "Large"},
-  {"id": "mraw392ky28v", "customer": "Iceland", "room": "fp2", "name": "Extra Tasty"},
-  {"id": "mraw4zz6h8xg", "customer": "Iceland", "room": "cut", "name": "Drumsticks"},
-  {"id": "mraw4zz63xuk", "customer": "Iceland", "room": "cut", "name": "Legs 1kg"},
-  {"id": "mrm8dox37mkl", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 320g"},
-  {"id": "mrm8dox310bq", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 650g"},
-  {"id": "mraw868hwg8x", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 1kg"},
-  {"id": "mraw868hxw2d", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 1.6kg"},
-  {"id": "mraw868ho2d0", "customer": "Tesco", "room": "cut", "name": "Diced Breast 400g"},
-  {"id": "mraw868hns0l", "customer": "Tesco", "room": "cut", "name": "Diced Breast 650g"},
-  {"id": "mraw9q1eqprh", "customer": "Ocado", "room": "fp1", "name": "Medium"},
-  {"id": "mraw9q1e1cco", "customer": "Ocado", "room": "fp1", "name": "Large"},
-  {"id": "mraw9q1eimfn", "customer": "Ocado", "room": "fp1", "name": "Extra Large"},
-  {"id": "mrawawns58f1", "customer": "Ocado", "room": "fp2", "name": "Extra Tasty"},
-  {"id": "mrawawnsedah", "customer": "Ocado", "room": "fp2", "name": "PSO"},
-  {"id": "mrawawnsybe1", "customer": "Ocado", "room": "fp2", "name": "Garlic and Herb"},
-  {"id": "mrawawnspx8o", "customer": "Ocado", "room": "fp2", "name": "Salt & Pepper CROWN"},
+  {"id": "mraw2vslrcw4", "customer": "Iceland", "room": "fp1", "name": "Small", "barcode": "5010482797355"},
+  {"id": "mraw2vslwrm0", "customer": "Iceland", "room": "fp1", "name": "Medium", "barcode": "5010482482619"},
+  {"id": "mraw2vsl4cvx", "customer": "Iceland", "room": "fp1", "name": "Large", "barcode": "5010482593902"},
+  {"id": "mraw392ky28v", "customer": "Iceland", "room": "fp2", "name": "Extra Tasty", "barcode": "5010482617929"},
+  {"id": "mraw4zz6h8xg", "customer": "Iceland", "room": "cut", "name": "Drumsticks", "barcode": "5010482564377"},
+  {"id": "mraw4zz63xuk", "customer": "Iceland", "room": "cut", "name": "Legs 1kg", "barcode": "5010482564414"},
+  {"id": "mrm8dox37mkl", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 320g", "barcode": "5063445799132"},
+  {"id": "mrm8dox310bq", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 650g", "barcode": "5057008546325"},
+  {"id": "mraw868hwg8x", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 1kg", "barcode": "5063446491592"},
+  {"id": "mraw868hxw2d", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 1.6kg", "barcode": "5057967251896"},
+  {"id": "mraw868ho2d0", "customer": "Tesco", "room": "cut", "name": "Diced Breast 400g", "barcode": "5057753932916"},
+  {"id": "mraw868hns0l", "customer": "Tesco", "room": "cut", "name": "Diced Breast 650g", "barcode": "5057753914028"},
+  {"id": "mraw9q1eqprh", "customer": "Ocado", "room": "fp1", "name": "Medium", "barcode": "2096922004743"},
+  {"id": "mraw9q1e1cco", "customer": "Ocado", "room": "fp1", "name": "Large", "barcode": "2092417005004"},
+  {"id": "mraw9q1eimfn", "customer": "Ocado", "room": "fp1", "name": "Extra Large", "barcode": "2096937006381"},
+  {"id": "mrawawns58f1", "customer": "Ocado", "room": "fp2", "name": "Extra Tasty", "barcode": "5055540029122"},
+  {"id": "mrawawnsedah", "customer": "Ocado", "room": "fp2", "name": "PSO", "barcode": "5055540054315"},
+  {"id": "mrawawnsybe1", "customer": "Ocado", "room": "fp2", "name": "Garlic and Herb", "barcode": "5055540059785"},
+  {"id": "mrawawnspx8o", "customer": "Ocado", "room": "fp2", "name": "Salt & Pepper CROWN", "barcode": "5055540020327"},
   {"id": "mrawcz7mmidz", "customer": "Other", "room": "none", "name": "Water Testing as per schedule", "freq": "monthly"},
   {"id": "mrdkg2sh956z", "customer": "Other", "room": "none", "name": "Nutritional x3 - Fat Validation - Breast Fillet - 2SP035C", "freq": "monthly"},
   {"id": "mrca7ibml4cl", "customer": "Other", "room": "cut", "name": "External Bulk - Intercompany", "freq": "weekly"},
   {"id": "mrcalr9hofl0", "customer": "Other", "room": "cut", "name": "Salmonella", "freq": "weekly"},
   {"id": "mrku0ab1chth", "customer": "Other", "room": "none", "name": "Swab Matrix", "freq": "weekly"},
-  {"id": "mrdqdr1nw66f", "customer": "Other", "room": "fp1", "name": "Costco Twin Pack", "freq": "weekly"},
-  {"id": "mravvgb6hbs9", "customer": "Co-op", "room": "cut", "name": "Wings 775g"},
-  {"id": "mrj3m1f70qcn", "customer": "Co-op", "room": "cut", "name": "Wings 1500g"},
-  {"id": "mrjbvbrkutgf", "customer": "Co-op", "room": "deb", "name": "Drumsticks Fillet 400g"},
-  {"id": "mrjbxki8v9c7", "customer": "Aldi", "room": "deb", "name": "Drumsticks Fillet 600g"},
-  {"id": "mrjbxki8jo4n", "customer": "Aldi", "room": "deb", "name": "Drumsticks Fillet 900g"},
+  {"id": "mrdqdr1nw66f", "customer": "Other", "room": "fp1", "name": "Costco Twin Pack", "freq": "weekly", "barcode": "2005725009527"},
+  {"id": "mravvgb6hbs9", "customer": "Co-op", "room": "cut", "name": "Wings 775g", "barcode": "5000128961318"},
+  {"id": "mrj3m1f70qcn", "customer": "Co-op", "room": "cut", "name": "Wings 1500g", "barcode": "5000129408584"},
+  {"id": "mrjbvbrkutgf", "customer": "Co-op", "room": "deb", "name": "Drumsticks Fillet 400g", "barcode": "5000129350234"},
+  {"id": "mrjbxki8v9c7", "customer": "Aldi", "room": "deb", "name": "Drumsticks Fillet 600g", "barcode": "4061459353037"},
+  {"id": "mrjbxki8jo4n", "customer": "Aldi", "room": "deb", "name": "Drumsticks Fillet 900g", "barcode": "4061461781248"},
   {"id": "mrkumr2wb12a", "customer": "Other", "room": "none", "name": "Weekly Report x4", "freq": "weekly"},
   {"id": "mrnejoos66ln", "customer": "Other", "room": "none", "name": "Water Samples", "freq": "monthly"},
-  {"id": "mraw868hfzxx", "customer": "Tesco", "room": "cut", "name": "Thighs 1kg"},
-  {"id": "mraw868hhbvx", "customer": "Tesco", "room": "cut", "name": "Wings 1kg"},
+  {"id": "mraw868hfzxx", "customer": "Tesco", "room": "cut", "name": "Thighs 1kg", "barcode": "5054268934725"},
+  {"id": "mraw868hhbvx", "customer": "Tesco", "room": "cut", "name": "Wings 1kg", "barcode": "5059697733185"},
   {"id": "mrnsqpmuc2eu", "customer": "Other", "room": "none", "name": "Line Assembly - Copies/Scan", "freq": "monthly"},
   {"id": "mrnsrruhs4tq", "customer": "Other", "room": "none", "name": "Clearing the Archive", "freq": "monthly"},
   {"id": "mrawcz7mdkxs", "customer": "Other", "room": "none", "name": "PSO - Gluten Testing for Product", "freq": "monthly"},
@@ -3905,12 +3904,23 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
 // gets re-merged back in by the sync layer on every startup, which was
 // resurrecting things like the two CO-OP "Butter Basted Hot Deli" ghost
 // entries. Purge the old keys once so the current seed is authoritative.
+// v9 (this migration) forces a fresh entryLookup rebuild — cached copies
+// from before the Ocado / Costco variable-weight MIMS rows were added had
+// no entry for 2096922004743 / 2092417005004 / 2096937006381 / 2005725009527,
+// so scans that matched by prefix couldn't find a MIMS row and the export
+// view showed just description + barcode.
 (function entryPurgeStaleVersionKeys(){
-  const MIGRATION_KEY = 'unified.entryMigration.v8';
+  const MIGRATION_KEY = 'unified.entryMigration.v9';
   if(localStorage.getItem(MIGRATION_KEY)) return;
-  ['unified.entryMims.v1','unified.entryMims.v2','unified.entryMims.v3','unified.entryMims.v4','unified.entryMims.v5','unified.entryMims.v6','unified.entryMims.v7',
-   'unified.entryLookup.v1','unified.entryLookup.v2','unified.entryLookup.v3','unified.entryLookup.v4','unified.entryLookup.v5','unified.entryLookup.v6','unified.entryLookup.v7'
+  ['unified.entryMims.v1','unified.entryMims.v2','unified.entryMims.v3','unified.entryMims.v4','unified.entryMims.v5','unified.entryMims.v6','unified.entryMims.v7','unified.entryMims.v8',
+   'unified.entryLookup.v1','unified.entryLookup.v2','unified.entryLookup.v3','unified.entryLookup.v4','unified.entryLookup.v5','unified.entryLookup.v6','unified.entryLookup.v7','unified.entryLookup.v8'
   ].forEach(k => { try{ localStorage.removeItem(k); }catch(_e){} });
+  // v9: nuke the current lookup cache too so it gets rebuilt from the
+  // freshly-merged entryMims. Without this the old cache (missing Ocado /
+  // Costco variable-weight rows) wins and scans stay broken.
+  try{ localStorage.removeItem(LS_ENTRY_LOOKUP); }catch(_e){}
+  entryLookup = entryBuildInitialLookup();
+  try{ localStorage.setItem(LS_ENTRY_LOOKUP, JSON.stringify(entryLookup)); }catch(_e){}
   // Also drop scan-added lookup entries whose correlation subtitle points at
   // a MIMS row the current file doesn't have — those are what showed up as
   // "Butter Basted Hot Deli · CO-OP · 2SP163". Content-legitimate scan-added
@@ -5517,13 +5527,18 @@ function entryCommit(){
   // Category 1 as well — the target frequency comes from the matched
   // routine product's own customer frequency, not from the scan category.
   //
+  // Skipped entirely for Category 4/5/6 (Meat Preparation 5E / 5S / 5E+1D+5S
+  // bundles). Those are daily meat-prep events, not the weekly/monthly
+  // routine cycle — closing out a weekly/monthly routine tick just because
+  // an EOL/SOL sample happened to run would be wrong.
+  //
   // Shared-SKU expansion: some Bizerba codes (MSBUTTER, MSBBQ, KFCDRUM,
   // KFCWING, KFC9PIECE, PMDDOLAV) resolve to more than one Routines row —
   // e.g. MSBUTTER covers both "Butter Basted Deli 1.1" and "…1.8". Ticking
   // just one of them still leaves the other appearing overdue, so when the
   // scanned lookup entry is one of these codes, tick every routine product
   // whose name matches the shared-SKU's name pattern.
-  {
+  if(entryPending.cat !== 'Category 4' && entryPending.cat !== 'Category 5' && entryPending.cat !== 'Category 6'){
     const primary = entryFindRoutinesMatch(entryPending, mimsRow);
     // Bizerba shared-SKU → routine product name substring match. Each entry
     // maps a code to the substring that identifies its family in the
