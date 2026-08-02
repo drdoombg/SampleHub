@@ -4761,7 +4761,14 @@ document.getElementById('entryNightHygieneClose').addEventListener('click', entr
 /* ---------- confirm card / category suggestion ---------- */
 function entryMimsRowFor(barcode){
   if(!barcode) return null;
-  return entryMims.find(m=>m.barcode===barcode) || null;
+  const exact = entryMims.find(m=>m.barcode===barcode);
+  if(exact) return exact;
+  // Variable-weight fallback (Ocado / Costco): the raw scanned barcode
+  // has per-pack digits that MIMS' row does not. Match on the fixed 10-digit
+  // prefix so a record saved with the raw scan still resolves.
+  const pfx = entryVarWeightPrefix(barcode);
+  if(pfx) return entryMims.find(m=>m.barcode && String(m.barcode).startsWith(pfx)) || null;
+  return null;
 }
 // Same purpose as entryMimsRowFor, but takes the full lookup entry so we can
 // disambiguate between multiple MIMS rows sharing a barcode using the
@@ -4771,7 +4778,12 @@ function entryMimsRowForLookup(p){
   if(!p) return null;
   const bc = p.mimsBarcode || p.barcode;
   if(!bc) return null;
-  const candidates = entryMims.filter(m => m.barcode === bc);
+  let candidates = entryMims.filter(m => m.barcode === bc);
+  // Variable-weight fallback for the same reason as entryMimsRowFor above.
+  if(!candidates.length){
+    const pfx = entryVarWeightPrefix(bc);
+    if(pfx) candidates = entryMims.filter(m => m.barcode && String(m.barcode).startsWith(pfx));
+  }
   if(!candidates.length) return null;
   if(candidates.length === 1) return candidates[0];
   // Multiple rows share this barcode. Prefer the one whose suite+shift
@@ -5565,15 +5577,14 @@ function entryCommit(){
     }
     let tickedNames = [];
     for(const match of targets){
+      // Strict category → frequency mapping. Cat 1 (Daily) never closes
+      // out a routine tick — routines are weekly/monthly cycles and a
+      // daily scan is not the same event. Cat 2 = weekly tick only,
+      // Cat 3 = monthly tick only. Anything else (Cat 4/5/6 already gated
+      // at the outer if) → skip.
       let targetFreq = null;
       if(entryPending.cat === 'Category 2') targetFreq = 'weekly';
       else if(entryPending.cat === 'Category 3') targetFreq = 'monthly';
-      else {
-        const cust = state.customers.find(c=>c.name===match.customer);
-        const freqs = (cust && Array.isArray(cust.freqs)) ? cust.freqs : [];
-        if(freqs.includes('weekly')) targetFreq = 'weekly';
-        else if(freqs.includes('monthly')) targetFreq = 'monthly';
-      }
       if(!targetFreq || isDone(match.id, targetFreq)) continue;
       const k = tickKey(match.id, targetFreq);
       const period = targetFreq === 'weekly' ? weekKey() : monthKey();
@@ -7739,8 +7750,14 @@ function entryStyleAndWriteSisSheet(aoa, filename){
   const ws=XLSX.utils.aoa_to_sheet(aoa);
   const range=XLSX.utils.decode_range(ws['!ref']);
   const FONT = {name:'Arial', sz:8};
-  const HEADER_FILL = {fgColor:{rgb:'FFFF99'}};
-  const PLACEHOLDER_FILL = {fgColor:{rgb:'FFFF00'}};  // bright yellow for [...] cells
+  // xlsx-js-style rejects fills without patternType — Excel then flags the
+  // file as corrupt and strips ALL styling on repair (that's the "Repaired
+  // Records: Cell information from /xl/worksheets/sheet1.xml" dialog that
+  // was killing the yellow placeholder highlight). Every fill below is
+  // solid, so it's explicit here.
+  const HEADER_FILL = {patternType:'solid', fgColor:{rgb:'FFFF99'}};
+  const PLACEHOLDER_FILL = {patternType:'solid', fgColor:{rgb:'FFFF00'}};  // bright yellow for [...] cells
+  const TOTAL_FILL = {patternType:'solid', fgColor:{rgb:'DDDDDD'}};
   const BORDER_SIDE = {style:'thin', color:{rgb:'000000'}};
   const BORDER_ALL  = {top:BORDER_SIDE, bottom:BORDER_SIDE, left:BORDER_SIDE, right:BORDER_SIDE};
   // Find PRICE column for £ prefix + sum
@@ -7764,9 +7781,12 @@ function entryStyleAndWriteSisSheet(aoa, filename){
       if(cell.v!=='' && typeof cell.v==='number'){ cell.t='s'; cell.v=String(cell.v); }
       // Detect [...] placeholder in cell value for yellow fill
       const isPh = R > 0 && typeof cell.v === 'string' && /\[[^\]]+\]/.test(cell.v);
-      cell.s = (R===0)
-        ? { font:FONT, fill:HEADER_FILL, alignment:{vertical:'center', horizontal:'left'}, border:BORDER_ALL }
-        : { font:FONT, fill: isPh ? PLACEHOLDER_FILL : undefined, alignment:{vertical:'center', horizontal:'left'}, border:BORDER_ALL };
+      // Build style. Never pass fill:undefined — that alone is what makes
+      // Excel repair the workbook and drop every other cell style with it.
+      const baseStyle = { font:FONT, alignment:{vertical:'center', horizontal:'left'}, border:BORDER_ALL };
+      if(R===0) baseStyle.fill = HEADER_FILL;
+      else if(isPh) baseStyle.fill = PLACEHOLDER_FILL;
+      cell.s = baseStyle;
     }
   }
   // Add TOTAL row at bottom with the price sum
@@ -7776,13 +7796,13 @@ function entryStyleAndWriteSisSheet(aoa, filename){
     ws[totalAddr] = {
       t:'s',
       v:'£' + priceTotal.toFixed(2),
-      s:{ font:{name:'Arial', sz:8, bold:true}, alignment:{vertical:'center', horizontal:'left'}, border:BORDER_ALL, fill:{fgColor:{rgb:'DDDDDD'}} }
+      s:{ font:{name:'Arial', sz:8, bold:true}, alignment:{vertical:'center', horizontal:'left'}, border:BORDER_ALL, fill:TOTAL_FILL }
     };
     // TOTAL label one cell to the left
     const labelAddr = XLSX.utils.encode_cell({r:totalRowIdx, c:priceCol - 1});
     ws[labelAddr] = {
       t:'s', v:'TOTAL',
-      s:{ font:{name:'Arial', sz:8, bold:true}, alignment:{vertical:'center', horizontal:'right'}, border:BORDER_ALL, fill:{fgColor:{rgb:'DDDDDD'}} }
+      s:{ font:{name:'Arial', sz:8, bold:true}, alignment:{vertical:'center', horizontal:'right'}, border:BORDER_ALL, fill:TOTAL_FILL }
     };
     // Extend the sheet range
     range.e.r = totalRowIdx;
