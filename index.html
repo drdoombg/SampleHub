@@ -443,8 +443,10 @@
     background:var(--panel-2); cursor:pointer; }
   .line-linecard-name { font-size:14px; font-weight:700; flex-shrink:0; }
   .line-linecard-name.line-alert { color:var(--danger); }
-  .line-collapsed-summary { font-size:12px; color:var(--ink-dim); font-family:monospace; overflow:hidden;
-    text-overflow:ellipsis; white-space:nowrap; }
+  .line-collapsed-summary { font-size:12px; color:var(--ink-dim); font-family:monospace;
+    display:inline-flex; align-items:center; gap:6px; min-width:0; max-width:100%;
+    overflow:hidden; white-space:nowrap; line-height:1.6; }
+  .line-collapsed-summary > .line-cust-badge { flex-shrink:0; }
   .line-collapsed-summary.down { color:var(--danger); }
   .line-lastcheck { font-size:11px; color:var(--ink-dim); font-family:monospace; margin-left:auto; flex-shrink:0; }
 
@@ -2700,9 +2702,19 @@ function load(){
       // what makes the list "baked-in" — if it got deleted, it comes back.
       // User-added products (non-seed ids) are left completely alone.
       if(!Array.isArray(s.products)) s.products=[];
+      const seedById = new Map(SEED_ROUTINE_PRODUCTS.map(p=>[p.id, p]));
       const haveIds = new Set(s.products.map(p=>p.id));
       for(const seed of SEED_ROUTINE_PRODUCTS){
         if(!haveIds.has(seed.id)) s.products.push({...seed});
+      }
+      // Backfill barcodes: if a local product exists but has no barcode set
+      // yet, adopt the seed's barcode. User-edited barcodes (non-empty) are
+      // never overwritten, so the Manage-barcodes screen shows what shipped
+      // by default without wiping anything the operator has typed.
+      for(const p of s.products){
+        if(p.barcode) continue;
+        const seed = seedById.get(p.id);
+        if(seed && seed.barcode) p.barcode = seed.barcode;
       }
       return s;
     }
@@ -3654,6 +3666,30 @@ let entryDeleted = JSON.parse(localStorage.getItem(LS_ENTRY_DELETED) || '{}');
 let entryMims = JSON.parse(localStorage.getItem(LS_ENTRY_MIMS) || 'null')
   || (typeof MIMS_SEED!=='undefined' ? MIMS_SEED : []);
 
+// Seed-merge for MIMS: any row present in the current MIMS_SEED but missing
+// from a user's cached entryMims (they were opened before the seed added
+// e.g. Ocado Medium's canonical barcode) gets appended. Keyed by the same
+// (barcode, suite, shift, descrptn) signature the lookup dedup uses so we
+// don't insert duplicates. This is what makes new MIMS rows appear without
+// forcing a manual re-import.
+(function entryMergeSeedMims(){
+  if(typeof MIMS_SEED === 'undefined' || !Array.isArray(MIMS_SEED)) return;
+  const sig = m => [
+    String(m.barcode||'').trim(),
+    String(m.suite||'').trim(),
+    String(m.shift||'').trim(),
+    String(m.descrptn||'').trim().toLowerCase()
+  ].join('|');
+  const have = new Set(entryMims.map(sig));
+  let added = 0;
+  for(const m of MIMS_SEED){
+    if(!have.has(sig(m))){ entryMims.push({...m}); added++; }
+  }
+  if(added){
+    try{ localStorage.setItem(LS_ENTRY_MIMS, JSON.stringify(entryMims)); }catch(_e){}
+  }
+})();
+
 // Runtime scrub: the reference MIMS file has cell-shift corruption on
 // ~24 Aldi/Tesco Product rows where a date (25/07/2026) landed in the
 // OTHER_ID and SUITE columns instead of the intended values. Exporting a
@@ -3761,13 +3797,31 @@ function entryBuildInitialLookup(){
       if(!mimsNameNorm.has(n)) mimsNameNorm.set(n, new Set());
       mimsNameNorm.get(n).add(m.barcode);
     });
+    // Keep-vs-drop rule (why the retailer-prefixed duplicates disappeared):
+    //   * If MIMS has no row with this barcode → the seed is a genuine gap-
+    //     filler alias (Costco Twin, MSBUTTER, KFCWING patterns). Keep it,
+    //     unless the seed's name normalises to a MIMS row's name under a
+    //     different barcode (a mistyped duplicate — drop).
+    //   * If MIMS DOES have rows with this barcode → the MIMS descrptn +
+    //     retailer are authoritative. Drop the seed to stop the search bar
+    //     from showing "M&S Sweet Smokey Spatchcock" (seed) alongside
+    //     "Sweet & Smokey Spatchcock — M&S" (MIMS). One entry, cleaner.
+    //     Exception: if every MIMS row for this barcode has an empty
+    //     descrptn, keep the seed — otherwise the search hit is unlabelled.
     LOOKUP_SEED.forEach((s,i)=>{
       const bc = String(s.barcode||'').trim();
       if(!bc) return;
-      if(!mimsHasBarcode.has(bc)){
+      const mimsRowsForBc = entryMims.filter(m => m.barcode === bc);
+      if(mimsRowsForBc.length === 0){
         const n = norm(s.name);
         if(n && mimsNameNorm.has(n)) return; // mistyped duplicate — drop
         // Otherwise keep — this is an ad-hoc alias that fills a gap in MIMS.
+      } else {
+        // MIMS covers this barcode. Drop the seed unless every MIMS row is
+        // descrptn-blank (in which case the seed's name is still the only
+        // usable label for the search hit).
+        const anyDescrptn = mimsRowsForBc.some(m => (m.descrptn||'').trim());
+        if(anyDescrptn) return;
       }
       const k = keyOf(bc, s.name, '', '', '');
       if(seen.has(k)) return;
@@ -4728,6 +4782,36 @@ function entrySuggestCategory(p){
   if(shift==='weekly') suggested = 'Category 2';
   else if(shift==='monthly') suggested = 'Category 3';
   else if(shift==='daily') suggested = 'Category 1';
+  // Routine-driven pre-selection: if this scan matches a Routines product
+  // (by exact barcode or variable-weight prefix — same rules the auto-tick
+  // uses), inspect state.ticks and prefer whichever frequency is currently
+  // OVERDUE. That way scanning e.g. an Ocado Medium whose Weekly is
+  // unticked auto-selects Cat 2 even though MIMS SHIFT says Daily, so the
+  // one scan closes the weekly routine tick. If the routine product is
+  // already ticked for every frequency it runs on, fall back to the MIMS
+  // shift so the export still exports as Daily / Monthly / etc.
+  const scannedBc = p.barcode || p.mimsBarcode || '';
+  if(scannedBc && typeof state !== 'undefined' && Array.isArray(state.products)){
+    let routineProd = state.products.find(x=>!x.delisted && x.barcode && String(x.barcode)===String(scannedBc));
+    if(!routineProd){
+      const pfx = entryVarWeightPrefix(scannedBc);
+      if(pfx) routineProd = state.products.find(x=>!x.delisted && x.barcode && String(x.barcode).startsWith(pfx));
+    }
+    if(routineProd){
+      const cust = state.customers.find(c=>c.name===routineProd.customer);
+      const freqs = (cust && Array.isArray(cust.freqs)) ? cust.freqs : [];
+      // Prefer weekly (more frequent). Only fall back to monthly if the
+      // customer doesn't run weekly at all.
+      if(freqs.includes('weekly') && !isDone(routineProd.id, 'weekly')){
+        return {cat:'Category 2', tag:'wk', note:'Weekly routine not yet ticked for '+routineProd.customer};
+      }
+      if(freqs.includes('monthly') && !isDone(routineProd.id, 'monthly')){
+        return {cat:'Category 3', tag:'mo', note:'Monthly routine not yet ticked for '+routineProd.customer};
+      }
+      // Everything the routine tracks is already done — fall through to the
+      // MIMS-shift-based suggestion below.
+    }
+  }
   // Annually / Bi Annual / Trial / Various etc. default to Category 1 but
   // note the actual SHIFT so the person knows the export column will carry
   // that literal value instead of "Daily".
@@ -7567,10 +7651,10 @@ function entryBuildSisRow(r){
     || descL.includes('salmonella')      || mimsDescL.includes('salmonella')
     || descL.includes('meat content')    || mimsDescL.includes('meat content');
   const noTimeSource = r.source === 'shelf-life-bundle'
-    || r.source === 'nutritional-bundle'
-    // Meat-Prep (5E+1D+5S) EOL/SOL rows carry no time — but the middle
-    // "1 Daily" row (mpRole:'daily') SHOULD, so exclude it here.
-    || (r.source === 'meat-prep' && r.mpRole !== 'daily');
+    || r.source === 'nutritional-bundle';
+    // Meat-Prep 5E+1D+5S records (r.source === 'meat-prep') used to be
+    // time-blank; you asked for MANUFTIME on all 11 rows so this list no
+    // longer excludes them.
   if(isAmber || noTimeSource || suppressByDesc){
     row.MANUFTIME = '';
   } else if(r.timeOverride){
