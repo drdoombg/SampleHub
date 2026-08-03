@@ -7650,14 +7650,24 @@ function entryBuildSisRow(r){
   if(mimsRow){
     row.PRODUCT=mimsRow.product; row.MATERIAL=mimsRow.material; row.RISE=mimsRow.rise; row.UNIT=mimsRow.unit;
     row.DESCRIPTN=mimsRow.descrptn||r.desc; row.SIZE=mimsRow.size; row.RETAILER=mimsRow.retailer;
-    // SHIFT: prefer the MIMS row's own value (Weekly / Monthly / Daily /
-    // Annually / Bi Annual / Various / etc.) — that's the frequency the
-    // catalogue considers correct for this entry. Only fall back to the
-    // cat-derived label when MIMS has nothing usable (empty, or the "."
-    // placeholder).
+    // SHIFT priority — the user's category choice wins over the MIMS
+    // default. The catalogue's MIMS.shift is a suggested default (nearly
+    // every row says "Daily"), but the person ticked a specific frequency
+    // on the routine list — Weekly / Monthly / Daily — and that choice
+    // must reach the export or the whole categorisation is meaningless.
+    //
+    //   Category 1 → Daily
+    //   Category 2 → Weekly
+    //   Category 3 → Monthly
+    //   no category → use MIMS's own shift (preserves "Annually",
+    //                 "Bi Annual", "Every house", "trial", etc.)
+    //   MIMS empty or "." → last-resort default "Daily"
+    const catShift = r.cat==='Category 2' ? 'Weekly'
+                   : r.cat==='Category 3' ? 'Monthly'
+                   : r.cat==='Category 1' ? 'Daily' : '';
     const mimsShift = (mimsRow.shift||'').trim();
-    row.SHIFT = (mimsShift && mimsShift !== '.') ? mimsShift
-              : (r.cat==='Category 2'?'Weekly': r.cat==='Category 3'?'Monthly':'Daily');
+    row.SHIFT = catShift
+              || (mimsShift && mimsShift !== '.' ? mimsShift : 'Daily');
     row.OTHER_ID=mimsRow.other_id; row.SUITE=mimsRow.suite; row.PRICE=mimsRow.price;
     // Only real barcodes go into the BARCODE column — the MIMS_NNNN internal
     // ids used to key non-barcoded rows must stay out of the exported file.
@@ -7690,7 +7700,13 @@ function entryBuildSisRow(r){
   } else if(r.tmpl){
     const t=r.tmpl;
     row.PRODUCT=t.product; row.MATERIAL=t.material; row.RISE=t.rise; row.UNIT=t.unit;
-    row.DESCRIPTN=t.desc; row.SIZE=t.size; row.RETAILER=t.retailer; row.SHIFT=t.shift||'Daily';
+    row.DESCRIPTN=t.desc; row.SIZE=t.size; row.RETAILER=t.retailer;
+    // Same category-wins rule as the MIMS branch above — the person's
+    // ticked frequency beats the template's stored default.
+    const catShift = r.cat==='Category 2' ? 'Weekly'
+                   : r.cat==='Category 3' ? 'Monthly'
+                   : r.cat==='Category 1' ? 'Daily' : '';
+    row.SHIFT = catShift || t.shift || 'Daily';
     row.OTHER_ID=t.other_id; row.SUITE=t.suite; row.PRICE=t.price; row.EOL=t.eol; row.BATCH=t.batch;
   } else {
     row.DESCRIPTN=r.desc;
