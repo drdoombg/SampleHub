@@ -4252,6 +4252,7 @@ function entryCommsIsBoilerplate(c){
 
 function entryResultSubtitle(p){
   if(p.action === 'swabMatrix') return 'Weekly swab collection · opens picker';
+  if(p.action === 'milkSwabBundle') return 'Monthly · Milk swab bundle · opens wizard';
   if(p.action === 'nightHygiene') return 'Environmental swabs by LINE · opens picker';
   if(p.action === 'nutritionalBundle') return 'Raw / Cooked with turnaround options · opens wizard';
   if(p.action === 'shelfLifeBundle') return 'K+1 through K+12 sets per retailer · opens wizard';
@@ -4651,10 +4652,14 @@ function entrySwabMatrixRenderReviewList(){
     const tail = extras.length ? ` <span style="color:var(--ink-dim)">· ${esc(extras.join(' · '))}</span>` : '';
     const keep = it._skip !== true;
     if(entrySwabMatrixReduceMode){
-      return `<div style="display:flex; align-items:center; gap:8px; ${keep?'':'opacity:.45; text-decoration:line-through;'}">
-                <input type="checkbox" ${keep?'checked':''} data-idx="${idx}" style="flex-shrink:0;">
-                <span>${it.count}× ${body}${tail}</span>
-              </div>`;
+      // Use <label> with display:block so long lines wrap naturally
+      // instead of overflowing horizontally (which was the "floating tick"
+      // layout bug from v18.4). Clicking anywhere on the row toggles the
+      // checkbox because label wraps the input.
+      return `<label style="display:block; padding:2px 0; cursor:pointer; ${keep?'':'opacity:.45; text-decoration:line-through;'}">
+                <input type="checkbox" ${keep?'checked':''} data-idx="${idx}" style="vertical-align:middle; margin-right:8px;">
+                <span style="vertical-align:middle;">${it.count}× ${body}${tail}</span>
+              </label>`;
     }
     return `<div>${it.count}× ${body}${tail}</div>`;
   }).join('');
@@ -4711,6 +4716,7 @@ let entryMilkSwabState = null;
 function entryMilkSwabBundleOpen(){
   entryMilkSwabState = {
     stage: 1,
+    caseinProduct: '',
     locations: ENTRY_MILK_SWAB_DEFAULT_LOCATIONS.map(l => ({ label:l, selected:true }))
   };
   document.getElementById('entryMilkSwabStage1').classList.remove('hidden');
@@ -4742,9 +4748,23 @@ function entryMilkSwabRender(){
   } else if(s.stage === 2){
     const items = entryMilkSwabBuildItems();
     document.getElementById('entryMilkSwabReviewCount').textContent = items.length;
-    document.getElementById('entryMilkSwabReviewList').innerHTML = items.map(it =>
-      `<div>${esc(it.summary)}</div>`
-    ).join('');
+    // Split the display: locations at top, then the product input, then the
+    // Casein rows so the person can see the product name applies to those.
+    const swabRows = items.filter(x => x.kind === 'swab');
+    const caseinRows = items.filter(x => x.kind === 'casein');
+    document.getElementById('entryMilkSwabReviewList').innerHTML = [
+      ...swabRows.map(it => `<div>${esc(it.summary)}</div>`),
+      `<div style="margin:8px 0 4px 0; padding-top:8px; border-top:1px solid var(--line);">
+         <label style="display:block; margin-bottom:4px; font-size:11px; color:var(--ink-dim);">Product name (fills LOT_NO on every Casein row) — optional</label>
+         <input type="text" id="entryMilkSwabCaseinProductInput" value="${esc(s.caseinProduct||'')}" placeholder="e.g. Coop Rotisserie" style="width:100%; padding:4px 6px;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true">
+       </div>`,
+      ...caseinRows.map(it => `<div>${esc(it.summary)}</div>`)
+    ].join('');
+    // Wire the input so typing persists in state.
+    const inp = document.getElementById('entryMilkSwabCaseinProductInput');
+    if(inp){
+      inp.addEventListener('input', e => { s.caseinProduct = e.target.value; });
+    }
   }
 }
 function entryMilkSwabBuildItems(){
@@ -4757,22 +4777,29 @@ function entryMilkSwabBuildItems(){
                    summary: `Milk Swab ${state} — ${loc.label}` });
     });
   });
-  items.push({ kind:'casein', summary:'Product - Casein (Milk)' });
+  // Three Casein (Milk) product rows — matches the SAMPCOUNT 141/142/143
+  // triplet in the reference worksheet the user shared.
+  for(let i = 0; i < 3; i++){
+    items.push({ kind:'casein', summary:`Product - Casein (Milk) #${i+1}` });
+  }
   return items;
 }
 function entryMilkSwabCommit(){
   if(!entryMilkSwabState) return;
   const items = entryMilkSwabBuildItems();
   if(!items.length){ entryMilkSwabClose(); return; }
+  // The optional product name from the review-stage input is applied to
+  // every Casein row's LOT_NO cell. If blank, LOT_NO keeps its
+  // [ENTER PRODUCT] placeholder → yellow in the export view.
+  const caseinProduct = (entryMilkSwabState.caseinProduct || '').trim();
   const newNums = [];
   const nowIso = new Date().toISOString();
-  const startNum = (entrySeq[entrySeq.length-1] || 0) + 1;
-  items.forEach((it, i) => {
-    const num = startNum + i;
+  let n = entryNextNumber();
+  items.forEach(it => {
     let rec;
     if(it.kind === 'swab'){
       rec = {
-        num, cat: 'Category 3', desc: it.location,
+        num: n, cat: 'Category 3', desc: it.location,
         barcode: '', mimsBarcode: '',
         source: 'milk-swab-bundle', createdAt: nowIso,
         manualCellOverrides: {
@@ -4787,7 +4814,7 @@ function entryMilkSwabCommit(){
       };
     } else {
       rec = {
-        num, cat: 'Category 3', desc: 'Product - Casein (Milk)',
+        num: n, cat: 'Category 3', desc: 'Product - Casein (Milk)',
         barcode: '', mimsBarcode: '',
         source: 'milk-swab-bundle', createdAt: nowIso,
         manualCellOverrides: {
@@ -4796,14 +4823,15 @@ function entryMilkSwabCommit(){
           DESCRIPTN:'Product - Casein (Milk)', SIZE:'1 Sample',
           RETAILER:'2Sisters', SHIFT:'Monthly',
           OTHER_ID:'Fresh Pack 2', SUITE:'2SP006A', PRICE:'48.00',
-          EOL:'N', LOT_NO:'[ENTER PRODUCT]',
+          EOL:'N',
+          LOT_NO: caseinProduct || '[ENTER PRODUCT]',
           CLIENT:'SIS'
         }
       };
     }
     entryRecords.push(rec);
-    entrySeq.push(num);
-    newNums.push(num);
+    newNums.push(n);
+    n++;
   });
   entrySaveLocal();
   renderEntryAll();
