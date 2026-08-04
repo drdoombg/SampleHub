@@ -7964,6 +7964,45 @@ function entryBuildSisRow(r){
   if(!mimsRow){
     mimsRow = entryFindMimsByContext(r);
   }
+  // Shift-aware re-resolution — CRITICAL for lab accuracy. Many MIMS
+  // products carry separate rows for Daily / Weekly / Monthly with the
+  // SAME product identity but DIFFERENT SUITE + EOL (e.g. Rotisserie
+  // Chicken Joint 00265829 has row 583 Daily/2SP015/N and row 584
+  // Monthly/2SP017/Y). Before this step, the resolver would return the
+  // first-matching row (usually Daily) and the code below would only
+  // override the visible SHIFT column, leaving SUITE + EOL pointing at
+  // the wrong lab method. That produced impossible combinations like
+  // "Monthly + 2SP015 + EOL=N" the lab can't process.
+  //
+  // Fix: when the record's category dictates a specific shift and the
+  // current mimsRow has a different shift, look for another mimsRow with
+  //   a) same barcode + matching shift, OR (as fallback)
+  //   b) same descrpton + same retailer + matching shift
+  // The fallback matters for Ocado Large Plain WB, where the Daily and
+  // Monthly variants have different (variable-weight) barcodes.
+  if(mimsRow && r.cat){
+    const wantedShift = r.cat === 'Category 2' ? 'Weekly'
+                      : r.cat === 'Category 3' ? 'Monthly'
+                      : r.cat === 'Category 1' ? 'Daily' : '';
+    if(wantedShift && (mimsRow.shift||'').trim() !== wantedShift){
+      const bc = mimsRow.barcode;
+      let better = null;
+      if(bc){
+        better = entryMims.find(m => m.barcode === bc && (m.shift||'').trim() === wantedShift);
+      }
+      if(!better){
+        const desc = (mimsRow.descrptn||'').trim();
+        const ret  = (mimsRow.retailer||'').trim();
+        if(desc && ret){
+          better = entryMims.find(m =>
+            (m.descrptn||'').trim() === desc &&
+            (m.retailer||'').trim() === ret &&
+            (m.shift||'').trim() === wantedShift);
+        }
+      }
+      if(better) mimsRow = better;
+    }
+  }
   if(mimsRow){
     row.PRODUCT=mimsRow.product; row.MATERIAL=mimsRow.material; row.RISE=mimsRow.rise; row.UNIT=mimsRow.unit;
     row.DESCRIPTN=mimsRow.descrptn||r.desc; row.SIZE=mimsRow.size; row.RETAILER=mimsRow.retailer;
