@@ -5555,16 +5555,21 @@ function entryCorrelateScore(candidateName, candidateRetailer, targetName, targe
 // these prefixes should resolve to the same product.
 // Extend this list as more variable-weight SKUs are found.
 const VARIABLE_WEIGHT_PREFIXES = new Set([
-  '2096922004', // Ocado Medium
-  '2092417005', // Ocado Large
-  '2096937006', // Ocado Extra Large
-  '2005725009'  // Costco Twin Pack
+  // 7-char product-identifier prefixes for the retailer's variable-weight
+  // barcodes. The full EAN-13 is <7-char product id><5-char weight><1 check>,
+  // so only the first 7 chars are fixed per SKU. Earlier versions used a
+  // 10-char prefix and only matched by coincidence when the scanned bird's
+  // weight happened to start with the 3 stored digits.
+  '2096922', // Ocado Medium whole bird
+  '2092417', // Ocado Large whole bird
+  '2096937', // Ocado Extra Large whole bird
+  '2005725'  // Costco Twin Pack whole bird
 ]);
 function entryVarWeightPrefix(code){
   if(!code) return null;
   const s = String(code);
-  if(s.length < 10) return null;
-  const pfx = s.slice(0,10);
+  if(s.length < 7) return null;
+  const pfx = s.slice(0,7);
   return VARIABLE_WEIGHT_PREFIXES.has(pfx) ? pfx : null;
 }
 // Resolve a scanned code to the canonical barcode stored on routine products /
