@@ -4652,14 +4652,22 @@ function entrySwabMatrixRenderReviewList(){
     const tail = extras.length ? ` <span style="color:var(--ink-dim)">· ${esc(extras.join(' · '))}</span>` : '';
     const keep = it._skip !== true;
     if(entrySwabMatrixReduceMode){
-      // Use <label> with display:block so long lines wrap naturally
-      // instead of overflowing horizontally (which was the "floating tick"
-      // layout bug from v18.4). Clicking anywhere on the row toggles the
-      // checkbox because label wraps the input.
-      return `<label style="display:block; padding:2px 0; cursor:pointer; ${keep?'':'opacity:.45; text-decoration:line-through;'}">
-                <input type="checkbox" ${keep?'checked':''} data-idx="${idx}" style="vertical-align:middle; margin-right:8px;">
-                <span style="vertical-align:middle;">${it.count}× ${body}${tail}</span>
-              </label>`;
+      // Use <div> — NOT <label> — to escape the global
+      //   .card-like label { font-size:11px; text-transform:uppercase; color:var(--ink-dim); ... }
+      // rule that made every row's text a tiny dim-grey uppercase blur.
+      // ALSO must undo the equally-global
+      //   .card-like input { width:100%; padding:10px; background:var(--panel-2); border:...; }
+      // rule that was stretching every checkbox to fill the whole row and
+      // pushing its label text off-screen — that's why only the ticks were
+      // visible in v18.7 with no name next to them. All those input
+      // properties are re-set inline below since inline style beats the
+      // class selector.
+      const shortBody = esc(it.note || it.descrptn || it.material || '');
+      const shortTail = extras.length ? ` <span style="color:var(--ink-dim)">· ${esc(extras.join(' · '))}</span>` : '';
+      return `<div class="entry-reduce-row" data-idx="${idx}" style="display:flex; align-items:center; gap:8px; padding:4px 2px; cursor:pointer; ${keep?'':'opacity:.45; text-decoration:line-through;'}">
+                <input type="checkbox" ${keep?'checked':''} data-idx="${idx}" style="width:18px !important; height:18px !important; padding:0 !important; margin:0 !important; background:transparent !important; border:none !important; border-radius:0 !important; flex-shrink:0;">
+                <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 1 0; min-width:0; color:var(--ink);">${it.count}× ${shortBody}${shortTail}</span>
+              </div>`;
     }
     return `<div>${it.count}× ${body}${tail}</div>`;
   }).join('');
@@ -4668,6 +4676,17 @@ function entrySwabMatrixRenderReviewList(){
       cb.addEventListener('change', ()=>{
         const i = parseInt(cb.dataset.idx, 10);
         entrySwabMatrixState.items[i]._skip = !cb.checked;
+        entrySwabMatrixRenderReviewList();
+      })
+    );
+    // Clicking anywhere on the row toggles its checkbox (fills in for the
+    // <label> wrapping we can't use here — see the render block above).
+    list.querySelectorAll('.entry-reduce-row').forEach(row =>
+      row.addEventListener('click', e => {
+        if(e.target.tagName === 'INPUT') return; // let the checkbox handle its own click
+        const i = parseInt(row.dataset.idx, 10);
+        const it = entrySwabMatrixState.items[i];
+        it._skip = it._skip !== true;
         entrySwabMatrixRenderReviewList();
       })
     );
@@ -4801,7 +4820,7 @@ function entryMilkSwabCommit(){
       rec = {
         num: n, cat: 'Category 3', desc: it.location,
         barcode: '', mimsBarcode: '',
-        source: 'milk-swab-bundle', createdAt: nowIso,
+        source: 'milk-swab-bundle', time: nowIso,
         manualCellOverrides: {
           PRODUCT:'Allergen', MATERIAL:'Allergen Swab',
           RISE:'Non-food', UNIT:'Non-food',
@@ -4816,7 +4835,7 @@ function entryMilkSwabCommit(){
       rec = {
         num: n, cat: 'Category 3', desc: 'Product - Casein (Milk)',
         barcode: '', mimsBarcode: '',
-        source: 'milk-swab-bundle', createdAt: nowIso,
+        source: 'milk-swab-bundle', time: nowIso,
         manualCellOverrides: {
           PRODUCT:'Allergen', MATERIAL:'Investigation Product',
           RISE:'Fresh', UNIT:'Meat',
