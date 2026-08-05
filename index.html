@@ -3952,7 +3952,7 @@ function entryBuildInitialLookup(){
 // Any real (non-synthetic) barcode overrides the signature — real barcodes
 // are already unique keys.
 function entryMimsContentKey(m){
-  if(m && m.barcode && !entryIsSyntheticBarcode(m.barcode)) return 'REAL::' + m.barcode + '::' + (m.shift || '');
+  if(m && m.barcode && !entryIsSyntheticBarcode(m.barcode)) return 'REAL::' + m.barcode;
   return 'SIG::' + [
     (m.product||''), (m.material||''), (m.descrptn||''), (m.unit||''),
     (m.size||''), (m.retailer||''), (m.shift||''), (m.line||''),
@@ -5739,9 +5739,6 @@ function entryFindMimsByContext(rec){
   for(const m of entryMims){
     if(!m.descrptn && !m.material) continue;
     let score = entryCorrelateScore(m.descrptn || m.material || '', m.retailer || '', targetName, targetRet, '');
-    const targetLooksLikeSwab = /\bswab\b|\bair[- ]plate\b/i.test(targetName);
-    const candLooksLikeSwab   = /\bswab\b|\bair[- ]plate\b/i.test(m.descrptn || '');
-    if(targetLooksLikeSwab !== candLooksLikeSwab) score -= 5;
     // A shift/frequency match is a strong extra signal for MIMS candidates,
     // since the same product often appears at Daily + Weekly + Monthly rows
     // that differ only by SUITE. Prefer the row whose shift matches the
