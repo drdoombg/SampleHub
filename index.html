@@ -601,6 +601,13 @@
   .card-like input { width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:8px;
     padding:10px; color:var(--ink); font-size:14px; }
   .entry-catgrid { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:6px; }
+  .entry-info-panel { display:flex; flex-direction:column; justify-content:center; align-items:center;
+    padding:6px 8px; border-radius:8px; background:var(--panel-2); border:1px solid var(--line);
+    text-align:center; overflow:hidden; }
+  .entry-info-retailer { font-size:13px; font-weight:700; color:var(--ink); line-height:1.2;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+  .entry-info-weight { font-size:11px; color:var(--ink-dim); line-height:1.2; margin-top:2px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
   .entry-catbtn { padding:10px 4px; font-size:12px; text-align:center; border-radius:8px; background:var(--panel-2);
     border:1px solid var(--line); color:var(--ink); cursor:pointer; }
   .entry-catbtn.sel { background:var(--done); color:#06231a; border-color:var(--done); font-weight:700; }
@@ -1051,7 +1058,11 @@
         <button class="entry-catbtn" data-cat="Category 1">1<br>Daily</button>
         <button class="entry-catbtn" data-cat="Category 2">2<br>Weekly</button>
         <button class="entry-catbtn" data-cat="Category 3">3<br>Monthly</button>
-        <button class="entry-catbtn manual" data-cat="Category 6" style="grid-column:span 3;">Meat Prep (5E + 1D + 5S)</button>
+        <div class="entry-info-panel" id="entryInfoPanel" style="grid-column:4 / span 2; grid-row:1 / span 2;">
+          <div class="entry-info-retailer" id="entryInfoRetailer">—</div>
+          <div class="entry-info-weight" id="entryInfoWeight"></div>
+        </div>
+        <button class="entry-catbtn manual" data-cat="Category 6" style="grid-column:1 / span 3;">Meat Prep (5E + 1D + 5S)</button>
       </div>
       <div class="entry-row-two">
         <div>
@@ -5465,6 +5476,11 @@ function entryShowConfirm(sug){
   document.getElementById('entryFBarcodeShown').value=entryPending.barcode||'—';
   document.getElementById('entryFEntries').value=entryPending.entries;
   entrySetCat(entryPending.cat);
+  // Populate the two-row info panel to the right of the category buttons —
+  // retailer on top, weight-class beneath. Try in order: MIMS row (most
+  // authoritative), then extract from the product name using a known-retailer
+  // prefix list. If nothing matches, both lines show a dash.
+  entryPopulateInfoPanel();
   const badge=document.getElementById('entrySuggestBadge');
   if(sug && sug.note){
     const cls = sug.tag==='wk'?'wk':sug.tag==='mo'?'mo':'';
@@ -5474,6 +5490,53 @@ function entryShowConfirm(sug){
   }
   const cardEl = document.getElementById('entryConfirmCard');
   if(cardEl.scrollIntoView) cardEl.scrollIntoView({behavior:'smooth', block:'end'});
+}
+// Retailer list is order-sensitive: longer variants first so "M&S" wins
+// over "MS" and "Extra Tasty" doesn't get swallowed by a shorter retailer
+// name. All matches are case-insensitive at the start of the product name.
+const ENTRY_INFO_RETAILERS = ['M&S','Co-op','CO-OP','Coop','Ocado','Iceland','Aldi','Tesco','Asda','Booths','Costco','KFC','2Sisters','Amber Foods'];
+function entryPopulateInfoPanel(){
+  const retEl = document.getElementById('entryInfoRetailer');
+  const wtEl  = document.getElementById('entryInfoWeight');
+  if(!retEl || !wtEl) return;
+  const p = entryPending && entryPending.lookupEntry;
+  const name = String((entryPending && entryPending.desc) || (p && p.name) || '').trim();
+  // Prefer MIMS row values when we can find one — most reliable.
+  let retailer = '';
+  let weight = '';
+  if(p){
+    const key = p.mimsBarcode || p.barcode || '';
+    let mimsRow = key && (typeof entryMimsRowForLookup === 'function') ? entryMimsRowForLookup(p) : null;
+    if(!mimsRow && typeof entryFindMimsByContext === 'function'){
+      mimsRow = entryFindMimsByContext({desc:name, retailerOverride:'', cat: entryPending.cat});
+    }
+    if(mimsRow){
+      retailer = String(mimsRow.retailer || '').trim();
+      const sz = String(mimsRow.size || '').trim();
+      // Only use MIMS size if it's meaningful — "Various", "1 Sample" etc.
+      // aren't weight classes and would just clutter the panel.
+      if(sz && !/^(various|1 sample|sample|\.|)$/i.test(sz)) weight = sz;
+    }
+  }
+  // Fallback: match a known retailer prefix in the product name.
+  if(!retailer && name){
+    const nl = name.toLowerCase();
+    for(const r of ENTRY_INFO_RETAILERS){
+      if(nl.startsWith(r.toLowerCase() + ' ') || nl === r.toLowerCase()){
+        retailer = r;
+        break;
+      }
+    }
+  }
+  // Weight class fallback: whatever's left of the name after stripping the
+  // retailer prefix. Handles "Coop Extra Large" → "Extra Large" and
+  // "Tesco breast fillet 950g" → "breast fillet 950g".
+  if(!weight && name && retailer){
+    const stripped = name.replace(new RegExp('^' + retailer.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&') + '\\s+', 'i'), '').trim();
+    if(stripped && stripped !== name) weight = stripped;
+  }
+  retEl.textContent = retailer || '—';
+  wtEl.textContent  = weight || '';
 }
 function entrySetCat(cat){
   entryPending.cat=cat;
@@ -5677,8 +5740,7 @@ function entryFindMimsByContext(rec){
     if(!m.descrptn && !m.material) continue;
     let score = entryCorrelateScore(m.descrptn || m.material || '', m.retailer || '', targetName, targetRet, '');
     const targetLooksLikeSwab = /\bswab\b|\bair[- ]plate\b/i.test(targetName);
-    const candLooksLikeSwab   = /\bswab\b|\bair[- ]plate\b/i.test(m.descrptn || '') ||
-                                /\bswab\b|\bair[- ]plate\b/i.test(m.material || '');
+    const candLooksLikeSwab   = /\bswab\b|\bair[- ]plate\b/i.test(m.descrptn || '');
     if(targetLooksLikeSwab !== candLooksLikeSwab) score -= 5;
     // A shift/frequency match is a strong extra signal for MIMS candidates,
     // since the same product often appears at Daily + Weekly + Monthly rows
