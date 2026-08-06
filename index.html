@@ -3745,16 +3745,26 @@ let entryMims = JSON.parse(localStorage.getItem(LS_ENTRY_MIMS) || 'null')
   }
 })();
 (function entryPatchMimsBracketFields(){
-  if(localStorage.getItem('unified.entryMims.bracketPatch.v1') === 'done') return;
   // Bracket-field patch: several MIMS columns (LINE, COMMS, LOCATION, PERIOD,
   // CONDITIONS, SUPPLIER, FARM_NO, PEN_NO, SHED_NO, LOT_NO, LORRY_NO,
-  // FLOCK_NO, LOAD_NO) previously weren't stored on the MIMS_xxxx synthetic
-  // rows, so the [ENTER FARM] / [ENTER SHED] / [ENTER THIN OR DEPOP] etc.
-  // placeholders never reached the export view. This applies those values
-  // to any MIMS_NNNN row that's missing them — one-shot, gated by a
-  // localStorage flag so a re-upload of MIMS_SAVE_FILE.xls (which now reads
-  // all these columns) still overwrites freely. Only fills fields that are
-  // absent / empty on the target row — real values in the seed win.
+  // FLOCK_NO, LOAD_NO) aren't stored on the MIMS_xxxx synthetic rows in the
+  // seed, so the [ENTER FARM] / [ENTER SHED] / [ENTER THIN OR DEPOP] etc.
+  // placeholders need to be injected before the export view + xlsx can render
+  // them yellow.
+  //
+  // *** Runs on every page load. *** The previous one-shot gate
+  // (bracketPatch.v1 === 'done') combined destructively with the v9 migration
+  // purge below, which deletes LS_ENTRY_MIMS (currently 'unified.entryMims.v8'
+  // — the LIVE key). Sequence that broke it:
+  //   Session 1: seed loads → this patch fills brackets → saves to LS
+  //              → v9 migration removes LS_ENTRY_MIMS.v8 → flag is 'done'
+  //   Session 2: LS empty → entryMims = MIMS_SEED (no brackets) → this
+  //              patch is skipped because flag says 'done' → brackets
+  //              never come back → search subtitle drops [ENTER...] hints
+  //              → export-view / xlsx cells don't detect [...] → no yellow.
+  // The patch only fills fields that are empty/undefined on the target row
+  // (line 3770), so re-running is idempotent — real values from the seed or
+  // from a re-uploaded MIMS_SAVE_FILE.xls always win. Safe to run every load.
   const PATCH = [[0,{"line":"[ENTER]","comms":"[ENTER THIN OR DEPOP]","location":"[ENTER]","pen_no":"[ENTER FARM]","shed_no":"[ENTER SHED]","lorry_no":"[ENTER AGE]","load_no":"[ENTER LOAD]"}],[1,{"line":"[ENTER]","comms":"[ENTER THIN OR DEPOP]","location":"[ENTER]","pen_no":"[ENTER FARM]","shed_no":"[ENTER SHED]","lorry_no":"[ENTER]","load_no":"[ENTER]"}],[2,{"comms":"[ENTER Product]"}],[3,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[4,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[5,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[6,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[7,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[8,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[9,{"comms":"[ENTER THIN OR DEPOP]","pen_no":"[ENTER FARM]","shed_no":"[ENTER SHED]","lorry_no":"[ENTER]","load_no":"[ENTER]"}],[10,{"comms":"[ENTER THIN OR DEPOP]","pen_no":"[ENTER FARM]","shed_no":"[ENTER SHED]","lorry_no":"[ENTER]","load_no":"[ENTER]"}],[11,{"comms":"[ENTER THIN OR DEPOP]","pen_no":"[ENTER]","shed_no":"[ENTER]","lorry_no":"[ENTER]","load_no":"[ENTER]"}],[12,{"comms":"[ENTER THIN OR DEPOP]","pen_no":"[ENTER]","shed_no":"[ENTER]","lorry_no":"[ENTER]","load_no":"[ENTER]"}],[13,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[14,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[15,{"comms":"[ENTER]"}],[19,{"comms":"[ENTER Product]"}],[20,{"comms":"[PORTION TYPE, WEIGHT]"}],[21,{"comms":"[ENTER Product]"}],[23,{"comms":"[K+\u2026, PORTION TYPE, WEIGHT]","supplier":"[ENTER]"}],[24,{"line":"[ENTER]","comms":"[ENTER Product]"}],[29,{"comms":"[ENTER PRODUCT]"}],[30,{"comms":"[ENTER PRODUCT]"}],[31,{"comms":"[ENTER PRODUCT]"}],[32,{"comms":"[AREA]"}],[33,{"comms":"[AREA, PERSON'S NAME]"}],[34,{"comms":"[AREA, PERSON'S NAME]"}],[35,{"comms":"[AREA, PERSON'S NAME]"}],[36,{"comms":"[AREA, PERSON'S NAME]"}],[37,{"comms":"[COLOUR]"}],[38,{"comms":"[AREA, PERSON'S NAME]"}],[39,{"comms":"[AREA, PERSON'S NAME]"}],[40,{"comms":"[ENTER PRODUCT]"}],[41,{"comms":"[ENTER PRODUCT]"}],[42,{"comms":"[ENTER PRODUCT]"}],[44,{"comms":"[PERSON'S NAME]"}],[45,{"comms":"[PERSON'S NAME]"}],[46,{"comms":"[PERSON'S NAME]"}],[47,{"comms":"[PERSON'S NAME]"}],[48,{"comms":"[PERSON'S NAME]"}],[49,{"comms":"[PERSON'S NAME]"}],[50,{"comms":"[PERSON'S NAME]"}],[51,{"comms":"[PERSON'S NAME]"}],[52,{"comms":"[PERSON'S NAME]"}],[53,{"comms":"[PERSON'S NAME]"}],[54,{"comms":"[PERSON'S NAME]"}],[55,{"comms":"[PERSON'S NAME]"}],[56,{"comms":"[PERSON'S NAME]"}],[57,{"comms":"[PERSON'S NAME]"}],[58,{"comms":"[PERSON'S NAME]"}],[59,{"comms":"[PERSON'S NAME]"}],[307,{"comms":"[SPECIFY ITEM]"}],[308,{"comms":"[SPECIFY ITEM]"}],[310,{"comms":"[SPECIFY UNTENSIL]"}],[361,{"comms":"[CUSTOMER, NFT, TRIP]"}],[362,{"comms":"[ENTER COMMENTS IF REQUIRED]"}],[365,{"comms":"[ENTER]"}],[366,{"comms":"[AREA]"}],[465,{"comms":"[ENTER]"}],[479,{"comms":"[Clean / Dirty]"}],[480,{"comms":"[Clean / Dirty]"}],[481,{"comms":"[ENTER Product]"}],[482,{"comms":"[ENTER Product]"}],[483,{"comms":"[ENTER Product]"}],[484,{"comms":"[Clean / Dirty]"}],[487,{"comms":"[ENTER Product]"}],[488,{"comms":"[ENTER Product]"}],[489,{"comms":"[ENTER Product]"}],[490,{"comms":"[ENTER Product]"}],[491,{"comms":"[ENTER Product]"}],[492,{"comms":"[ENTER Product]"}],[493,{"comms":"[ENTER Product]"}],[494,{"comms":"[ENTER Product]"}],[495,{"comms":"[ENTER Product]"}],[496,{"comms":"[ENTER Product]"}],[497,{"comms":"[ENTER Product]"}],[498,{"comms":"[ENTER Product]"}],[499,{"comms":"[ENTER Product]"}],[500,{"comms":"[ENTER Product]"}],[501,{"comms":"[ENTER Product]"}],[502,{"comms":"[ENTER Product details]"}],[503,{"comms":"[ENTER Product details]"}],[504,{"comms":"[ENTER Product details]"}],[513,{"comms":"Swab - SO2 [Where]"}],[514,{"comms":"[ENTER Product]"}],[515,{"comms":"Air - plate Milk [Where]"}],[520,{"comms":"[ENTER Product]"}],[521,{"comms":"[ENTER Product]"}],[545,{"comms":"[ENTER PRODUCT]"}],[546,{"comms":"[ENTER PRODUCT]"}],[547,{"comms":"[ENTER PRODUCT]"}],[548,{"comms":"[ENTER PRODUCT]"}],[549,{"comms":"5 Portion [Type of portyon]"}],[551,{"line":"[ENTER]","comms":"[ENTER]"}],[552,{"line":"[ENTER]","comms":"[ENTER]"}],[553,{"line":"[ENTER]","comms":"[ENTER]"}],[575,{"comms":"[ PORTION TYPE ]"}],[699,{"pen_no":"[ENTER FARM]","shed_no":"[ENTER SHED]","lorry_no":"[ENTER AGE]","load_no":"[ENTER LOAD]"}],[806,{"line":"[3 sets]"}],[819,{"line":"[3 sets]"}],[820,{"line":"[3 sets]"}],[821,{"line":"[3 sets]"}],[822,{"line":"[3 sets]"}],[823,{"line":"[3 sets]"}],[824,{"line":"[3 sets]"}],[825,{"line":"[3 sets]"}],[826,{"line":"[3 sets]"}],[827,{"line":"[3 sets]"}],[828,{"line":"[3 sets]"}],[829,{"line":"[3 sets]"}],[830,{"line":"[3 sets]"}],[831,{"line":"[3 sets]"}],[832,{"line":"[3 sets]"}],[844,{"comms":"[ENTER]"}],[845,{"line":"[3 sets]"}],[846,{"line":"[3 sets]"}],[847,{"line":"[3 sets]"}],[848,{"line":"[3 sets]"}],[849,{"line":"[3 sets]"}],[850,{"line":"[3 sets]"}],[851,{"line":"[3 sets]"}],[852,{"line":"[3 sets]"}],[853,{"line":"[3 sets]"}],[854,{"line":"[3 sets]"}],[855,{"line":"[3 sets]"}],[856,{"line":"[3 sets]"}],[857,{"line":"[3 sets]"}],[858,{"line":"[3 sets]"}],[859,{"line":"[3 sets]"}],[883,{"line":"[3 sets]"}],[884,{"line":"[3 sets]"}],[885,{"line":"[3 sets]"}],[886,{"line":"[3 sets]"}],[887,{"line":"[3 sets]"}],[888,{"line":"[3 sets]"}],[889,{"line":"[3 sets]"}],[890,{"line":"[3 sets]"}],[891,{"line":"[3 sets]"}],[892,{"line":"[3 sets]"}],[893,{"line":"[3 sets]"}],[894,{"line":"[3 sets]"}],[895,{"line":"[3 sets]"}],[896,{"line":"[3 sets]"}],[897,{"line":"[3 sets]"}],[898,{"line":"[3 sets]"}],[899,{"line":"[3 sets]"}],[900,{"line":"[3 sets]"}],[901,{"line":"[3 sets]"}],[902,{"line":"[3 sets]"}],[903,{"line":"[3 sets]"}],[904,{"line":"[3 sets]"}],[905,{"line":"[3 sets]"}],[906,{"line":"[3 sets]"}],[907,{"line":"[3 sets]"}],[908,{"line":"[3 sets]"}],[909,{"line":"[3 sets]"}],[910,{"line":"[3 sets]"}],[911,{"line":"[3 sets]"}],[912,{"line":"[3 sets]"}],[913,{"line":"[3 sets]"}],[914,{"line":"[3 sets]"}],[915,{"line":"[3 sets]"}],[916,{"line":"[3 sets]"}],[917,{"line":"[3 sets]"}],[918,{"line":"[3 sets]"}],[919,{"line":"[3 sets]"}],[920,{"line":"[3 sets]"}],[921,{"line":"[3 sets]"}],[922,{"line":"[3 sets]"}],[923,{"line":"[3 sets]"}],[924,{"line":"[3 sets]"}],[925,{"line":"[3 sets]"}],[926,{"line":"[3 sets]"}],[927,{"line":"[3 sets]"}],[928,{"line":"[3 sets]"}],[929,{"line":"[3 sets]"}],[930,{"line":"[3 sets]"}],[931,{"line":"[3 sets]"}],[932,{"line":"[3 sets]"}],[933,{"line":"[3 sets]"}],[934,{"line":"[3 sets]"}],[935,{"line":"[3 sets]"}],[936,{"line":"[3 sets]"}],[937,{"line":"[3 sets]"}],[938,{"line":"[3 sets]"}],[939,{"line":"[3 sets]"}],[940,{"line":"[3 sets]"}],[941,{"line":"[3 sets]"}],[942,{"line":"[3 sets]"}],[943,{"line":"[3 sets]"}],[944,{"line":"[3 sets]"}],[945,{"line":"[3 sets]"}],[946,{"line":"[3 sets]"}],[947,{"line":"[3 sets]"}],[948,{"line":"[3 sets]"}],[949,{"line":"[3 sets]"}],[950,{"line":"[3 sets]"}],[951,{"line":"[3 sets]"}],[952,{"line":"[3 sets]"}],[953,{"line":"[3 sets]"}],[954,{"line":"[3 sets]"}],[955,{"line":"[3 sets]"}],[956,{"line":"[3 sets]"}],[957,{"line":"[3 sets]"}],[958,{"line":"[3 sets]"}],[959,{"line":"[3 sets]"}],[960,{"line":"[3 sets]"}],[961,{"line":"[3 sets]"}],[962,{"line":"[3 sets]"}],[963,{"line":"[3 sets]"}],[964,{"line":"[3 sets]"}],[979,{"line":"[3 sets]"}],[980,{"line":"[3 sets]"}],[981,{"line":"[3 sets]"}],[982,{"line":"[3 sets]"}],[983,{"line":"[3 sets]"}],[984,{"line":"[3 sets]"}],[985,{"line":"[3 sets]"}],[986,{"line":"[3 sets]"}],[987,{"line":"[3 sets]"}],[988,{"line":"[3 sets]"}],[989,{"line":"[3 sets]"}],[990,{"line":"[3 sets]"}],[991,{"line":"[3 sets]"}],[992,{"line":"[3 sets]"}],[993,{"line":"[3 sets]"}]];
   const byId = new Map();
   entryMims.forEach(m => { if(typeof m.barcode === 'string') byId.set(m.barcode, m); });
@@ -3775,8 +3785,7 @@ let entryMims = JSON.parse(localStorage.getItem(LS_ENTRY_MIMS) || 'null')
     if(changed) touched++;
   });
   try{
-    localStorage.setItem(LS_ENTRY_MIMS, JSON.stringify(entryMims));
-    localStorage.setItem('unified.entryMims.bracketPatch.v1','done');
+    if(touched) localStorage.setItem(LS_ENTRY_MIMS, JSON.stringify(entryMims));
   }catch(_e){}
 })();
 const ENTRY_TEMPLATES = (typeof TEMPLATES_SEED!=='undefined') ? TEMPLATES_SEED : [];
@@ -3984,8 +3993,13 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
 (function entryPurgeStaleVersionKeys(){
   const MIGRATION_KEY = 'unified.entryMigration.v9';
   if(localStorage.getItem(MIGRATION_KEY)) return;
-  ['unified.entryMims.v1','unified.entryMims.v2','unified.entryMims.v3','unified.entryMims.v4','unified.entryMims.v5','unified.entryMims.v6','unified.entryMims.v7','unified.entryMims.v8',
-   'unified.entryLookup.v1','unified.entryLookup.v2','unified.entryLookup.v3','unified.entryLookup.v4','unified.entryLookup.v5','unified.entryLookup.v6','unified.entryLookup.v7','unified.entryLookup.v8'
+  // ONLY purge STALE keys — never the current LS_ENTRY_MIMS / LS_ENTRY_LOOKUP.
+  // Previously v8 was included here even though v8 is the LIVE key, which
+  // wiped the freshly-patched entryMims blob and caused the [ENTER FARM] /
+  // [ENTER SHED] etc. bracket fields (and their yellow highlight in the
+  // export view + xlsx) to disappear on every subsequent page load.
+  ['unified.entryMims.v1','unified.entryMims.v2','unified.entryMims.v3','unified.entryMims.v4','unified.entryMims.v5','unified.entryMims.v6','unified.entryMims.v7',
+   'unified.entryLookup.v1','unified.entryLookup.v2','unified.entryLookup.v3','unified.entryLookup.v4','unified.entryLookup.v5','unified.entryLookup.v6','unified.entryLookup.v7'
   ].forEach(k => { try{ localStorage.removeItem(k); }catch(_e){} });
   // v9: nuke the current lookup cache too so it gets rebuilt from the
   // freshly-merged entryMims. Without this the old cache (missing Ocado /
