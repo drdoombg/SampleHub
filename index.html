@@ -5549,7 +5549,16 @@ function entryPopulateInfoPanel(){
     const stripped = name.replace(new RegExp('^' + retailer.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&') + '\\s+', 'i'), '').trim();
     if(stripped && stripped !== name) weight = stripped;
   }
-  retEl.textContent = retailer || '—';
+  // Colour the retailer name using the shared Line Timeline palette, so
+  // "M&S" gets its light-grey oval, Aldi shows blue, Tesco yellow, etc. —
+  // matching the search subtitle above and the Line Timeline tab exactly.
+  // Retailers not in the palette fall back to plain text.
+  if(retailer){
+    const cls = entryRetailerColorClass(retailer);
+    retEl.innerHTML = cls ? `<span class="${cls}">${esc(retailer)}</span>` : esc(retailer);
+  } else {
+    retEl.textContent = '—';
+  }
   wtEl.textContent  = weight || '';
 }
 function entrySetCat(cat){
