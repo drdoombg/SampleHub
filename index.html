@@ -607,10 +607,15 @@
   .entry-info-retailer { font-size:13px; font-weight:700; color:var(--ink); line-height:1.2;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
   /* When the retailer is rendered as a Line-Timeline-style pill (border +
-     rounded), keep the type larger than the 10px default so it stays readable
-     inside the card. M&S skips the badge (it has its own light-grey pill) so
-     this rule only affects the outlined variants. */
-  .entry-info-retailer .line-cust-badge { font-size:12px; padding:2px 10px; }
+     rounded), it needs display:inline-block — with the default inline flow
+     the top/bottom of the border gets clipped by the surrounding line-height
+     and only the left/right curves show, making the name look enclosed in
+     round brackets ( ). inline-block gives the span its own line box so the
+     full oval renders. Font is bumped over the 10px default so it stays
+     readable in the card. M&S skips the badge (it has its own light-grey
+     pill) so this rule only affects the outlined variants. */
+  .entry-info-retailer .line-cust-badge { display:inline-block; font-size:12px;
+    padding:1px 10px; line-height:1.5; vertical-align:middle; }
   .entry-info-weight { font-size:11px; color:var(--ink-dim); line-height:1.2; margin-top:2px;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
   .entry-catbtn { padding:10px 4px; font-size:12px; text-align:center; border-radius:8px; background:var(--panel-2);
