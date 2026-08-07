@@ -606,6 +606,11 @@
     text-align:center; overflow:hidden; }
   .entry-info-retailer { font-size:13px; font-weight:700; color:var(--ink); line-height:1.2;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+  /* When the retailer is rendered as a Line-Timeline-style pill (border +
+     rounded), keep the type larger than the 10px default so it stays readable
+     inside the card. M&S skips the badge (it has its own light-grey pill) so
+     this rule only affects the outlined variants. */
+  .entry-info-retailer .line-cust-badge { font-size:12px; padding:2px 10px; }
   .entry-info-weight { font-size:11px; color:var(--ink-dim); line-height:1.2; margin-top:2px;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
   .entry-catbtn { padding:10px 4px; font-size:12px; text-align:center; border-radius:8px; background:var(--panel-2);
@@ -3726,6 +3731,54 @@ let entryMims = JSON.parse(localStorage.getItem(LS_ENTRY_MIMS) || 'null')
   }
 })();
 
+// Self-heal missing seed fields on cached entryMims rows.
+//
+// Fields like flock_no were added to MIMS_SEED after some devices had
+// already cached the older seed shape in localStorage. entryMergeSeedMims
+// above only ADDS missing rows — it never refreshes fields on existing
+// ones — so a Rotisserie Chicken Joint (00265829) row cached before
+// flock_no existed would stay without "FAV Cuts" forever, and the
+// FLOCK_NO column would render empty in both export view and the .xlsx.
+//
+// This IIFE fills any of the listed fields when the current row is empty
+// AND the seed's matching row (by barcode+suite+shift+descrpton) has it.
+// Empty-only: real user data or values from an uploaded MIMS_SAVE_FILE
+// always win. Safe to run every load.
+(function entryHealMissingSeedFields(){
+  if(typeof MIMS_SEED === 'undefined' || !Array.isArray(MIMS_SEED)) return;
+  const HEAL_FIELDS = ['flock_no','farm_no','pen_no','shed_no','lot_no',
+                       'lorry_no','load_no','location','period','conditions',
+                       'supplier','use_by','client'];
+  const sig = m => [
+    String(m.barcode||'').trim(),
+    String(m.suite||'').trim(),
+    String(m.shift||'').trim(),
+    String(m.descrptn||'').trim().toLowerCase()
+  ].join('|');
+  const seedBySig = new Map();
+  for(const s of MIMS_SEED){ seedBySig.set(sig(s), s); }
+  let touched = 0;
+  entryMims.forEach(m => {
+    const s = seedBySig.get(sig(m));
+    if(!s) return;
+    let changed = false;
+    HEAL_FIELDS.forEach(k => {
+      const cur = m[k];
+      const nxt = s[k];
+      if((cur === undefined || cur === null || cur === '') &&
+         nxt !== undefined && nxt !== null && nxt !== ''){
+        m[k] = nxt;
+        changed = true;
+      }
+    });
+    if(changed) touched++;
+  });
+  if(touched){
+    try{ localStorage.setItem(LS_ENTRY_MIMS, JSON.stringify(entryMims)); }catch(_e){}
+    try{ console.info(`[SampleHub] Healed missing seed fields on ${touched} MIMS row(s).`); }catch(_e){}
+  }
+})();
+
 // Runtime scrub: the reference MIMS file has cell-shift corruption on
 // ~24 Aldi/Tesco Product rows where a date (25/07/2026) landed in the
 // OTHER_ID and SUITE columns instead of the intended values. Exporting a
@@ -4025,6 +4078,74 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
     setTimeout(()=>{ try{ entryLookupSyncScheduleWrite(); }catch(_e){} }, 200);
   }
   localStorage.setItem(MIGRATION_KEY, String(Date.now()));
+})();
+
+// Raw Portions barcode-detach patch. Ships state: no MIMS_SEED "Raw Portions"
+// row has a real barcode, and no LOOKUP_SEED entry is named "Raw Portions".
+// But a live device may still carry the anomaly from
+//   (a) an older scan-added lookup entry whose name is "Raw Portions" or
+//       whose mimsBarcode resolves to a MIMS Raw Portions row, or
+//   (b) a modified MIMS_SAVE_FILE.xls upload that put a real barcode on a
+//       "Raw Portions" MIMS row.
+// Either way a camera scan of that real barcode would resurface the
+// "Raw Portions" hit the user thought they'd deleted. This runs every load,
+// detects both cases, and detaches the real barcode:
+//   - MIMS row: real barcode → fresh synthetic MIMS_NNNN id (row stays, but
+//     the real barcode is no longer a scan target).
+//   - Lookup entry with source in {scan, manual, import}: strip the barcode
+//     field so the entry stays name-searchable but can't be scan-matched.
+// Idempotent — after the first pass finishes the checks find nothing and
+// the patch is a no-op.
+(function entryDetachRawPortionsBarcodes(){
+  const isRawPortions = s => String(s||'').trim().toLowerCase() === 'raw portions';
+  // Highest current synthetic index so new ids don't collide.
+  let synCounter = 0;
+  entryMims.forEach(m=>{
+    if(entryIsSyntheticBarcode(m.barcode)){
+      const n = parseInt(String(m.barcode).slice('MIMS_'.length), 10);
+      if(!Number.isNaN(n)) synCounter = Math.max(synCounter, n+1);
+    }
+  });
+  let mimsTouched = 0;
+  const detachedBarcodes = new Set();
+  entryMims.forEach(m=>{
+    if(isRawPortions(m.descrptn) && m.barcode && !entryIsSyntheticBarcode(m.barcode)){
+      detachedBarcodes.add(m.barcode);
+      m.barcode = `MIMS_${String(synCounter++).padStart(4,'0')}`;
+      m._syn = true;
+      mimsTouched++;
+    }
+  });
+  if(mimsTouched){
+    try{ localStorage.setItem(LS_ENTRY_MIMS, JSON.stringify(entryMims)); }catch(_e){}
+    try{ entryMimsSyncScheduleWrite && setTimeout(()=>entryMimsSyncScheduleWrite(), 200); }catch(_e){}
+  }
+  // Now the lookup side. Anything named "Raw Portions" with a real barcode
+  // is the exact case the user wanted gone; strip the barcode from those.
+  // Also strip barcodes on lookup entries whose stored mimsBarcode matches
+  // one of the real barcodes we just detached from a MIMS row, so a stale
+  // scan-added entry keyed on that real barcode no longer resurfaces Raw
+  // Portions.
+  let lookupTouched = 0;
+  entryLookup.forEach(p=>{
+    const nameHit = isRawPortions(p.name);
+    const bcHit = p.barcode && detachedBarcodes.has(p.barcode);
+    const mimsBcHit = p.mimsBarcode && detachedBarcodes.has(p.mimsBarcode);
+    if((nameHit || bcHit || mimsBcHit) && (p.barcode || p.mimsBarcode)){
+      if(p.barcode){ p.barcode = ''; }
+      if(p.mimsBarcode && detachedBarcodes.has(p.mimsBarcode)){ p.mimsBarcode = ''; }
+      lookupTouched++;
+    }
+  });
+  if(lookupTouched){
+    try{ localStorage.setItem(LS_ENTRY_LOOKUP, JSON.stringify(entryLookup)); }catch(_e){}
+    try{ setTimeout(()=>{ try{ entryLookupSyncScheduleWrite(); }catch(_e){} }, 200); }catch(_e){}
+  }
+  if(mimsTouched || lookupTouched){
+    try{
+      console.info(`[SampleHub] Raw Portions cleanup: detached ${mimsTouched} MIMS row barcode(s), ${lookupTouched} lookup entry barcode(s). Real barcodes removed: ${[...detachedBarcodes].join(', ') || '(none from MIMS)'}`);
+    }catch(_e){}
+  }
 })();
 
 let entryOverrideNum = null;
@@ -5552,10 +5673,20 @@ function entryPopulateInfoPanel(){
   // Colour the retailer name using the shared Line Timeline palette, so
   // "M&S" gets its light-grey oval, Aldi shows blue, Tesco yellow, etc. —
   // matching the search subtitle above and the Line Timeline tab exactly.
+  // Non-M&S retailers also get the .line-cust-badge pill (border + rounded)
+  // so the outline mirrors what Line Timeline shows around each customer
+  // name. M&S already has its own light-grey background pill from
+  // .line-cust-color-ms, so it skips the badge to keep the current look.
   // Retailers not in the palette fall back to plain text.
   if(retailer){
     const cls = entryRetailerColorClass(retailer);
-    retEl.innerHTML = cls ? `<span class="${cls}">${esc(retailer)}</span>` : esc(retailer);
+    if(cls){
+      const useBadge = cls !== 'line-cust-color-ms';
+      const finalCls = useBadge ? ('line-cust-badge ' + cls) : cls;
+      retEl.innerHTML = `<span class="${finalCls}">${esc(retailer)}</span>`;
+    } else {
+      retEl.textContent = retailer;
+    }
   } else {
     retEl.textContent = '—';
   }
@@ -5870,8 +6001,19 @@ function entryCommit(){
   });
   // If no explicit force, use the MIMS row's actual shift (Annually, Trial,
   // Bi Annual, etc.) so the export column is authentic.
-  if(!forcedShift && mimsRow && mimsRow.shift){
-    forcedShift = mimsRow.shift;
+  //
+  // Also: if the MIMS row's actual shift is NON-STANDARD (anything other
+  // than Daily/Weekly/Monthly — e.g. Annually, Quarterly, Bi Annual, Various,
+  // trial, Every house, month names), it wins over the Cat 1/2/3 button.
+  // The card only has three frequency buttons (Daily/Weekly/Monthly), and
+  // there is no "Annually" button — so forcing Weekly on an Annually-only
+  // product would mislabel the export.
+  if(mimsRow && mimsRow.shift){
+    const actualLc = String(mimsRow.shift).trim().toLowerCase();
+    const isStdShift = actualLc === 'daily' || actualLc === 'weekly' || actualLc === 'monthly';
+    if(!forcedShift || (!isStdShift && actualLc !== '' && actualLc !== '.')){
+      forcedShift = mimsRow.shift;
+    }
   }
   const newNums=[];
 
@@ -8145,12 +8287,22 @@ function entryBuildSisRow(r){
     //   no category → use MIMS's own shift (preserves "Annually",
     //                 "Bi Annual", "Every house", "trial", etc.)
     //   MIMS empty or "." → last-resort default "Daily"
+    //
+    // EXCEPTION — non-standard MIMS shifts win over catShift. The card
+    // only offers Daily/Weekly/Monthly buttons; there's no Annually or
+    // Quarterly button. If the MIMS row itself carries a non-standard
+    // frequency (Annually, Bi Annual, Various, Quarterly, trial, Every
+    // house, month names, …), respect it verbatim — the Cat 1/2/3 pick
+    // was just "put this in my scan sequence today", not a real reclassify.
     const catShift = r.cat==='Category 2' ? 'Weekly'
                    : r.cat==='Category 3' ? 'Monthly'
                    : r.cat==='Category 1' ? 'Daily' : '';
     const mimsShift = (mimsRow.shift||'').trim();
-    row.SHIFT = catShift
-              || (mimsShift && mimsShift !== '.' ? mimsShift : 'Daily');
+    const mimsShiftLc = mimsShift.toLowerCase();
+    const isStdMimsShift = mimsShiftLc === 'daily' || mimsShiftLc === 'weekly' || mimsShiftLc === 'monthly';
+    row.SHIFT = (mimsShift && mimsShift !== '.' && !isStdMimsShift)
+              ? mimsShift
+              : (catShift || (mimsShift && mimsShift !== '.' ? mimsShift : 'Daily'));
     row.OTHER_ID=mimsRow.other_id; row.SUITE=mimsRow.suite; row.PRICE=mimsRow.price;
     // Only real barcodes go into the BARCODE column — the MIMS_NNNN internal
     // ids used to key non-barcoded rows must stay out of the exported file.
