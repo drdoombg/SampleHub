@@ -548,7 +548,7 @@
      to be a thumb target, and a clearly-lit on-state so the person knows the
      result list below is scoped to that filter. */
   .entry-squares { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:2px 0 12px; }
-  .entry-square { aspect-ratio:1/1; background:var(--panel-2); border:1px solid var(--line);
+  .entry-square { aspect-ratio:1/1; max-height:180px; background:var(--panel-2); border:1px solid var(--line);
     border-radius:12px; color:var(--ink); cursor:pointer; display:grid; place-items:center;
     font-family:inherit; padding:6px; transition:background .12s, border-color .12s, color .12s; }
   .entry-square:active { background:var(--panel); }
@@ -787,7 +787,7 @@
 <header>
   <div class="title-row">
     <div>
-      <h1>SampleHub</h1>
+      <h1>SampleHub <span style="font-size:11px;font-weight:400;opacity:0.45;vertical-align:middle;letter-spacing:0.03em;">v38.7</span></h1>
       <div class="period-note" id="periodNote"></div>
     </div>
     <button class="icon-btn" id="menuBtn">Menu</button>
@@ -1051,6 +1051,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"></rect><path d="M6 15h4M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01"></path></svg>
       </button>
     </div>
+    <div id="entryMimsCountLive" style="font-size:11px;color:var(--ink-dim);text-align:center;padding:4px 0 6px;"></div>
     <div class="entry-results" id="entryResultsAll"></div>
 
     <!-- Confirm card. Hidden by default; only appears once a scan or a search
@@ -3346,6 +3347,9 @@ function entryMimsMatches(m, q){
 function entryLookupMatches(p, q){ return true; }
 function entrySearchAll(q){
   q = q.trim().toLowerCase();
+  if(q && entryMims.length === 0){
+    console.warn('[SampleHub v38] entrySearchAll: entryMims is EMPTY. Query was:', q);
+  }
   // If a square is active, start from its scoped set.
   // Square results are MIMS rows (or shortcut objects for wizard actions).
   const scoped = entryLookupByCurrentSquare();
@@ -3481,13 +3485,47 @@ function entryResultSubtitle(p){
   return bits.join(' • ');
 }
 function entryRenderAllResults(list){
+  // Live diagnostic: always show MIMS count + result count. Makes it obvious
+  // whether the listener fires and what the data state is.
+  try{
+    const liveEl = document.getElementById('entryMimsCountLive');
+    if(liveEl){
+      const sq = document.getElementById('entrySearchAll');
+      const v1 = sq ? sq.value : '(no elem)';
+      const v2 = sq ? sq.getAttribute('value') : '';
+      const v3 = sq ? sq.textContent : '';
+      liveEl.textContent = `MIMS:${entryMims.length} val="${v1}" fires:${window.__searchFireCount||0} last:${window.__lastFireEvent||'?'} results:${list.length}`;
+    }
+  }catch(_e){}
   const el=document.getElementById('entryResultsAll');
-  if(!list.length){ el.innerHTML=''; el._list=[]; return; }
+  if(!list.length){
+    // Show a visible reason when results are empty, so the user knows why
+    // instead of staring at a blank list.
+    const sq = document.getElementById('entrySearchAll');
+    const q = sq ? sq.value.trim() : '';
+    if(entryMims.length === 0){
+      el.innerHTML = '<div style="padding:16px;color:var(--ink-dim);font-size:13px;text-align:center;">No MIMS loaded. Go to Settings → Reference and upload MIMS_SAVE_FILE.xls.</div>';
+    } else if(q){
+      el.innerHTML = `<div style="padding:16px;color:var(--ink-dim);font-size:13px;text-align:center;">No matches for "${esc(q)}" in ${entryMims.length} MIMS rows.</div>`;
+    } else {
+      el.innerHTML = '';
+    }
+    el._list=[];
+    // Scroll the results/message into view — on desktop the squares can push
+    // the results off the bottom of the viewport, so the user never sees them
+    // without manually scrolling. This applies to both the empty state and
+    // any actual results (see below).
+    if(el.innerHTML) try{ el.scrollIntoView({block:'nearest', behavior:'smooth'}); }catch(_e){}
+    return;
+  }
   el.innerHTML=list.map((item,i)=>{
-    // item is a MIMS row or a shortcut object (has .action)
+    // item is a MIMS row (has .descrptn key), a shortcut object (has .action),
+    // or an already-converted p-object from a swab shortcut resolve() (has .name, no .descrptn key).
     const isShortcut = !!item.action;
+    const isMimsRow = !isShortcut && ('descrptn' in item);
     const name = isShortcut ? item.name :
-      ((item.descrptn && item.descrptn.trim()) || item.material || item.unit || item.name || '(unnamed)');
+      isMimsRow ? ((item.descrptn && item.descrptn.trim()) || item.material || item.unit || '(unnamed)') :
+      (item.name || '(unnamed)'); // p-object from resolve()
     const bc = isShortcut ? '' : (item.barcode && !entryIsSyntheticBarcode(item.barcode) ? item.barcode : '');
     return `
     <div class="entry-result-row" data-idx="${i}">
@@ -3499,17 +3537,61 @@ function entryRenderAllResults(list){
     </div>`;
   }).join('');
   el._list=list;
+  // Scroll results into view — desktop widescreen viewports can push the
+  // results area off the bottom of the screen when the squares grid takes
+  // full width (aspect-ratio 1/1 makes each square as tall as it is wide).
+  try{ el.scrollIntoView({block:'nearest', behavior:'smooth'}); }catch(_e){}
 }
-document.getElementById('entrySearchAll').addEventListener('input', e=>{
-  entryRenderAllResults(entrySearchAll(e.target.value));
-});
-document.getElementById('entrySearchAll').addEventListener('keydown', e=>{
-  if(e.key==='Enter'){
-    const v=e.target.value.trim();
-    const exact=entryMims.find(m=>m.barcode===v && !entryIsSyntheticBarcode(m.barcode));
-    if(exact) entryOpenConfirm(entryMimsToP(exact));
-  }
-});
+// Robust search input handling: some Android WebViews (Amaze File Manager
+// content:// origin, in-app browsers) don't reliably fire the 'input' event
+// on every keystroke, or e.target.value is stale. Listen to a broader set
+// and always read directly from the DOM to get the current text.
+(function(){
+  const sq = document.getElementById('entrySearchAll');
+  window.__searchFireCount = 0;
+  window.__lastFireEvent = 'none';
+  const doFire = (evType) => {
+    const v = sq.value || '';
+    window.__lastFireEvent = evType + ' val=' + v.length;
+    entryRenderAllResults(entrySearchAll(v));
+  };
+  const fireSearch = (ev) => {
+    window.__searchFireCount++;
+    const evType = ev && ev.type || 'manual';
+    // textInput and beforeinput fire BEFORE the DOM value updates.
+    // Defer the read by one animation frame so we see the committed value.
+    if(evType === 'textInput' || evType === 'beforeinput'){
+      requestAnimationFrame(() => doFire(evType));
+    } else {
+      doFire(evType);
+    }
+  };
+  ['input','change','keyup','paste','compositionend','beforeinput','textInput'].forEach(ev =>
+    sq.addEventListener(ev, fireSearch)
+  );
+  // Fallback: poll the input value every 300ms while focused. If value changes,
+  // run search. This works even if no events fire.
+  let lastPolled = '';
+  setInterval(()=>{
+    if(document.activeElement === sq){
+      // Try multiple ways to read the value — Amaze WebView content:// breaks .value
+      const v = sq.value || sq.getAttribute('value') || sq.textContent || sq.innerText || '';
+      const selEnd = sq.selectionEnd || 0;
+      window.__lastFireEvent = `poll v=${v.length} sel=${selEnd}`;
+      if(v !== lastPolled){
+        lastPolled = v;
+        fireSearch({type:'poll'});
+      }
+    }
+  }, 300);
+  sq.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){
+      const v = (sq.value||'').trim();
+      const exact = entryMims.find(m=>m.barcode===v && !entryIsSyntheticBarcode(m.barcode));
+      if(exact) entryOpenConfirm(entryMimsToP(exact));
+    }
+  });
+})();
 document.getElementById('entryResultsAll').addEventListener('click', e=>{
   const row=e.target.closest('.entry-result-row'); if(!row) return;
   const list=document.getElementById('entryResultsAll')._list;
@@ -3524,7 +3606,12 @@ document.getElementById('entryResultsAll').addEventListener('click', e=>{
   if(rawPicked.action === 'shelfLifeBundle'){ entryShelfLifeBundleOpen(); return; }
   if(rawPicked.action === 'rawPortions'){ entryRawPortionsOpen(); return; }
   // Convert MIMS row to p-shape for all downstream functions.
-  const picked = rawPicked.source === 'shortcut' ? rawPicked : entryMimsToP(rawPicked);
+  // rawPicked may be: (a) a shortcut object, (b) a raw MIMS row (has .descrptn key),
+  // or (c) already a p-object from a swab shortcut resolve() call (has .name, no .descrptn key).
+  // Only call entryMimsToP on actual MIMS rows — p-objects are already converted.
+  const picked = rawPicked.source === 'shortcut' ? rawPicked :
+                 ('descrptn' in rawPicked) ? entryMimsToP(rawPicked) :
+                 rawPicked; // already a p-object from resolve()
   // Amber items (except Amber Skin) are "tap and add" — a single tap adds
   // one record directly to the sequence with no confirm card. Amber Skin
   // still goes through the quick-count flow so the person can request 4
@@ -6516,6 +6603,14 @@ function entrySwitchSubTab(tab){
   document.getElementById('entryPaneReference').classList.toggle('hidden', tab!=='reference');
   if(tab==='records') renderEntryRecordsView();
   if(tab==='reference') renderEntryLookupResults(entrySearchLookup(document.getElementById('entryLookupSearch').value));
+  if(tab==='scan'){
+    // Re-run the search so results are always fresh when returning to the scan pane.
+    // Covers: coming back from Reference after uploading MIMS, returning from Records, etc.
+    try{
+      const sq = document.getElementById('entrySearchAll');
+      if(sq) entryRenderAllResults(entrySearchAll(sq.value));
+    }catch(_e){}
+  }
 }
 document.getElementById('entrySubScan').addEventListener('click', ()=>entrySwitchSubTab('scan'));
 document.getElementById('entrySubRecords').addEventListener('click', ()=>entrySwitchSubTab('records'));
@@ -7185,7 +7280,21 @@ function renderEntryAll(){
     entryShowNoMimsBanner();
   }
 }
-function renderEntry(){ renderEntryAll(); }  // kept as the app's init hook name
+function renderEntry(){
+  renderEntryAll();
+  try{
+    const liveEl = document.getElementById('entryMimsCountLive');
+    if(liveEl) liveEl.textContent = `MIMS: ${entryMims.length} rows loaded`;
+  }catch(_e){}
+  // Re-fire search on init so any pre-loaded MIMS (from localStorage) immediately
+  // populates results if a query is present. Also populates active square scoped lists.
+  try{
+    const sq = document.getElementById('entrySearchAll');
+    if(sq && (sq.value.trim() || typeof entryActiveSquare === 'string' && entryActiveSquare)){
+      entryRenderAllResults(entrySearchAll(sq.value));
+    }
+  }catch(_e){}
+}
 
 /* ---------- export: exact SIS_Micro_Sub schema, values as TEXT ---------- */
 function entryFmtDateUK(d){ const x=new Date(d); const p=n=>String(n).padStart(2,'0');
@@ -7692,7 +7801,8 @@ document.getElementById('entryFileMims').addEventListener('change', async e=>{
         order:r.ORDER||'', batch:r.BATCH||'', eol:r.EOL||'', use_by:r.USE_BY||'',
         supplier:r.SUPPLIER||'', comms:r.COMMS||'', location:r.LOCATION||'',
         period:r.PERIOD||'', client:r.CLIENT||'',
-        conditions:r.CONDITIONS||'', flock_no:r.FLOCK_NO||'',
+        conditions:r.CONDITIONS||'',
+        manufdate:r.MANUFDATE||'', flock_no:r.FLOCK_NO||'',
         farm_no:r.FARM_NO||'', pen_no:r.PEN_NO||'', shed_no:r.SHED_NO||'',
         lot_no:r.LOT_NO||'', lorry_no:r.LORRY_NO||'', load_no:r.LOAD_NO||''
       };
@@ -7710,6 +7820,12 @@ document.getElementById('entryFileMims').addEventListener('change', async e=>{
 
     // REPLACE — not merge. The uploaded file is the new ground truth.
     entryMims = nextMims;
+    console.info('[SampleHub v38] MIMS upload:', {
+      totalRows: nextMims.length,
+      realBarcodes: realCount,
+      firstRow: nextMims[0],
+      sampleDescrpton: nextMims.slice(0,3).map(r => r.descrptn)
+    });
     entrySaveMims();
     // Invalidate the dup-name cache so search subtitles rebuild.
     entryDupNameSet = null;
@@ -7738,6 +7854,13 @@ document.getElementById('entryFileMims').addEventListener('change', async e=>{
 
     statusEl.textContent = `Loaded ${f.name}: ${nextMims.length} rows (${realCount} with real barcodes). Synced to all devices.`;
     if(entrySubTab==='records' && entryRecordsView==='export') renderEntryExportView();
+    // Re-run the search so the scan pane immediately reflects the loaded MIMS.
+    // If the user had typed a query before uploading, results now populate.
+    // If no query and a square is active, the square's scoped list refreshes too.
+    try{
+      const sq = document.getElementById('entrySearchAll');
+      if(sq) entryRenderAllResults(entrySearchAll(sq.value));
+    }catch(_e){}
   }catch(err){
     console.error('MIMS upload failed', err);
     statusEl.textContent='Could not read that file — check it is a valid MIMS_SAVE_FILE.xls';
@@ -7887,6 +8010,10 @@ function entryMimsSyncScheduleWrite(){
   }, 700);
 }
 function entryMimsSyncApplyRemote(remoteMims){
+  // V37+: MIMS is now distributed via mimsFile/current Firestore doc (uploaded by user).
+  // The individual-row sync path (this function) was for the old seed-sync and is now
+  // disabled to prevent old Firestore rows from polluting a freshly uploaded MIMS.
+  return;
   if(!Array.isArray(remoteMims)) return;
   entryMimsSyncApplyingRemote=true;
   try{
@@ -7965,6 +8092,7 @@ async function entryMimsFileFirestoreLoad(circleId){
       document.getElementById('entryMimsStatus').textContent =
         `MIMS loaded from cloud: ${entryMims.length} rows (uploaded ${data.uploadedAt ? data.uploadedAt.slice(0,10) : 'unknown date'} by ${data.uploadedBy||'unknown'}).`;
       renderEntryAll();
+      try{ const sq=document.getElementById('entrySearchAll'); if(sq) entryRenderAllResults(entrySearchAll(sq.value)); }catch(_e){}
     } else {
       entryShowNoMimsBanner();
     }
@@ -7975,6 +8103,13 @@ function entryShowNoMimsBanner(){
   document.getElementById('entryMimsStatus').textContent =
     'No MIMS loaded — upload MIMS_SAVE_FILE in the Reference tab to begin.';
 }
+
+// V37+ seed-clear migration REMOVED (v38). It was wiping legitimately uploaded MIMS
+// on subsequent loads because the heuristic (checking for 'manufdate' field) could
+// misfire if the field wasn't present on rows from earlier v37 uploads. Since
+// MIMS_SEED is now []/empty, whatever is in entryMims is user data — never wipe it.
+// If entryMims is empty, entryShowNoMimsBanner is shown by renderEntryAll.
+
 
 document.getElementById('entrySamplerName').addEventListener('input', e=>{
   localStorage.setItem('unified.samplerName', e.target.value.trim());
