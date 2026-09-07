@@ -8333,12 +8333,10 @@ function entryExportEditCell(num, h, initial){
         const t = grid[nr][nc];
         entryExportSetFocus(t.num, t.h);
         // Auto-re-enter edit mode on the new cell so the person can keep
-        // typing without another tap. This is what makes rapid data entry
-        // work on mobile (keyboard stays open) and matches Excel Mobile.
-        // Skip the auto-edit only if the moved-to cell isn't editable
-        // (shouldn't happen with the current schema — every cell is
-        // editable — but defensive).
-        entryExportEditCell(t.num, t.h);
+        // typing without another tap. Use setTimeout so the DOM has settled
+        // after renderEntryExportView() — on mobile this keeps the keyboard
+        // open instead of letting the OS dismiss it between elements.
+        setTimeout(()=>{ entryExportEditCell(t.num, t.h); }, 0);
       }
     } else {
       // Blur / Escape: keep focus on the same cell.
