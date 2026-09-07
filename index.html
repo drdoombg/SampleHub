@@ -8282,7 +8282,6 @@ function entryExportEditCell(num, h, initial){
   let _navCommitting = false;
   const commit = (save, moveDir)=>{
     if(!entryExportEditing) return;
-    entryExportEditing = false;
     const v = input.value;
     if(save){
       if(!rec.manualCellOverrides) rec.manualCellOverrides = {};
@@ -8311,8 +8310,12 @@ function entryExportEditCell(num, h, initial){
       }
       entrySaveLocal();
     }
-    renderEntryExportView();
     if(moveDir){
+      // KEYBOARD FIX: skip re-render during navigation so the DOM stays
+      // intact and the keyboard never dismisses. Just update the current
+      // cell's text in-place, open the next cell's input directly.
+      // Full re-render happens on blur (when user taps away).
+      td.textContent = v;
       const grid = entryExportGrid();
       let ri=-1, ci=-1;
       for(let i=0;i<grid.length;i++){
@@ -8327,10 +8330,13 @@ function entryExportEditCell(num, h, initial){
         const t=grid[nr][nc];
         entryExportSetFocus(t.num,t.h);
         entryExportEditCell(t.num,t.h);
+        return; // keyboard stays — no re-render
       }
-    } else {
-      entryExportSetFocus(num, h);
     }
+    // Blur / Escape / no next cell: now safe to fully re-render
+    entryExportEditing = false;
+    renderEntryExportView();
+    entryExportSetFocus(num, h);
   };
   input.addEventListener('keydown', ev=>{
     if(ev.key === 'Enter'){
