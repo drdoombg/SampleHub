@@ -8275,55 +8275,49 @@ function entryExportEditCell(num, h, initial){
   if(initial === undefined){
     input.select();
   } else {
-    // With a prefilled character the caret should be at the end so the next
-    // keystroke appends, matching Excel's "type-to-replace" behaviour.
     const l = input.value.length;
     input.setSelectionRange(l, l);
   }
-  let _cellNum = num, _cellH = h, _cellRec = entryRecords.find(r => r.num === num);
-
-  const saveCell = (cellRec, cellH, v) => {
-    if(!cellRec) return;
-    if(!cellRec.manualCellOverrides) cellRec.manualCellOverrides = {};
-    if(v === ''){
-      delete cellRec.manualCellOverrides[cellH];
-      if(Object.keys(cellRec.manualCellOverrides).length === 0) delete cellRec.manualCellOverrides;
-    } else {
-      cellRec.manualCellOverrides[cellH] = v;
-    }
-    if(cellH === 'KILLDATE'){
-      const km = String(v||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-      if(km){
-        const kd = new Date(+km[3], +km[2]-1, +km[1]);
-        if(!isNaN(kd)){
-          const jk = cellRec.mimsBarcode || cellRec.barcode;
-          let mr = jk ? entryMimsRowFor(jk) : (cellRec.mimsRow||null);
-          if(!mr) mr = entryFindMimsByContext(cellRec);
-          const ub = entryComputeUseByDays(cellRec, mr);
-          if(ub !== null){
-            const ud = new Date(kd); ud.setDate(ud.getDate()+ub);
-            if(!cellRec.manualCellOverrides) cellRec.manualCellOverrides = {};
-            cellRec.manualCellOverrides.USE_BY = entryFmtDateUK(ud);
+  // Mobile: guard against spurious blur firing during keyboard navigation
+  let _navCommitting = false;
+  const commit = (save, moveDir)=>{
+    if(!entryExportEditing) return;
+    entryExportEditing = false;
+    const v = input.value;
+    if(save){
+      if(!rec.manualCellOverrides) rec.manualCellOverrides = {};
+      if(v === ''){
+        delete rec.manualCellOverrides[h];
+        if(Object.keys(rec.manualCellOverrides).length === 0) delete rec.manualCellOverrides;
+      } else {
+        rec.manualCellOverrides[h] = v;
+      }
+      if(h === 'KILLDATE'){
+        const km = String(v||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if(km){
+          const killDate = new Date(+km[3], +km[2]-1, +km[1]);
+          if(!isNaN(killDate)){
+            const jk = rec.mimsBarcode || rec.barcode;
+            let mr = jk ? entryMimsRowFor(jk) : (rec.mimsRow||null);
+            if(!mr) mr = entryFindMimsByContext(rec);
+            const ub = entryComputeUseByDays(rec, mr);
+            if(ub !== null){
+              const ud = new Date(killDate); ud.setDate(ud.getDate()+ub);
+              if(!rec.manualCellOverrides) rec.manualCellOverrides = {};
+              rec.manualCellOverrides.USE_BY = entryFmtDateUK(ud);
+            }
           }
         }
       }
+      entrySaveLocal();
     }
-    entrySaveLocal();
-  };
-
-  const commit = (save, moveDir)=>{
-    if(!entryExportEditing) return;
-    const v = input.value;
-    if(save) saveCell(_cellRec, _cellH, v);
-
+    renderEntryExportView();
     if(moveDir){
-      // MOBILE KEYBOARD: relocate the same <input> to the next cell.
-      // No new element created = no focus event = keyboard stays open.
       const grid = entryExportGrid();
-      let ri = -1, ci = -1;
+      let ri=-1, ci=-1;
       for(let i=0;i<grid.length;i++){
         for(let j=0;j<grid[i].length;j++){
-          if(grid[i][j].num===_cellNum && grid[i][j].h===_cellH){ri=i;ci=j;break;}
+          if(grid[i][j].num===num && grid[i][j].h===h){ri=i;ci=j;break;}
         }
         if(ri>=0) break;
       }
@@ -8331,51 +8325,13 @@ function entryExportEditCell(num, h, initial){
         const nr=Math.max(0,Math.min(grid.length-1,ri+moveDir.dr));
         const nc=Math.max(0,Math.min(grid[nr].length-1,ci+moveDir.dc));
         const t=grid[nr][nc];
-        const nextTd=document.querySelector(
-          '#entryExportTable td[data-num="'+t.num+'"][data-h="'+CSS.escape(t.h)+'"]');
-        if(nextTd){
-          const nextRec=entryRecords.find(r=>r.num===t.num);
-          // Restore current cell to text (inline, no full re-render)
-          const curTd=document.querySelector(
-            '#entryExportTable td[data-num="'+_cellNum+'"][data-h="'+CSS.escape(_cellH)+'"]');
-          if(curTd){
-            curTd.textContent=v;
-            const isFilled=!!v&&!entryExportCellIsPlaceholder(v);
-            curTd.className=isFilled?'entry-export-manual-filled':(entryExportCellIsPlaceholder(v)?'entry-export-manual-empty':'');
-            curTd.dataset.num=String(_cellNum); curTd.dataset.h=_cellH;
-          }
-          // Move input into next cell — set _navCommitting so the blur
-          // triggered by the DOM relocation doesn't fire a spurious commit.
-          _navCommitting=true;
-          const nextVal=nextTd.textContent;
-          nextTd.innerHTML='';
-          nextTd.appendChild(input);
-          _navCommitting=false;
-          input.value=nextVal;
-          input.select();
-          nextTd.classList.add('entry-export-focused');
-          // Update tracked cell
-          entryExportFocus={num:t.num,h:t.h};
-          _cellNum=t.num; _cellH=t.h; _cellRec=nextRec||_cellRec;
-          // Deferred sync render (updates colours, totals) — won't fire if still typing
-          clearTimeout(entryExportRenderTimer);
-          entryExportRenderTimer=setTimeout(()=>{
-            if(entryExportEditing) return; // still editing, skip
-            renderEntryExportView();
-            entryExportSetFocus(entryExportFocus?entryExportFocus.num:0, entryExportFocus?entryExportFocus.h:'');
-          },1200);
-          return;
-        }
+        entryExportSetFocus(t.num,t.h);
+        entryExportEditCell(t.num,t.h);
       }
+    } else {
+      entryExportSetFocus(num, h);
     }
-    // Blur / Escape / no next cell — full render
-    entryExportEditing=false;
-    renderEntryExportView();
-    entryExportSetFocus(_cellNum, _cellH);
   };
-  // Mobile: blur fires after Enter/Tab re-renders DOM (old input loses focus).
-  // _navCommitting prevents a double-commit from that spurious blur.
-  let _navCommitting = false;
   input.addEventListener('keydown', ev=>{
     if(ev.key === 'Enter'){
       ev.preventDefault();
