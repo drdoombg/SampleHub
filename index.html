@@ -780,6 +780,8 @@
   .entry-or-divider { display:flex; align-items:center; gap:10px; margin:14px 0 10px;
     color:var(--ink-dim); font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; }
   .entry-or-divider::before, .entry-or-divider::after { content:''; flex:1; height:1px; background:var(--line); }
+  div.entry-search:empty:before { content:attr(data-placeholder); color:var(--ink-dim); pointer-events:none; }
+  div.entry-search:focus { border-color:var(--accent); outline:none; }
 </style>
 </head>
 <body>
@@ -787,7 +789,7 @@
 <header>
   <div class="title-row">
     <div>
-      <h1>SampleHub <span style="font-size:11px;font-weight:400;opacity:0.45;vertical-align:middle;letter-spacing:0.03em;">v38.10</span></h1>
+      <h1>SampleHub <span style="font-size:11px;font-weight:400;opacity:0.45;vertical-align:middle;letter-spacing:0.03em;">v38.11</span></h1>
       <div class="period-note" id="periodNote"></div>
     </div>
     <button class="icon-btn" id="menuBtn">Menu</button>
@@ -1027,7 +1029,7 @@
     <div id="entryScanIdleCard">
       <button class="btn primary" id="entryBtnCam" style="width:100%; height:64px; font-size:16px;">Start camera</button>
       <div id="entrySearchDiag" style="font-size:11px;color:var(--ink-dim);padding:2px 4px;min-height:16px;"></div>
-      <input id="entrySearchAll" class="entry-search" placeholder="Search Barcode or Name" autocomplete="new-password" style="width:100%; height:64px; margin-top:10px; font-size:16px;" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true">
+      <div id="entrySearchAll" contenteditable="true" role="textbox" aria-label="Search Barcode or Name" class="entry-search" style="width:100%; height:64px; margin-top:10px; font-size:16px; line-height:64px; padding:0 12px; box-sizing:border-box; overflow:hidden; white-space:nowrap; cursor:text;" data-placeholder="Search Barcode or Name"></div>
       <!-- Four quick-action squares. Tapping one filters the results list
            below to just that category / curated shortcut set; tapping it
            again clears the filter. State lives in entryActiveSquare. -->
@@ -3501,8 +3503,7 @@ function entryRenderAllResults(list){
   if(!list.length){
     // Show a visible reason when results are empty, so the user knows why
     // instead of staring at a blank list.
-    const sq = document.getElementById('entrySearchAll');
-    const q = sq ? sq.value.trim() : '';
+    const q = entryGetSearchText();
     if(entryMims.length === 0){
       el.innerHTML = '<div style="padding:16px;color:var(--ink-dim);font-size:13px;text-align:center;">No MIMS loaded. Go to Settings → Reference and upload MIMS_SAVE_FILE.xls.</div>';
     } else if(q){
@@ -3542,21 +3543,40 @@ function entryRenderAllResults(list){
   // full width (aspect-ratio 1/1 makes each square as tall as it is wide).
   try{ el.scrollIntoView({block:'nearest', behavior:'smooth'}); }catch(_e){}
 }
-document.getElementById('entrySearchAll').addEventListener('input', e=>{
-  const v = e.target.value;
-  const results = entrySearchAll(v);
-  entryRenderAllResults(results);
-  // Minimal inline diagnostic — single line, always visible
+// Helper: read search text from contenteditable div (or input as fallback)
+function entryGetSearchText(){
+  const el = document.getElementById('entrySearchAll');
+  if(!el) return '';
+  return (el.value !== undefined ? el.value : (el.textContent || el.innerText || '')).trim();
+}
+// Helper: set search text
+function entrySetSearchText(v){
+  const el = document.getElementById('entrySearchAll');
+  if(!el) return;
+  if(el.value !== undefined) el.value = v;
+  else el.textContent = v;
+}
+// Search: contenteditable div — read textContent (works where .value breaks)
+(function(){
+  const sq = document.getElementById('entrySearchAll');
   const diag = document.getElementById('entrySearchDiag');
-  if(diag) diag.textContent = `"${v}" → ${results.length} results (MIMS:${entryMims.length})`;
-});
-document.getElementById('entrySearchAll').addEventListener('keydown', e=>{
-  if(e.key==='Enter'){
-    const v=e.target.value.trim();
-    const exact=entryMims.find(m=>m.barcode===v && !entryIsSyntheticBarcode(m.barcode));
-    if(exact) entryOpenConfirm(entryMimsToP(exact));
-  }
-});
+  const fire = () => {
+    const v = (sq.textContent || sq.innerText || '').trim();
+    const results = entrySearchAll(v);
+    entryRenderAllResults(results);
+    if(diag) diag.textContent = v ? `"${v}" → ${results.length} of ${entryMims.length}` : '';
+  };
+  sq.addEventListener('input', fire);
+  sq.addEventListener('keyup', fire);
+  sq.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){
+      e.preventDefault();
+      const v = (sq.textContent || sq.innerText || '').trim();
+      const exact = entryMims.find(m=>m.barcode===v && !entryIsSyntheticBarcode(m.barcode));
+      if(exact) entryOpenConfirm(entryMimsToP(exact));
+    }
+  });
+})();
 document.getElementById('entryResultsAll').addEventListener('click', e=>{
   const row=e.target.closest('.entry-result-row'); if(!row) return;
   const list=document.getElementById('entryResultsAll')._list;
@@ -3635,7 +3655,7 @@ document.getElementById('entrySquares').addEventListener('click', e=>{
   });
   // Re-run the search with whatever's already in the input; when the input
   // is empty and a square is active, the scoped set shows in full.
-  const q = document.getElementById('entrySearchAll').value;
+  const q = entryGetSearchText();
   entryRenderAllResults(entrySearchAll(q));
 });
 
@@ -4649,7 +4669,7 @@ function entryTapAddOne(p){
   entrySaveLocal();
   // Clear the search bar so consecutive taps on different amber items
   // don't require re-typing. Results list stays scoped to the amber square.
-  document.getElementById('entrySearchAll').value = '';
+  entrySetSearchText('');
   renderEntryAll();
   try{ entryFlashToast(`Added #${n}: ${p.name}`); }catch(_e){}
 }
@@ -5411,7 +5431,7 @@ function entryCommit(){
   const followUpPackagingCustomer = !!entryPending.needsPackagingCustomerFlow;
   entryPending=null;
   document.getElementById('entryConfirmCard').classList.add('hidden');
-  document.getElementById('entrySearchAll').value='';
+  entrySetSearchText('');
   document.getElementById('entryResultsAll').innerHTML='';
   if(followUpBatch){ entryStartBatchLoop(newNums); return; }
   if(followUpComms){
@@ -6573,7 +6593,7 @@ function entrySwitchSubTab(tab){
     // Covers: coming back from Reference after uploading MIMS, returning from Records, etc.
     try{
       const sq = document.getElementById('entrySearchAll');
-      if(sq) entryRenderAllResults(entrySearchAll(sq.value));
+      entryRenderAllResults(entrySearchAll(entryGetSearchText()));
     }catch(_e){}
   }
 }
@@ -7255,7 +7275,7 @@ function renderEntry(){
     entrySearchInitDone = true;
     try{
       const sq = document.getElementById('entrySearchAll');
-      if(sq && sq.value) entryRenderAllResults(entrySearchAll(sq.value));
+      if(entryGetSearchText()) entryRenderAllResults(entrySearchAll(entryGetSearchText()));
     }catch(_e){}
   }
 }
@@ -7823,7 +7843,7 @@ document.getElementById('entryFileMims').addEventListener('change', async e=>{
     // If no query and a square is active, the square's scoped list refreshes too.
     try{
       const sq = document.getElementById('entrySearchAll');
-      if(sq) entryRenderAllResults(entrySearchAll(sq.value));
+      entryRenderAllResults(entrySearchAll(entryGetSearchText()));
     }catch(_e){}
   }catch(err){
     console.error('MIMS upload failed', err);
@@ -8056,7 +8076,7 @@ async function entryMimsFileFirestoreLoad(circleId){
       document.getElementById('entryMimsStatus').textContent =
         `MIMS loaded from cloud: ${entryMims.length} rows (uploaded ${data.uploadedAt ? data.uploadedAt.slice(0,10) : 'unknown date'} by ${data.uploadedBy||'unknown'}).`;
       renderEntryAll();
-      try{ const sq=document.getElementById('entrySearchAll'); if(sq) entryRenderAllResults(entrySearchAll(sq.value)); }catch(_e){}
+      try{ const sq=document.getElementById('entrySearchAll'); entryRenderAllResults(entrySearchAll(entryGetSearchText())); }catch(_e){}
     } else {
       entryShowNoMimsBanner();
     }
