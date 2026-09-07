@@ -787,7 +787,7 @@
 <header>
   <div class="title-row">
     <div>
-      <h1>SampleHub <span style="font-size:11px;font-weight:400;opacity:0.45;vertical-align:middle;letter-spacing:0.03em;">v38.8</span></h1>
+      <h1>SampleHub <span style="font-size:11px;font-weight:400;opacity:0.45;vertical-align:middle;letter-spacing:0.03em;">v38.9</span></h1>
       <div class="period-note" id="periodNote"></div>
     </div>
     <button class="icon-btn" id="menuBtn">Menu</button>
@@ -1051,7 +1051,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"></rect><path d="M6 15h4M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01"></path></svg>
       </button>
     </div>
-    <div id="entryMimsCountLive" style="font-size:11px;color:var(--ink-dim);text-align:center;padding:4px 0 6px;"></div>
     <div class="entry-results" id="entryResultsAll"></div>
 
     <!-- Confirm card. Hidden by default; only appears once a scan or a search
@@ -3494,7 +3493,7 @@ function entryRenderAllResults(list){
       const v1 = sq ? sq.value : '(no elem)';
       const v2 = sq ? sq.getAttribute('value') : '';
       const v3 = sq ? sq.textContent : '';
-      liveEl.textContent = `MIMS:${entryMims.length} val="${v1}" fires:${window.__searchFireCount||0} last:${window.__lastFireEvent||'?'} results:${list.length}`;
+
     }
   }catch(_e){}
   const el=document.getElementById('entryResultsAll');
@@ -3542,56 +3541,16 @@ function entryRenderAllResults(list){
   // full width (aspect-ratio 1/1 makes each square as tall as it is wide).
   try{ el.scrollIntoView({block:'nearest', behavior:'smooth'}); }catch(_e){}
 }
-// Robust search input handling: some Android WebViews (Amaze File Manager
-// content:// origin, in-app browsers) don't reliably fire the 'input' event
-// on every keystroke, or e.target.value is stale. Listen to a broader set
-// and always read directly from the DOM to get the current text.
-(function(){
-  const sq = document.getElementById('entrySearchAll');
-  window.__searchFireCount = 0;
-  window.__lastFireEvent = 'none';
-  const doFire = (evType) => {
-    const v = sq.value || '';
-    window.__lastFireEvent = evType + ' val=' + v.length;
-    entryRenderAllResults(entrySearchAll(v));
-  };
-  const fireSearch = (ev) => {
-    window.__searchFireCount++;
-    const evType = ev && ev.type || 'manual';
-    // textInput and beforeinput fire BEFORE the DOM value updates.
-    // Defer the read by one animation frame so we see the committed value.
-    if(evType === 'textInput' || evType === 'beforeinput'){
-      requestAnimationFrame(() => doFire(evType));
-    } else {
-      doFire(evType);
-    }
-  };
-  ['input','change','keyup','paste','compositionend','beforeinput','textInput','focus'].forEach(ev =>
-    sq.addEventListener(ev, fireSearch)
-  );
-  // Fallback: poll the input value every 300ms while focused. If value changes,
-  // run search. This works even if no events fire.
-  let lastPolled = '';
-  setInterval(()=>{
-    if(document.activeElement === sq){
-      // Try multiple ways to read the value — Amaze WebView content:// breaks .value
-      const v = sq.value || sq.getAttribute('value') || sq.textContent || sq.innerText || '';
-      const selEnd = sq.selectionEnd || 0;
-      window.__lastFireEvent = `poll v=${v.length} sel=${selEnd}`;
-      if(v !== lastPolled){
-        lastPolled = v;
-        fireSearch({type:'poll'});
-      }
-    }
-  }, 300);
-  sq.addEventListener('keydown', e=>{
-    if(e.key==='Enter'){
-      const v = (sq.value||'').trim();
-      const exact = entryMims.find(m=>m.barcode===v && !entryIsSyntheticBarcode(m.barcode));
-      if(exact) entryOpenConfirm(entryMimsToP(exact));
-    }
-  });
-})();
+document.getElementById('entrySearchAll').addEventListener('input', e=>{
+  entryRenderAllResults(entrySearchAll(e.target.value));
+});
+document.getElementById('entrySearchAll').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){
+    const v=e.target.value.trim();
+    const exact=entryMims.find(m=>m.barcode===v && !entryIsSyntheticBarcode(m.barcode));
+    if(exact) entryOpenConfirm(entryMimsToP(exact));
+  }
+});
 document.getElementById('entryResultsAll').addEventListener('click', e=>{
   const row=e.target.closest('.entry-result-row'); if(!row) return;
   const list=document.getElementById('entryResultsAll')._list;
@@ -7280,18 +7239,19 @@ function renderEntryAll(){
     entryShowNoMimsBanner();
   }
 }
+let entrySearchInitDone = false;
 function renderEntry(){
   renderEntryAll();
-  try{
-    const liveEl = document.getElementById('entryMimsCountLive');
-    if(liveEl) liveEl.textContent = `MIMS: ${entryMims.length} rows loaded`;
-  }catch(_e){}
-  // Read whatever is in the search box — catches browser form-restore and autofill
-  // that populates the field silently without firing input events.
-  try{
-    const sq = document.getElementById('entrySearchAll');
-    if(sq) entryRenderAllResults(entrySearchAll(sq.value || ''));
-  }catch(_e){}
+  // On first call only: read the search box value (catches browser form-restore).
+  // After that, the input event listener handles all search updates.
+  // We must NOT re-fire on every renderEntryAll call or it clears typed results.
+  if(!entrySearchInitDone){
+    entrySearchInitDone = true;
+    try{
+      const sq = document.getElementById('entrySearchAll');
+      if(sq && sq.value) entryRenderAllResults(entrySearchAll(sq.value));
+    }catch(_e){}
+  }
 }
 
 /* ---------- export: exact SIS_Micro_Sub schema, values as TEXT ---------- */
