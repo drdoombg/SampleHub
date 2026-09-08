@@ -4507,6 +4507,7 @@ function entryLookupByCurrentSquare(){
     return [
       { id:'sq_nutri_bundle', name:'Nutritional Bundle', barcode:'', mimsBarcode:'', product:'Product', cat:'Category 1', source:'shortcut', action:'nutritionalBundle', _shortcutLabel:'Nutritional Bundle' },
       { id:'sq_shelflife_bundle', name:'Shelf Life Bundle', barcode:'', mimsBarcode:'', product:'Product', cat:'Category 1', source:'shortcut', action:'shelfLifeBundle', _shortcutLabel:'Shelf Life Bundle' },
+      { id:'sq_external_intake', name:'External Intake', barcode:'MIMS_0002', mimsBarcode:'MIMS_0002', product:'Intake', cat:'Category 1', source:'shortcut', action:'externalIntake', _shortcutLabel:'External Intake' },
       { id:'sq_raw_portions', name:'Raw Portions', barcode:'', mimsBarcode:'', product:'Product', cat:'Category 1', source:'shortcut', action:'rawPortions', _shortcutLabel:'Raw Portions' },
       { id:'sq_pmd_wholebirds', name:'PMD Wholebirds', barcode:'MIMS_0018', mimsBarcode:'MIMS_0018', product:'Prep', cat:'Category 1', source:'shortcut', action:'pmdWholebirds', _shortcutLabel:'PMD Wholebirds' }
     ];
@@ -4639,6 +4640,7 @@ function entryResultSubtitle(p){
   if(p.action === 'nightHygiene') return 'Environmental swabs by LINE · opens picker';
   if(p.action === 'rawPortions') return 'Daily raw portions · opens wizard';
   if(p.action === 'pmdWholebirds') return 'PMD Wholebirds · prompts colour';
+  if(p.action === 'externalIntake') return 'External Intake · prompts comment per entry';
   if(p.action === 'nutritionalBundle') return 'Raw / Cooked with turnaround options · opens wizard';
   if(p.action === 'shelfLifeBundle') return 'K+1 through K+12 sets per retailer · opens wizard';
   const m = entryMimsRowForLookup(p);
@@ -4731,6 +4733,7 @@ document.getElementById('entryResultsAll').addEventListener('click', e=>{
   }
   if(picked.action === 'rawPortions'){ entryRawPortionsOpen(); return; }
   if(picked.action === 'pmdWholebirds'){ entryPmdWholeBirdOpen(); return; }
+  if(picked.action === 'externalIntake'){ entryExternalIntakeOpen(); return; }
   if(picked.action === 'nutritionalBundle'){ entryNutritionalBundleOpen(); return; }
   if(picked.action === 'shelfLifeBundle'){ entryShelfLifeBundleOpen(); return; }
   // Amber items (except Amber Skin) are "tap and add" — a single tap adds
@@ -5622,6 +5625,11 @@ document.getElementById('entryRawPortionsClose').addEventListener('click', entry
 // ============================================================
 // PMD Wholebirds direct shortcut — same as picking from search
 // ============================================================
+function entryExternalIntakeOpen(){
+  const lp = entryLookup.find(p => p.mimsBarcode === 'MIMS_0002');
+  if(!lp){ alert('External Intake entry not found.'); return; }
+  entryOpenConfirm(lp, { quickCount:true, needsExternalIntakeComms:true });
+}
 function entryPmdWholeBirdOpen(){
   const lp = entryLookup.find(p => p.mimsBarcode === 'MIMS_0018');
   if(!lp){ alert('PMD Wholebirds entry not found.'); return; }
@@ -5905,6 +5913,7 @@ function entryOpenConfirm(p, opts){
     needsKfcHotWingsEol: !!opts.needsKfcHotWingsEol,
     needsExternalBulkProduct: !!opts.needsExternalBulkProduct,
     needsAmberSwabFlow: !!opts.needsAmberSwabFlow,
+    needsExternalIntakeComms: !!opts.needsExternalIntakeComms,
     needsControlSwabFlow: !!opts.needsControlSwabFlow,
     needsEquipmentSwabFlow: !!opts.needsEquipmentSwabFlow,
     needsMeatContentFlow: !!opts.needsMeatContentFlow,
@@ -6645,6 +6654,7 @@ function entryCommit(){
   const followUpKfcHotWingsEol = !!entryPending.needsKfcHotWingsEol;
   const followUpExternalBulkProduct = !!entryPending.needsExternalBulkProduct;
   const followUpAmberSwabFlow = !!entryPending.needsAmberSwabFlow;
+  const followUpExternalIntakeComms = !!entryPending.needsExternalIntakeComms;
   const followUpControlSwab = !!entryPending.needsControlSwabFlow;
   const followUpEquipmentSwab = !!entryPending.needsEquipmentSwabFlow;
   const followUpMeatContent = !!entryPending.needsMeatContentFlow;
@@ -6698,6 +6708,16 @@ function entryCommit(){
       column: 'COMMS',
       placeholder: 'e.g. Chicken Breast 650g',
       hint: 'Product name for this entry',
+      numeric: false
+    });
+    return;
+  }
+  if(followUpExternalIntakeComms){
+    entryStartPromptLoop(newNums, {
+      title: 'External Intake · Comment',
+      column: 'COMMS',
+      placeholder: 'e.g. Sandy P1',
+      hint: 'Comment for this intake entry',
       numeric: false
     });
     return;
