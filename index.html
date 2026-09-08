@@ -792,7 +792,7 @@
 <header>
   <div class="title-row">
     <div>
-      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v40</span></h1>
+      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v41</span></h1>
       <div class="period-note" id="periodNote"></div>
     </div>
     <button class="icon-btn" id="menuBtn">Menu</button>
@@ -1210,10 +1210,9 @@
       <div id="entryRecordsWrap" class="entry-table-scroll">
         <table class="entry-table">
           <colgroup>
-            <col style="width:7%"><col style="width:14%"><col style="width:30%">
-            <col style="width:7%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:9%">
+            <col style="width:10%"><col style="width:46%"><col style="width:10%"><col style="width:10%"><col style="width:19%"><col style="width:5%">
           </colgroup>
-          <thead><tr><th># <span id="entryCount" class="entry-count-inline">0</span></th><th>Barcode</th><th>Description</th><th>Cat</th><th>Kill Date</th><th>Use By</th><th>Time</th><th></th></tr></thead>
+          <thead><tr><th># <span id="entryCount" class="entry-count-inline">0</span></th><th>Description</th><th>Kill</th><th>UB</th><th>Time</th><th></th></tr></thead>
           <tbody id="entryTbody"></tbody>
         </table>
         <div class="empty" id="entryEmpty">No records yet.</div>
@@ -1258,7 +1257,6 @@
 
     <!-- Export button moved below the table as a green bar. Delete/reset lives underneath. -->
     <button class="btn primary" id="entryBtnExport" style="width:100%; margin-top:14px;">Export SIS_Micro_Sub (today's sequence)</button>
-    <button class="btn ghost" id="entryBtnExportAllMims" style="width:100%; margin-top:8px;">Export Full MIMS catalogue</button>
     <div class="sheet-actions" style="margin-top:10px;">
       <button class="btn ghost" id="entryBtnWipe" style="width:100%;">Delete all</button>
     </div>
@@ -2590,124 +2588,121 @@ function hasRooms(custName){ return custName!=='KFC'; }
 
 // Hardcoded routine product list, including any assigned barcode.
 // Seeded on every load() for missing IDs so the list is baked-in.
+const STALE_SEED_IDS = new Set(['mrca7ibml4cl', 'mrawcz7mmidz', 'mrnejoos66ln', 'mrnsqpmuc2eu', 'msy59uqrawq6', 'msy59uqrfxat', 'msy59uqr77ji', 'msy59uqre2ai', 'msy59uqrmn4w', 'msy59uqr6ogb', 'msy5bnuw6p3x']);
 const SEED_ROUTINE_PRODUCTS = [
-  {"id": "mrautec9s5jv", "customer": "Aldi", "room": "fp1", "name": "Medium", "barcode": "4061462251283"},
-  {"id": "mrautleqa9q6", "customer": "Aldi", "room": "fp1", "name": "Large", "barcode": "4061462255458"},
-  {"id": "mrautppo49am", "customer": "Aldi", "room": "fp1", "name": "Extra Large", "barcode": "4061462256271"},
-  {"id": "mrautzv4444v", "customer": "Aldi", "room": "fp2", "name": "Extra Tasty", "barcode": "4061462273308"},
-  {"id": "mrauu6gcsxgt", "customer": "Aldi", "room": "fp2", "name": "PSO", "barcode": "4088600390826"},
-  {"id": "mrauuj3ynowj", "customer": "Aldi", "room": "fp2", "name": "Rotisserie Spatchcock", "barcode": "4061461658960"},
-  {"id": "mrauushp3k1m", "customer": "Aldi", "room": "fp2", "name": "Garlic and Herb Spatchcock", "barcode": "4088600039077"},
-  {"id": "mrauve719mio", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 300g", "barcode": "4088600146348"},
-  {"id": "mrauvsad2zzx", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 650g", "barcode": "4088600237008"},
-  {"id": "mrauw6p3fpnb", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 1000g", "barcode": "4088600148144"},
-  {"id": "mraux8vwlazk", "customer": "Aldi", "room": "cut", "name": "Breast Fillet 2000g", "barcode": "4088600295411"},
-  {"id": "mrauxto6r7n0", "customer": "Aldi", "room": "cut", "name": "Diced Breast 600g", "barcode": "4088600147734"},
-  {"id": "mrav1qfk6bvu", "customer": "Aldi", "room": "cut", "name": "Thigh 1kg", "barcode": "4088600147017"},
-  {"id": "mrav20vw23cv", "customer": "Aldi", "room": "cut", "name": "Thigh Fillet 900g", "barcode": "4088600281421"},
-  {"id": "mrav2fl2h5zv", "customer": "Aldi", "room": "cut", "name": "Drumsticks 1kg", "barcode": "4088600280578"},
-  {"id": "mti9dxzcmjry", "customer": "Aldi", "room": "cut", "name": "Thigh Fillets 600g", "barcode": "4088600176345"},
-  {"id": "mrav2qt7rpr5", "customer": "Aldi", "room": "cut", "name": "Drumsticks 2kg", "barcode": "4088600172453"},
-  {"id": "mrav34otn3d8", "customer": "Aldi", "room": "cut", "name": "Legs 1kg", "barcode": "4088600147345"},
-  {"id": "mrav48lhch5p", "customer": "Asda", "room": "fp1", "name": "Medium", "barcode": "5063717285769"},
-  {"id": "mrav4ltqv4wx", "customer": "Asda", "room": "fp1", "name": "Large", "barcode": "5057172354801"},
-  {"id": "mrav52fnmtej", "customer": "Asda", "room": "fp1", "name": "Extra Large", "barcode": "5063717285783"},
-  {"id": "mrav5fl65vzh", "customer": "Asda", "room": "fp2", "name": "Extra Tasty Small", "barcode": "5054070468654"},
-  {"id": "mrav5q3k7uku", "customer": "Asda", "room": "fp2", "name": "Piri Piri Spatchcock", "barcode": "5063717059681"},
-  {"id": "mrav69s8kp4g", "customer": "Asda", "room": "fp2", "name": "Lemon & Herb Spatchcock", "barcode": "5063089826683"},
-  {"id": "mrav6ias0307", "customer": "Asda", "room": "fp2", "name": "BBQ Spatchcock", "delisted": true, "barcode": "5063089676967"},
-  {"id": "mrav6swv67kp", "customer": "Asda", "room": "fp2", "name": "PSO", "barcode": "5057172091751"},
-  {"id": "mrav823xgint", "customer": "Asda", "room": "fp2", "name": "Salt and Pepper", "delisted": true},
-  {"id": "mrav8tavtq75", "customer": "Asda", "room": "cut", "name": "Breast Fillet 600g", "delisted": true},
-  {"id": "mrav9d1smxw7", "customer": "Asda", "room": "cut", "name": "Mini Fillet 400g", "delisted": true},
-  {"id": "mravatwj7z0b", "customer": "Asda", "room": "cut", "name": "Diced Breast 400g", "delisted": true},
-  {"id": "mravo9lls7iy", "customer": "Asda", "room": "cut", "name": "Drumsticks 1.1 kg", "delisted": true},
-  {"id": "mravo9llk9kx", "customer": "Asda", "room": "cut", "name": "Thigh Fillets 650g", "delisted": true},
-  {"id": "mravputqauas", "customer": "Asda", "room": "deb", "name": "Drum Fillet 400g", "delisted": true},
-  {"id": "mravputqzzvx", "customer": "Asda", "room": "deb", "name": "Drum Fillet 600g", "delisted": true},
-  {"id": "mravqpq0n17a", "customer": "Co-op", "room": "fp1", "name": "Large", "barcode": "5000129350456"},
-  {"id": "mravqpq0tvmf", "customer": "Co-op", "room": "fp1", "name": "Extra Large", "barcode": "5000129355628"},
-  {"id": "mravrcpja18h", "customer": "Co-op", "room": "fp2", "name": "Rotisserie", "barcode": "5000129373936"},
-  {"id": "mravvgb6vtgo", "customer": "Co-op", "room": "cut", "name": "Breast Fillet 300g", "barcode": "5000128744836"},
-  {"id": "mravvgb62g6v", "customer": "Co-op", "room": "cut", "name": "Breast Fillet 580g", "barcode": "5000129334098"},
-  {"id": "mravvgb68k8i", "customer": "Co-op", "room": "cut", "name": "Breast Fillet 850g", "barcode": "5000129334180"},
-  {"id": "mravvgb6cknz", "customer": "Co-op", "room": "cut", "name": "Mini Fillet 400g", "barcode": "5000129365368"},
-  {"id": "mravvgb633jf", "customer": "Co-op", "room": "cut", "name": "Diced Breast 400g", "barcode": "5000129365375"},
-  {"id": "mravvgb6nqpy", "customer": "Co-op", "room": "cut", "name": "Breast Strips 250g", "barcode": "5000129323191"},
-  {"id": "mrj3rz6ulst9", "customer": "Co-op", "room": "cut", "name": "Thighs 600g", "barcode": "5000129353761"},
-  {"id": "mravvgb6b399", "customer": "Co-op", "room": "cut", "name": "Thigh Fillet 500g", "barcode": "5000129333800"},
-  {"id": "mravvgb6bf3d", "customer": "Co-op", "room": "cut", "name": "Drumsticks 750g", "barcode": "5000128996204"},
-  {"id": "mravxvoo7flk", "customer": "M&S", "room": "fp1", "name": "Butter Basted Joints  452g", "barcode": "00404358"},
-  {"id": "mravxvool3z9", "customer": "M&S", "room": "fp1", "name": "Rotisserie Joints 490g", "barcode": "00265829"},
-  {"id": "mraw0g0p48d4", "customer": "M&S", "room": "fp2", "name": "Butter Basted Deli 1.1"},
-  {"id": "mraw0g0ptnfx", "customer": "M&S", "room": "fp2", "name": "Butter Basted Deli 1.8"},
-  {"id": "mraw0g0pxufm", "customer": "M&S", "room": "fp2", "name": "BBQ Deli 1.1"},
-  {"id": "mraw0g0pms7e", "customer": "M&S", "room": "fp2", "name": "BBQ Deli 1.8"},
-  {"id": "mraw0g0pz91r", "customer": "M&S", "room": "fp2", "name": "Sweet and Smokey Spatchcock", "barcode": "29000067"},
-  {"id": "mraw0g0pimzk", "customer": "M&S", "room": "fp2", "name": "AYR Rotisserie", "barcode": "00014649"},
-  {"id": "mraw0g0pl3pf", "customer": "M&S", "room": "fp2", "name": "Garlic and Herb", "barcode": "29421442"},
-  {"id": "mraw0g0p9zrq", "customer": "M&S", "room": "fp2", "name": "Salt and Pepper BDF", "barcode": "29421435"},
-  {"id": "mraw0g0poq46", "customer": "M&S", "room": "fp2", "name": "Hot Honey BDF", "barcode": "29421411"},
-  {"id": "mraw0g0pr6t1", "customer": "M&S", "room": "fp2", "name": "PSO", "barcode": "00015035"},
-  {"id": "mraw10j54xkc", "customer": "KFC", "room": "none", "name": "9 Piece"},
-  {"id": "mraw10j5k6z8", "customer": "KFC", "room": "none", "name": "Dark Meat"},
-  {"id": "mraw10j51y59", "customer": "KFC", "room": "none", "name": "Hot Wings"},
-  {"id": "mraw2atywlna", "customer": "Booth", "room": "fp1", "name": "Fresh Whole Bird", "barcode": "5028440025235"},
-  {"id": "mraw2atyvjgt", "customer": "Booth", "room": "fp1", "name": "Hot Cooked Fresh Whole Bird"},
-  {"id": "mraw2vslrcw4", "customer": "Iceland", "room": "fp1", "name": "Small", "barcode": "5010482797355"},
-  {"id": "mraw2vslwrm0", "customer": "Iceland", "room": "fp1", "name": "Medium", "barcode": "5010482482619"},
-  {"id": "mraw2vsl4cvx", "customer": "Iceland", "room": "fp1", "name": "Large", "barcode": "5010482593902"},
-  {"id": "mraw392ky28v", "customer": "Iceland", "room": "fp2", "name": "Extra Tasty", "barcode": "5010482617929"},
-  {"id": "mraw4zz6h8xg", "customer": "Iceland", "room": "cut", "name": "Drumsticks", "barcode": "5010482564377"},
-  {"id": "mraw4zz63xuk", "customer": "Iceland", "room": "cut", "name": "Legs 1kg", "barcode": "5010482564414"},
-  {"id": "mrm8dox37mkl", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 320g", "barcode": "5063445799132"},
-  {"id": "mrm8dox310bq", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 650g", "barcode": "5057008546325"},
-  {"id": "mraw868hwg8x", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 1kg", "barcode": "5063446491592"},
-  {"id": "mraw868hxw2d", "customer": "Tesco", "room": "cut", "name": "Breast Fillet 1.6kg", "barcode": "5057967251896"},
-  {"id": "mraw868ho2d0", "customer": "Tesco", "room": "cut", "name": "Diced Breast 400g", "barcode": "5057753932916"},
-  {"id": "mraw868hns0l", "customer": "Tesco", "room": "cut", "name": "Diced Breast 650g", "barcode": "5057753914028"},
-  {"id": "mraw9q1eqprh", "customer": "Ocado", "room": "fp1", "name": "Medium", "barcode": "2096922004743"},
-  {"id": "mraw9q1e1cco", "customer": "Ocado", "room": "fp1", "name": "Large", "barcode": "2092417005004"},
-  {"id": "mraw9q1eimfn", "customer": "Ocado", "room": "fp1", "name": "Extra Large", "barcode": "2096937006381"},
-  {"id": "mrawawns58f1", "customer": "Ocado", "room": "fp2", "name": "Extra Tasty", "barcode": "5055540029122"},
-  {"id": "msk978eq8v6v", "customer": "Ocado", "room": "cut", "name": "Thigh Fillet 400g", "barcode": "2089235004050"},
-  {"id": "mrawawnsedah", "customer": "Ocado", "room": "fp2", "name": "PSO", "barcode": "5055540054315"},
-  {"id": "mrawawnsybe1", "customer": "Ocado", "room": "fp2", "name": "Garlic and Herb", "barcode": "5055540059785"},
-  {"id": "mrawawnspx8o", "customer": "Ocado", "room": "fp2", "name": "Salt & Pepper CROWN", "barcode": "5055540020327"},
-  {"id": "mrawcz7mmidz", "customer": "Other", "room": "none", "name": "Water Testing as per schedule", "freq": "monthly"},
-  {"id": "mrdkg2sh956z", "customer": "Other", "room": "none", "name": "Nutritional x3 - Fat Validation - Breast Fillet - 2SP035C", "freq": "monthly"},
-  {"id": "mrca7ibml4cl", "customer": "Other", "room": "cut", "name": "External Bulk - Intercompany", "freq": "weekly"},
-  {"id": "mrcalr9hofl0", "customer": "Other", "room": "cut", "name": "Salmonella", "freq": "weekly"},
-  {"id": "mrku0ab1chth", "customer": "Other", "room": "none", "name": "Swab Matrix", "freq": "weekly"},
-  {"id": "mrdqdr1nw66f", "customer": "Other", "room": "fp1", "name": "Costco Twin Pack", "freq": "weekly", "barcode": "2005725009527"},
-  {"id": "mravvgb6hbs9", "customer": "Co-op", "room": "cut", "name": "Wings 775g", "barcode": "5000128961318"},
-  {"id": "mrj3m1f70qcn", "customer": "Co-op", "room": "cut", "name": "Wings 1500g", "barcode": "5000129408584"},
-  {"id": "mrjbvbrkutgf", "customer": "Co-op", "room": "deb", "name": "Drumsticks Fillet 400g", "barcode": "5000129350234"},
-  {"id": "mt33epbds428", "customer": "Co-op", "room": "cut", "name": "Drumsticks 1.5kg", "barcode": "5000129408683"},
-  {"id": "mrjbxki8v9c7", "customer": "Aldi", "room": "deb", "name": "Drumsticks Fillet 600g", "barcode": "4061459353037"},
-  {"id": "mrjbxki8jo4n", "customer": "Aldi", "room": "deb", "name": "Drumsticks Fillet 900g", "barcode": "4061461781248"},
-  {"id": "mrkumr2wb12a", "customer": "Other", "room": "none", "name": "Weekly Report x4", "freq": "weekly"},
-  {"id": "mrnejoos66ln", "customer": "Other", "room": "none", "name": "Water Samples", "freq": "monthly"},
-  {"id": "mraw868hfzxx", "customer": "Tesco", "room": "cut", "name": "Thighs 1kg", "barcode": "5054268934725"},
-  {"id": "mraw868hhbvx", "customer": "Tesco", "room": "cut", "name": "Wings 1kg", "barcode": "5059697733185"},
-  {"id": "mrnsqpmuc2eu", "customer": "Other", "room": "none", "name": "Line Assembly - Copies/Scan", "freq": "monthly"},
-  {"id": "mrnsrruhs4tq", "customer": "Other", "room": "none", "name": "Clearing the Archive", "freq": "monthly"},
-  {"id": "mrawcz7mdkxs", "customer": "Other", "room": "none", "name": "PSO - Gluten Testing for Product", "freq": "monthly"},
-  {"id": "ms77m5oy2juw", "customer": "Other", "room": "none", "name": "PSO ISTUF133", "freq": "monthly"},
-  {"id": "ms77m5oy2vqb", "customer": "Other", "room": "none", "name": "PSO ISTUF141", "freq": "monthly"},
-  {"id": "msq6dgc3emtb", "customer": "Other", "room": "none", "name": "Water Testing as per schedule", "freq": "weekly"},
-  {"id": "msy59uqrawq6", "customer": "Other", "room": "cut", "name": "Breast Fillet", "freq": "weekly"},
-  {"id": "msy59uqrycwp", "customer": "Other", "room": "cut", "name": "Thigh", "freq": "weekly"},
-  {"id": "msy59uqrfxat", "customer": "Other", "room": "cut", "name": "Thigh Fillets", "freq": "weekly"},
-  {"id": "msy59uqr77ji", "customer": "Other", "room": "cut", "name": "Drumsticks", "freq": "weekly"},
-  {"id": "msy59uqre2ai", "customer": "Other", "room": "cut", "name": "Drum Fillets", "freq": "weekly"},
-  {"id": "msy59uqrmn4w", "customer": "Other", "room": "cut", "name": "Legs", "freq": "weekly"},
-  {"id": "msy59uqr6ogb", "customer": "Other", "room": "cut", "name": "Wings", "freq": "weekly"},
-  {"id": "msy5bnuw6p3x", "customer": "Other", "room": "cut", "name": "Mini fillets", "freq": "weekly"},
-  {"id": "msy5bnuw8ooj", "customer": "Other", "room": "cut", "name": "Breast Strips", "freq": "weekly"},
-  {"id": "msy5cuarub8d", "customer": "Other", "room": "cut", "name": "Diced Breast", "freq": "weekly"},
-  {"id": "ms77m5oyo2gs", "customer": "Other", "room": "none", "name": "PSO ISTUF143", "freq": "monthly"},
-  {"id": "ms78ofb9m4ak", "customer": "Other", "room": "none", "name": "Milk Sponge Swabs", "freq": "monthly"},
+  {"name": "Medium", "barcode": "4061462251283", "room": "fp1", "customer": "Aldi", "id": "mrautec9s5jv"},
+  {"room": "fp1", "barcode": "4061462255458", "id": "mrautleqa9q6", "name": "Large", "customer": "Aldi"},
+  {"room": "fp1", "name": "Extra Large", "id": "mrautppo49am", "barcode": "4061462256271", "customer": "Aldi"},
+  {"customer": "Aldi", "barcode": "4061462273308", "room": "fp2", "name": "Extra Tasty", "id": "mrautzv4444v"},
+  {"id": "mrauu6gcsxgt", "room": "fp2", "barcode": "4088600390826", "customer": "Aldi", "name": "PSO"},
+  {"id": "mrauuj3ynowj", "room": "fp2", "barcode": "4061461658960", "customer": "Aldi", "name": "Rotisserie Spatchcock"},
+  {"room": "fp2", "id": "mrauushp3k1m", "name": "Garlic and Herb Spatchcock", "barcode": "4088600039077", "customer": "Aldi"},
+  {"room": "cut", "barcode": "4088600146348", "name": "Breast Fillet 300g", "customer": "Aldi", "id": "mrauve719mio"},
+  {"customer": "Aldi", "name": "Breast Fillet 650g", "barcode": "4088600237008", "id": "mrauvsad2zzx", "room": "cut"},
+  {"name": "Breast Fillet 1000g", "customer": "Aldi", "barcode": "4088600148144", "room": "cut", "id": "mrauw6p3fpnb"},
+  {"id": "mraux8vwlazk", "room": "cut", "barcode": "4088600295411", "customer": "Aldi", "name": "Breast Fillet 2000g"},
+  {"room": "cut", "barcode": "4088600147734", "id": "mrauxto6r7n0", "customer": "Aldi", "name": "Diced Breast 600g"},
+  {"name": "Thigh 1kg", "barcode": "4088600147017", "room": "cut", "customer": "Aldi", "id": "mrav1qfk6bvu"},
+  {"id": "mti9dxzcmjry", "name": "Thigh Fillets 600g", "barcode": "4088600176345", "customer": "Aldi", "room": "cut"},
+  {"barcode": "4088600281421", "room": "cut", "customer": "Aldi", "name": "Thigh Fillet 900g", "id": "mrav20vw23cv"},
+  {"id": "mrav2fl2h5zv", "room": "cut", "customer": "Aldi", "barcode": "4088600280578", "name": "Drumsticks 1kg"},
+  {"room": "cut", "customer": "Aldi", "barcode": "4088600172453", "name": "Drumsticks 2kg", "id": "mrav2qt7rpr5"},
+  {"name": "Medium", "customer": "Asda", "id": "mrav48lhch5p", "room": "fp1", "barcode": "5063717285769"},
+  {"name": "Large", "customer": "Asda", "id": "mrav4ltqv4wx", "barcode": "5057172354801", "room": "fp1"},
+  {"id": "mrav52fnmtej", "room": "fp1", "customer": "Asda", "barcode": "5063717285783", "name": "Extra Large"},
+  {"barcode": "5054070468654", "customer": "Asda", "id": "mrav5fl65vzh", "name": "Extra Tasty Small", "room": "fp2"},
+  {"room": "fp2", "customer": "Asda", "barcode": "5063717059681", "name": "Piri Piri Spatchcock", "id": "mrav5q3k7uku"},
+  {"name": "Lemon & Herb Spatchcock", "id": "mrav69s8kp4g", "customer": "Asda", "room": "fp2", "barcode": "5063089826683"},
+  {"barcode": "5063089676967", "id": "mrav6ias0307", "delisted": true, "name": "BBQ Spatchcock", "customer": "Asda", "room": "fp2"},
+  {"name": "PSO", "room": "fp2", "barcode": "5057172091751", "id": "mrav6swv67kp", "customer": "Asda"},
+  {"id": "mrav823xgint", "name": "Salt and Pepper", "delisted": true, "room": "fp2", "customer": "Asda"},
+  {"room": "cut", "customer": "Asda", "delisted": true, "id": "mrav8tavtq75", "name": "Breast Fillet 600g"},
+  {"id": "mrav9d1smxw7", "customer": "Asda", "name": "Mini Fillet 400g", "delisted": true, "room": "cut"},
+  {"room": "cut", "delisted": true, "name": "Diced Breast 400g", "customer": "Asda", "id": "mravatwj7z0b"},
+  {"customer": "Asda", "room": "cut", "id": "mravo9lls7iy", "name": "Drumsticks 1.1 kg", "delisted": true},
+  {"delisted": true, "room": "cut", "id": "mravo9llk9kx", "customer": "Asda", "name": "Thigh Fillets 650g"},
+  {"room": "deb", "delisted": true, "name": "Drum Fillet 400g", "customer": "Asda", "id": "mravputqauas"},
+  {"delisted": true, "name": "Drum Fillet 600g", "id": "mravputqzzvx", "room": "deb", "customer": "Asda"},
+  {"customer": "Co-op", "id": "mravqpq0n17a", "room": "fp1", "barcode": "5000129350456", "name": "Large"},
+  {"id": "mravqpq0tvmf", "name": "Extra Large", "barcode": "5000129355628", "room": "fp1", "customer": "Co-op"},
+  {"customer": "Co-op", "barcode": "5000129373936", "id": "mravrcpja18h", "room": "fp2", "name": "Rotisserie"},
+  {"name": "Breast Fillet 300g", "id": "mravvgb6vtgo", "room": "cut", "barcode": "5000128744836", "customer": "Co-op"},
+  {"id": "mravvgb62g6v", "name": "Breast Fillet 580g", "barcode": "5000129334098", "customer": "Co-op", "room": "cut"},
+  {"name": "Breast Fillet 850g", "barcode": "5000129334180", "room": "cut", "customer": "Co-op", "id": "mravvgb68k8i"},
+  {"customer": "Co-op", "room": "cut", "barcode": "5000129365368", "name": "Mini Fillet 400g", "id": "mravvgb6cknz"},
+  {"room": "cut", "customer": "Co-op", "name": "Diced Breast 400g", "barcode": "5000129365375", "id": "mravvgb633jf"},
+  {"name": "Breast Strips 250g", "customer": "Co-op", "id": "mravvgb6nqpy", "room": "cut", "barcode": "5000129323191"},
+  {"id": "mrj3rz6ulst9", "room": "cut", "barcode": "5000129353761", "customer": "Co-op", "name": "Thighs 600g"},
+  {"room": "cut", "customer": "Co-op", "barcode": "5000129333800", "id": "mravvgb6b399", "name": "Thigh Fillet 500g"},
+  {"customer": "Co-op", "barcode": "5000128996204", "name": "Drumsticks 750g", "id": "mravvgb6bf3d", "room": "cut"},
+  {"name": "Butter Basted Joints  452g", "barcode": "00404358", "id": "mravxvoo7flk", "delisted": true, "room": "fp1", "customer": "M&S"},
+  {"room": "fp1", "customer": "M&S", "id": "mravxvool3z9", "barcode": "00265829", "name": "Rotisserie Joints 490g"},
+  {"room": "fp2", "name": "Butter Basted Deli 1.1", "id": "mraw0g0p48d4", "customer": "M&S"},
+  {"room": "fp2", "name": "Butter Basted Deli 1.8", "customer": "M&S", "id": "mraw0g0ptnfx"},
+  {"id": "mraw0g0pxufm", "customer": "M&S", "name": "BBQ Deli 1.1", "room": "fp2"},
+  {"customer": "M&S", "name": "BBQ Deli 1.8", "room": "fp2", "id": "mraw0g0pms7e"},
+  {"id": "mraw0g0pz91r", "customer": "M&S", "name": "Sweet and Smokey Spatchcock", "barcode": "29000067", "room": "fp2"},
+  {"name": "AYR Rotisserie", "id": "mraw0g0pimzk", "barcode": "00014649", "room": "fp2", "customer": "M&S"},
+  {"room": "fp2", "id": "mraw0g0pl3pf", "barcode": "29421442", "name": "Garlic and Herb", "customer": "M&S"},
+  {"id": "mraw0g0p9zrq", "room": "fp2", "customer": "M&S", "barcode": "29421435", "name": "Salt and Pepper BDF"},
+  {"room": "fp2", "barcode": "29421411", "name": "Hot Honey BDF", "customer": "M&S", "id": "mraw0g0poq46"},
+  {"id": "mraw0g0pr6t1", "name": "PSO", "customer": "M&S", "room": "fp2", "barcode": "00015035"},
+  {"name": "9 Piece", "customer": "KFC", "id": "mraw10j54xkc"},
+  {"id": "mraw10j5k6z8", "name": "Dark Meat", "customer": "KFC"},
+  {"customer": "KFC", "id": "mraw10j51y59", "name": "Hot Wings"},
+  {"customer": "Booth", "id": "mraw2atywlna", "barcode": "5028440025235", "room": "fp1", "name": "Fresh Whole Bird"},
+  {"id": "mraw2atyvjgt", "name": "Hot Cooked Fresh Whole Bird", "room": "fp1", "customer": "Booth"},
+  {"name": "Small", "customer": "Iceland", "barcode": "5010482797355", "room": "fp1", "id": "mraw2vslrcw4"},
+  {"room": "fp1", "customer": "Iceland", "name": "Medium", "barcode": "5010482482619", "id": "mraw2vslwrm0"},
+  {"id": "mraw2vsl4cvx", "name": "Large", "customer": "Iceland", "barcode": "5010482593902", "room": "fp1"},
+  {"customer": "Iceland", "room": "fp2", "id": "mraw392ky28v", "barcode": "5010482617929", "name": "Extra Tasty"},
+  {"room": "cut", "barcode": "5010482564377", "id": "mraw4zz6h8xg", "customer": "Iceland", "name": "Drumsticks"},
+  {"name": "Legs 1kg", "customer": "Iceland", "id": "mraw4zz63xuk", "barcode": "5010482564414", "room": "cut"},
+  {"name": "Breast Fillet 320g", "customer": "Tesco", "room": "cut", "id": "mrm8dox37mkl", "barcode": "5063445799132"},
+  {"name": "Breast Fillet 650g", "id": "mrm8dox310bq", "barcode": "5057008546325", "room": "cut", "customer": "Tesco"},
+  {"room": "cut", "barcode": "5063446491592", "customer": "Tesco", "name": "Breast Fillet 1kg", "id": "mraw868hwg8x"},
+  {"name": "Breast Fillet 1.6kg", "id": "mraw868hxw2d", "customer": "Tesco", "barcode": "5057967251896", "room": "cut"},
+  {"customer": "Tesco", "barcode": "5057753932916", "room": "cut", "id": "mraw868ho2d0", "name": "Diced Breast 400g"},
+  {"name": "Diced Breast 650g", "room": "cut", "id": "mraw868hns0l", "barcode": "5057753914028", "customer": "Tesco"},
+  {"barcode": "2096922004743", "room": "fp1", "customer": "Ocado", "id": "mraw9q1eqprh", "name": "Medium"},
+  {"id": "mraw9q1e1cco", "room": "fp1", "name": "Large", "customer": "Ocado", "barcode": "2092417005004"},
+  {"name": "Extra Large", "customer": "Ocado", "id": "mraw9q1eimfn", "room": "fp1", "barcode": "2096937006381"},
+  {"room": "fp2", "id": "mrawawns58f1", "barcode": "5055540029122", "name": "Extra Tasty", "customer": "Ocado"},
+  {"name": "PSO", "barcode": "5055540054315", "customer": "Ocado", "id": "mrawawnsedah", "room": "fp2"},
+  {"customer": "Ocado", "id": "mrawawnsybe1", "barcode": "5055540059785", "name": "Garlic and Herb", "room": "fp2"},
+  {"room": "fp2", "id": "mrawawnspx8o", "barcode": "5055540020327", "name": "Salt & Pepper CROWN", "customer": "Ocado"},
+  {"id": "mrdkg2sh956z", "customer": "Other", "room": "none", "freq": "monthly", "name": "Nutritional x3 - Fat Validation - Breast Fillet - 2SP035C"},
+  {"id": "mrcalr9hofl0", "freq": "weekly", "room": "cut", "customer": "Other", "name": "Salmonella"},
+  {"customer": "Other", "id": "mrku0ab1chth", "name": "Swab Matrix", "room": "none", "freq": "weekly"},
+  {"id": "mrdqdr1nw66f", "name": "Costco Twin Pack", "barcode": "2005725009527", "freq": "weekly", "room": "fp1", "customer": "Other"},
+  {"room": "cut", "name": "Wings 775g", "customer": "Co-op", "barcode": "5000128961318", "id": "mravvgb6hbs9"},
+  {"barcode": "5000129408584", "id": "mrj3m1f70qcn", "room": "cut", "customer": "Co-op", "name": "Wings 1500g"},
+  {"room": "deb", "id": "mrjbvbrkutgf", "customer": "Co-op", "name": "Drumsticks Fillet 400g", "barcode": "5000129350234"},
+  {"barcode": "4061459353037", "name": "Drumsticks Fillet 600g", "id": "mrjbxki8v9c7", "customer": "Aldi", "room": "deb"},
+  {"name": "Drumsticks Fillet 900g", "barcode": "4061461781248", "id": "mrjbxki8jo4n", "room": "deb", "customer": "Aldi"},
+  {"room": "none", "freq": "weekly", "id": "mrkumr2wb12a", "customer": "Other", "name": "Weekly Report x4"},
+  {"id": "mraw868hfzxx", "barcode": "5054268934725", "name": "Thighs 1kg", "customer": "Tesco", "room": "cut"},
+  {"room": "cut", "id": "mraw868hhbvx", "customer": "Tesco", "barcode": "5059697733185", "name": "Wings 1kg"},
+  {"id": "mrnsrruhs4tq", "customer": "Other", "room": "none", "freq": "monthly", "name": "Clearing the Archive"},
+  {"name": "PSO - Gluten Testing for Product", "freq": "monthly", "room": "none", "customer": "Other", "id": "mrawcz7mdkxs"},
+  {"name": "PSO ISTUF133", "customer": "Other", "room": "none", "freq": "monthly", "id": "ms77m5oy2juw"},
+  {"name": "PSO ISTUF141", "customer": "Other", "room": "none", "freq": "monthly", "id": "ms77m5oy2vqb"},
+  {"freq": "monthly", "room": "none", "customer": "Other", "name": "PSO ISTUF143", "id": "ms77m5oyo2gs"},
+  {"room": "none", "freq": "monthly", "customer": "Other", "name": "Milk Sponge Swabs", "id": "ms78ofb9m4ak"},
+  {"barcode": "2089235004050", "name": "Thigh Fillet 400g", "customer": "Ocado", "room": "cut", "id": "msk978eq8v6v"},
+  {"id": "msq6dgc3emtb", "name": "Water Testing as per schedule", "customer": "Other", "freq": "weekly", "room": "none"},
+  {"room": "cut", "freq": "weekly", "name": "Breast Strips", "id": "msy5bnuw8ooj", "customer": "Other"},
+  {"id": "msy5cuarub8d", "customer": "Other", "name": "Diced Breast", "room": "cut", "freq": "weekly"},
+  {"id": "mtspno998i0e", "name": "Drum Fillet", "freq": "weekly", "room": "cut", "customer": "Other"},
+  {"id": "mt33epbds428", "name": "Drumsticks 1.5kg", "barcode": "5000129408683", "customer": "Co-op", "room": "cut"},
+  {"name": "Legs 1kg", "id": "mrav34otn3d8", "barcode": "4088600147345", "room": "cut", "customer": "Aldi"},
+  {"name": "Drumstick", "customer": "Other", "room": "cut", "freq": "weekly", "id": "mtspno99ryti"},
+  {"id": "mtspl7e6pyh5", "room": "cut", "freq": "weekly", "customer": "Other", "name": "Inner Fillets"},
+  {"freq": "weekly", "room": "cut", "customer": "Other", "id": "mtspl7e6h1m6", "name": "Oyster Leg"},
+  {"name": "Skinless Breast Fillet", "customer": "Other", "room": "cut", "freq": "weekly", "id": "mtspl7e61ee3"},
+  {"customer": "Other", "name": "Thigh", "freq": "weekly", "room": "cut", "id": "msy59uqrycwp"},
+  {"id": "mtspno99f8g1", "name": "Thigh Fillet", "customer": "Other", "room": "cut", "freq": "weekly"},
+  {"room": "cut", "freq": "weekly", "customer": "Other", "id": "mtspq5fiirw5", "name": "Wing"},
 ];
 
 let state = load();
@@ -2795,6 +2790,9 @@ function load(){
       for(const seed of SEED_ROUTINE_PRODUCTS){
         if(!haveIds.has(seed.id)) s.products.push({...seed});
       }
+      // Remove products whose ids were in a previous seed version but
+      // have since been renamed or deleted from the seed.
+      s.products = s.products.filter(p => !STALE_SEED_IDS.has(p.id));
       // Backfill barcodes: if a local product exists but has no barcode set
       // yet, adopt the seed's barcode. User-edited barcodes (non-empty) are
       // never overwritten, so the Manage-barcodes screen shows what shipped
@@ -3867,7 +3865,7 @@ let entryMims = JSON.parse(localStorage.getItem(LS_ENTRY_MIMS) || 'null')
   // The patch only fills fields that are empty/undefined on the target row
   // (line 3770), so re-running is idempotent — real values from the seed or
   // from a re-uploaded MIMS_SAVE_FILE.xls always win. Safe to run every load.
-  const PATCH = [[0,{"line":"[ENTER]","comms":"[ENTER THIN OR DEPOP]","location":"[ENTER]","pen_no":"[ENTER FARM]","shed_no":"[ENTER SHED]","lorry_no":"[ENTER AGE]","load_no":"[ENTER LOAD]"}],[1,{"line":"[ENTER]","comms":"[ENTER THIN OR DEPOP]","location":"[ENTER]","pen_no":"[ENTER FARM]","shed_no":"[ENTER SHED]","lorry_no":"[ENTER]","load_no":"[ENTER]"}],[2,{"comms":"[ENTER Product]"}],[3,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[4,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[5,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[6,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[7,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[8,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[9,{"comms":"[ENTER THIN OR DEPOP]","pen_no":"[ENTER FARM]","shed_no":"[ENTER SHED]","lorry_no":"[ENTER]","load_no":"[ENTER]"}],[10,{"comms":"[ENTER THIN OR DEPOP]","pen_no":"[ENTER FARM]","shed_no":"[ENTER SHED]","lorry_no":"[ENTER]","load_no":"[ENTER]"}],[11,{"comms":"[ENTER THIN OR DEPOP]","pen_no":"[ENTER]","shed_no":"[ENTER]","lorry_no":"[ENTER]","load_no":"[ENTER]"}],[12,{"comms":"[ENTER THIN OR DEPOP]","pen_no":"[ENTER]","shed_no":"[ENTER]","lorry_no":"[ENTER]","load_no":"[ENTER]"}],[13,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[14,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[15,{"comms":"[ENTER]"}],[19,{"comms":"[ENTER Product]"}],[20,{"comms":"[PORTION TYPE, WEIGHT]"}],[21,{"comms":"[ENTER Product]"}],[23,{"comms":"[K+\u2026, PORTION TYPE, WEIGHT]","supplier":"[ENTER]"}],[24,{"line":"[ENTER]","comms":"[ENTER Product]"}],[29,{"comms":"[ENTER PRODUCT]"}],[30,{"comms":"[ENTER PRODUCT]"}],[31,{"comms":"[ENTER PRODUCT]"}],[32,{"comms":"[AREA]"}],[33,{"comms":"[AREA, PERSON'S NAME]"}],[34,{"comms":"[AREA, PERSON'S NAME]"}],[35,{"comms":"[AREA, PERSON'S NAME]"}],[36,{"comms":"[AREA, PERSON'S NAME]"}],[37,{"comms":"[COLOUR]"}],[38,{"comms":"[AREA, PERSON'S NAME]"}],[39,{"comms":"[AREA, PERSON'S NAME]"}],[40,{"comms":"[ENTER PRODUCT]"}],[41,{"comms":"[ENTER PRODUCT]"}],[42,{"comms":"[ENTER PRODUCT]"}],[44,{"comms":"[PERSON'S NAME]"}],[45,{"comms":"[PERSON'S NAME]"}],[46,{"comms":"[PERSON'S NAME]"}],[47,{"comms":"[PERSON'S NAME]"}],[48,{"comms":"[PERSON'S NAME]"}],[49,{"comms":"[PERSON'S NAME]"}],[50,{"comms":"[PERSON'S NAME]"}],[51,{"comms":"[PERSON'S NAME]"}],[52,{"comms":"[PERSON'S NAME]"}],[53,{"comms":"[PERSON'S NAME]"}],[54,{"comms":"[PERSON'S NAME]"}],[55,{"comms":"[PERSON'S NAME]"}],[56,{"comms":"[PERSON'S NAME]"}],[57,{"comms":"[PERSON'S NAME]"}],[58,{"comms":"[PERSON'S NAME]"}],[59,{"comms":"[PERSON'S NAME]"}],[307,{"comms":"[SPECIFY ITEM]"}],[308,{"comms":"[SPECIFY ITEM]"}],[310,{"comms":"[SPECIFY UNTENSIL]"}],[361,{"comms":"[CUSTOMER, NFT, TRIP]"}],[362,{"comms":"[ENTER COMMENTS IF REQUIRED]"}],[365,{"comms":"[ENTER]"}],[366,{"comms":"[AREA]"}],[465,{"comms":"[ENTER]"}],[479,{"comms":"[Clean / Dirty]"}],[480,{"comms":"[Clean / Dirty]"}],[481,{"comms":"[ENTER Product]"}],[482,{"comms":"[ENTER Product]"}],[483,{"comms":"[ENTER Product]"}],[484,{"comms":"[Clean / Dirty]"}],[487,{"comms":"[ENTER Product]"}],[488,{"comms":"[ENTER Product]"}],[489,{"comms":"[ENTER Product]"}],[490,{"comms":"[ENTER Product]"}],[491,{"comms":"[ENTER Product]"}],[492,{"comms":"[ENTER Product]"}],[493,{"comms":"[ENTER Product]"}],[494,{"comms":"[ENTER Product]"}],[495,{"comms":"[ENTER Product]"}],[496,{"comms":"[ENTER Product]"}],[497,{"comms":"[ENTER Product]"}],[498,{"comms":"[ENTER Product]"}],[499,{"comms":"[ENTER Product]"}],[500,{"comms":"[ENTER Product]"}],[501,{"comms":"[ENTER Product]"}],[502,{"comms":"[ENTER Product details]"}],[503,{"comms":"[ENTER Product details]"}],[504,{"comms":"[ENTER Product details]"}],[513,{"comms":"Swab - SO2 [Where]"}],[514,{"comms":"[ENTER Product]"}],[515,{"comms":"Air - plate Milk [Where]"}],[520,{"comms":"[ENTER Product]"}],[521,{"comms":"[ENTER Product]"}],[545,{"comms":"[ENTER PRODUCT]"}],[546,{"comms":"[ENTER PRODUCT]"}],[547,{"comms":"[ENTER PRODUCT]"}],[548,{"comms":"[ENTER PRODUCT]"}],[549,{"comms":"5 Portion [Type of portyon]"}],[551,{"line":"[ENTER]","comms":"[ENTER]"}],[552,{"line":"[ENTER]","comms":"[ENTER]"}],[553,{"line":"[ENTER]","comms":"[ENTER]"}],[575,{"comms":"[ PORTION TYPE ]"}],[699,{"pen_no":"[ENTER FARM]","shed_no":"[ENTER SHED]","lorry_no":"[ENTER AGE]","load_no":"[ENTER LOAD]"}],[806,{"line":"[3 sets]"}],[819,{"line":"[3 sets]"}],[820,{"line":"[3 sets]"}],[821,{"line":"[3 sets]"}],[822,{"line":"[3 sets]"}],[823,{"line":"[3 sets]"}],[824,{"line":"[3 sets]"}],[825,{"line":"[3 sets]"}],[826,{"line":"[3 sets]"}],[827,{"line":"[3 sets]"}],[828,{"line":"[3 sets]"}],[829,{"line":"[3 sets]"}],[830,{"line":"[3 sets]"}],[831,{"line":"[3 sets]"}],[832,{"line":"[3 sets]"}],[844,{"comms":"[ENTER]"}],[845,{"line":"[3 sets]"}],[846,{"line":"[3 sets]"}],[847,{"line":"[3 sets]"}],[848,{"line":"[3 sets]"}],[849,{"line":"[3 sets]"}],[850,{"line":"[3 sets]"}],[851,{"line":"[3 sets]"}],[852,{"line":"[3 sets]"}],[853,{"line":"[3 sets]"}],[854,{"line":"[3 sets]"}],[855,{"line":"[3 sets]"}],[856,{"line":"[3 sets]"}],[857,{"line":"[3 sets]"}],[858,{"line":"[3 sets]"}],[859,{"line":"[3 sets]"}],[883,{"line":"[3 sets]"}],[884,{"line":"[3 sets]"}],[885,{"line":"[3 sets]"}],[886,{"line":"[3 sets]"}],[887,{"line":"[3 sets]"}],[888,{"line":"[3 sets]"}],[889,{"line":"[3 sets]"}],[890,{"line":"[3 sets]"}],[891,{"line":"[3 sets]"}],[892,{"line":"[3 sets]"}],[893,{"line":"[3 sets]"}],[894,{"line":"[3 sets]"}],[895,{"line":"[3 sets]"}],[896,{"line":"[3 sets]"}],[897,{"line":"[3 sets]"}],[898,{"line":"[3 sets]"}],[899,{"line":"[3 sets]"}],[900,{"line":"[3 sets]"}],[901,{"line":"[3 sets]"}],[902,{"line":"[3 sets]"}],[903,{"line":"[3 sets]"}],[904,{"line":"[3 sets]"}],[905,{"line":"[3 sets]"}],[906,{"line":"[3 sets]"}],[907,{"line":"[3 sets]"}],[908,{"line":"[3 sets]"}],[909,{"line":"[3 sets]"}],[910,{"line":"[3 sets]"}],[911,{"line":"[3 sets]"}],[912,{"line":"[3 sets]"}],[913,{"line":"[3 sets]"}],[914,{"line":"[3 sets]"}],[915,{"line":"[3 sets]"}],[916,{"line":"[3 sets]"}],[917,{"line":"[3 sets]"}],[918,{"line":"[3 sets]"}],[919,{"line":"[3 sets]"}],[920,{"line":"[3 sets]"}],[921,{"line":"[3 sets]"}],[922,{"line":"[3 sets]"}],[923,{"line":"[3 sets]"}],[924,{"line":"[3 sets]"}],[925,{"line":"[3 sets]"}],[926,{"line":"[3 sets]"}],[927,{"line":"[3 sets]"}],[928,{"line":"[3 sets]"}],[929,{"line":"[3 sets]"}],[930,{"line":"[3 sets]"}],[931,{"line":"[3 sets]"}],[932,{"line":"[3 sets]"}],[933,{"line":"[3 sets]"}],[934,{"line":"[3 sets]"}],[935,{"line":"[3 sets]"}],[936,{"line":"[3 sets]"}],[937,{"line":"[3 sets]"}],[938,{"line":"[3 sets]"}],[939,{"line":"[3 sets]"}],[940,{"line":"[3 sets]"}],[941,{"line":"[3 sets]"}],[942,{"line":"[3 sets]"}],[943,{"line":"[3 sets]"}],[944,{"line":"[3 sets]"}],[945,{"line":"[3 sets]"}],[946,{"line":"[3 sets]"}],[947,{"line":"[3 sets]"}],[948,{"line":"[3 sets]"}],[949,{"line":"[3 sets]"}],[950,{"line":"[3 sets]"}],[951,{"line":"[3 sets]"}],[952,{"line":"[3 sets]"}],[953,{"line":"[3 sets]"}],[954,{"line":"[3 sets]"}],[955,{"line":"[3 sets]"}],[956,{"line":"[3 sets]"}],[957,{"line":"[3 sets]"}],[958,{"line":"[3 sets]"}],[959,{"line":"[3 sets]"}],[960,{"line":"[3 sets]"}],[961,{"line":"[3 sets]"}],[962,{"line":"[3 sets]"}],[963,{"line":"[3 sets]"}],[964,{"line":"[3 sets]"}],[979,{"line":"[3 sets]"}],[980,{"line":"[3 sets]"}],[981,{"line":"[3 sets]"}],[982,{"line":"[3 sets]"}],[983,{"line":"[3 sets]"}],[984,{"line":"[3 sets]"}],[985,{"line":"[3 sets]"}],[986,{"line":"[3 sets]"}],[987,{"line":"[3 sets]"}],[988,{"line":"[3 sets]"}],[989,{"line":"[3 sets]"}],[990,{"line":"[3 sets]"}],[991,{"line":"[3 sets]"}],[992,{"line":"[3 sets]"}],[993,{"line":"[3 sets]"}]];
+  const PATCH = [[0,{"line":"[ENTER]","comms":"[ENTER THIN OR DEPOP]","location":"[ENTER]","pen_no":"[ENTER FARM]","shed_no":"[ENTER SHED]","lorry_no":"[ENTER AGE]","load_no":"[ENTER LOAD]"}],[1,{"line":"[ENTER]","comms":"[ENTER THIN OR DEPOP]","location":"[ENTER]","pen_no":"[ENTER FARM]","shed_no":"[ENTER SHED]","lorry_no":"[ENTER]","load_no":"[ENTER]"}],[2,{"comms":"."}],[3,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[4,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[5,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[6,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[7,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[8,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[9,{"comms":"[ENTER THIN OR DEPOP]","pen_no":"[ENTER FARM]","shed_no":"[ENTER SHED]","lorry_no":"[ENTER]","load_no":"[ENTER]"}],[10,{"comms":"[ENTER THIN OR DEPOP]","pen_no":"[ENTER FARM]","shed_no":"[ENTER SHED]","lorry_no":"[ENTER]","load_no":"[ENTER]"}],[11,{"comms":"[ENTER THIN OR DEPOP]","pen_no":"[ENTER]","shed_no":"[ENTER]","lorry_no":"[ENTER]","load_no":"[ENTER]"}],[12,{"comms":"[ENTER THIN OR DEPOP]","pen_no":"[ENTER]","shed_no":"[ENTER]","lorry_no":"[ENTER]","load_no":"[ENTER]"}],[13,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[14,{"comms":"[ENTER Product, Batch, Lot, Product code]"}],[15,{"comms":"[ENTER]"}],[19,{"comms":"."}],[20,{"comms":"[PORTION TYPE, WEIGHT]"}],[21,{"comms":"."}],[23,{"comms":"[K+\u2026, PORTION TYPE, WEIGHT]","supplier":"[ENTER]"}],[24,{"line":"[ENTER]"}],[29,{"comms":"."}],[30,{"comms":"."}],[31,{"comms":"."}],[32,{"comms":"[AREA]"}],[33,{"comms":"[AREA, PERSON'S NAME]"}],[34,{"comms":"[AREA, PERSON'S NAME]"}],[35,{"comms":"[AREA, PERSON'S NAME]"}],[36,{"comms":"[AREA, PERSON'S NAME]"}],[37,{"comms":"[COLOUR]"}],[38,{"comms":"[AREA, PERSON'S NAME]"}],[39,{"comms":"[AREA, PERSON'S NAME]"}],[40,{"comms":"."}],[41,{"comms":"."}],[42,{"comms":"."}],[44,{"comms":"[PERSON'S NAME]"}],[45,{"comms":"[PERSON'S NAME]"}],[46,{"comms":"[PERSON'S NAME]"}],[47,{"comms":"[PERSON'S NAME]"}],[48,{"comms":"[PERSON'S NAME]"}],[49,{"comms":"[PERSON'S NAME]"}],[50,{"comms":"[PERSON'S NAME]"}],[51,{"comms":"[PERSON'S NAME]"}],[52,{"comms":"[PERSON'S NAME]"}],[53,{"comms":"[PERSON'S NAME]"}],[54,{"comms":"[PERSON'S NAME]"}],[55,{"comms":"[PERSON'S NAME]"}],[56,{"comms":"[PERSON'S NAME]"}],[57,{"comms":"[PERSON'S NAME]"}],[58,{"comms":"[PERSON'S NAME]"}],[59,{"comms":"[PERSON'S NAME]"}],[307,{"comms":"[SPECIFY ITEM]"}],[308,{"comms":"[SPECIFY ITEM]"}],[310,{"comms":"[SPECIFY UNTENSIL]"}],[361,{"comms":"[CUSTOMER, NFT, TRIP]"}],[362,{"comms":"[ENTER COMMENTS IF REQUIRED]"}],[365,{"comms":"[ENTER]"}],[366,{"comms":"[AREA]"}],[465,{"comms":"[ENTER]"}],[479,{"comms":"[Clean / Dirty]"}],[480,{"comms":"[Clean / Dirty]"}],[481,{"comms":"."}],[482,{"comms":"."}],[483,{"comms":"."}],[484,{"comms":"[Clean / Dirty]"}],[487,{"comms":"."}],[488,{"comms":"."}],[489,{"comms":"."}],[490,{"comms":"."}],[491,{"comms":"."}],[492,{"comms":"."}],[493,{"comms":"."}],[494,{"comms":"."}],[495,{"comms":"."}],[496,{"comms":"."}],[497,{"comms":"."}],[498,{"comms":"."}],[499,{"comms":"."}],[500,{"comms":"."}],[501,{"comms":"."}],[502,{"comms":"[ENTER Product details]"}],[503,{"comms":"[ENTER Product details]"}],[504,{"comms":"[ENTER Product details]"}],[513,{"comms":"Swab - SO2 [Where]"}],[514,{"comms":"."}],[515,{"comms":"Air - plate Milk [Where]"}],[520,{"comms":"."}],[521,{"comms":"."}],[545,{"comms":"."}],[546,{"comms":"."}],[547,{"comms":"."}],[548,{"comms":"."}],[549,{"comms":"5 Portion [Type of portyon]"}],[551,{"line":"[ENTER]","comms":"[ENTER]"}],[552,{"line":"[ENTER]","comms":"[ENTER]"}],[553,{"line":"[ENTER]","comms":"[ENTER]"}],[575,{"comms":"[ PORTION TYPE ]"}],[699,{"pen_no":"[ENTER FARM]","shed_no":"[ENTER SHED]","lorry_no":"[ENTER AGE]","load_no":"[ENTER LOAD]"}],[806,{"line":"[3 sets]"}],[819,{"line":"[3 sets]"}],[820,{"line":"[3 sets]"}],[821,{"line":"[3 sets]"}],[822,{"line":"[3 sets]"}],[823,{"line":"[3 sets]"}],[824,{"line":"[3 sets]"}],[825,{"line":"[3 sets]"}],[826,{"line":"[3 sets]"}],[827,{"line":"[3 sets]"}],[828,{"line":"[3 sets]"}],[829,{"line":"[3 sets]"}],[830,{"line":"[3 sets]"}],[831,{"line":"[3 sets]"}],[832,{"line":"[3 sets]"}],[844,{"comms":"[ENTER]"}],[845,{"line":"[3 sets]"}],[846,{"line":"[3 sets]"}],[847,{"line":"[3 sets]"}],[848,{"line":"[3 sets]"}],[849,{"line":"[3 sets]"}],[850,{"line":"[3 sets]"}],[851,{"line":"[3 sets]"}],[852,{"line":"[3 sets]"}],[853,{"line":"[3 sets]"}],[854,{"line":"[3 sets]"}],[855,{"line":"[3 sets]"}],[856,{"line":"[3 sets]"}],[857,{"line":"[3 sets]"}],[858,{"line":"[3 sets]"}],[859,{"line":"[3 sets]"}],[883,{"line":"[3 sets]"}],[884,{"line":"[3 sets]"}],[885,{"line":"[3 sets]"}],[886,{"line":"[3 sets]"}],[887,{"line":"[3 sets]"}],[888,{"line":"[3 sets]"}],[889,{"line":"[3 sets]"}],[890,{"line":"[3 sets]"}],[891,{"line":"[3 sets]"}],[892,{"line":"[3 sets]"}],[893,{"line":"[3 sets]"}],[894,{"line":"[3 sets]"}],[895,{"line":"[3 sets]"}],[896,{"line":"[3 sets]"}],[897,{"line":"[3 sets]"}],[898,{"line":"[3 sets]"}],[899,{"line":"[3 sets]"}],[900,{"line":"[3 sets]"}],[901,{"line":"[3 sets]"}],[902,{"line":"[3 sets]"}],[903,{"line":"[3 sets]"}],[904,{"line":"[3 sets]"}],[905,{"line":"[3 sets]"}],[906,{"line":"[3 sets]"}],[907,{"line":"[3 sets]"}],[908,{"line":"[3 sets]"}],[909,{"line":"[3 sets]"}],[910,{"line":"[3 sets]"}],[911,{"line":"[3 sets]"}],[912,{"line":"[3 sets]"}],[913,{"line":"[3 sets]"}],[914,{"line":"[3 sets]"}],[915,{"line":"[3 sets]"}],[916,{"line":"[3 sets]"}],[917,{"line":"[3 sets]"}],[918,{"line":"[3 sets]"}],[919,{"line":"[3 sets]"}],[920,{"line":"[3 sets]"}],[921,{"line":"[3 sets]"}],[922,{"line":"[3 sets]"}],[923,{"line":"[3 sets]"}],[924,{"line":"[3 sets]"}],[925,{"line":"[3 sets]"}],[926,{"line":"[3 sets]"}],[927,{"line":"[3 sets]"}],[928,{"line":"[3 sets]"}],[929,{"line":"[3 sets]"}],[930,{"line":"[3 sets]"}],[931,{"line":"[3 sets]"}],[932,{"line":"[3 sets]"}],[933,{"line":"[3 sets]"}],[934,{"line":"[3 sets]"}],[935,{"line":"[3 sets]"}],[936,{"line":"[3 sets]"}],[937,{"line":"[3 sets]"}],[938,{"line":"[3 sets]"}],[939,{"line":"[3 sets]"}],[940,{"line":"[3 sets]"}],[941,{"line":"[3 sets]"}],[942,{"line":"[3 sets]"}],[943,{"line":"[3 sets]"}],[944,{"line":"[3 sets]"}],[945,{"line":"[3 sets]"}],[946,{"line":"[3 sets]"}],[947,{"line":"[3 sets]"}],[948,{"line":"[3 sets]"}],[949,{"line":"[3 sets]"}],[950,{"line":"[3 sets]"}],[951,{"line":"[3 sets]"}],[952,{"line":"[3 sets]"}],[953,{"line":"[3 sets]"}],[954,{"line":"[3 sets]"}],[955,{"line":"[3 sets]"}],[956,{"line":"[3 sets]"}],[957,{"line":"[3 sets]"}],[958,{"line":"[3 sets]"}],[959,{"line":"[3 sets]"}],[960,{"line":"[3 sets]"}],[961,{"line":"[3 sets]"}],[962,{"line":"[3 sets]"}],[963,{"line":"[3 sets]"}],[964,{"line":"[3 sets]"}],[979,{"line":"[3 sets]"}],[980,{"line":"[3 sets]"}],[981,{"line":"[3 sets]"}],[982,{"line":"[3 sets]"}],[983,{"line":"[3 sets]"}],[984,{"line":"[3 sets]"}],[985,{"line":"[3 sets]"}],[986,{"line":"[3 sets]"}],[987,{"line":"[3 sets]"}],[988,{"line":"[3 sets]"}],[989,{"line":"[3 sets]"}],[990,{"line":"[3 sets]"}],[991,{"line":"[3 sets]"}],[992,{"line":"[3 sets]"}],[993,{"line":"[3 sets]"}]];
   const byId = new Map();
   entryMims.forEach(m => { if(typeof m.barcode === 'string') byId.set(m.barcode, m); });
   let touched = 0;
@@ -3919,7 +3917,7 @@ let entryMims = JSON.parse(localStorage.getItem(LS_ENTRY_MIMS) || 'null')
   const removed = before - entryMims.length;
   if(removed > 0){
     try{ localStorage.setItem(LS_ENTRY_MIMS, JSON.stringify(entryMims)); }catch(_e){}
-    try{ console.info(`[SampleHub V40] Deduplication: removed ${removed} duplicate MIMS rows (${before} → ${entryMims.length}).`); }catch(_e){}
+    try{ console.info(`[SampleHub V41] Deduplication: removed ${removed} duplicate MIMS rows (${before} → ${entryMims.length}).`); }catch(_e){}
   }
 })();
 
@@ -4196,7 +4194,7 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
   // rebuild replaces entryMims with exactly the current MIMS_SEED.
   // Scan-added lookup entries are preserved by rebuilding entryLookup fresh.
   // Runs once (guarded by v13 flag).
-  const MIGRATION_KEY = 'unified.entryMigration.v16';
+  const MIGRATION_KEY = 'unified.entryMigration.v20';
   if(localStorage.getItem(MIGRATION_KEY)) return;
   try{
     localStorage.removeItem(LS_ENTRY_MIMS);
@@ -4213,7 +4211,7 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
     try{ entryLookupSyncScheduleWrite && entryLookupSyncScheduleWrite(); }catch(_e){}
   }, 300);
   localStorage.setItem(MIGRATION_KEY, String(Date.now()));
-  try{ console.info('[SampleHub V40] Migration v13: rebuilt entryMims (1006 entries from updated XLS) + entryLookup. Stale MIMS rows (old suite codes) purged.'); }catch(_e){}
+  try{ console.info('[SampleHub V41] Migration v13: rebuilt entryMims (1006 entries from updated XLS) + entryLookup. Stale MIMS rows (old suite codes) purged.'); }catch(_e){}
 })();
 
 (function entryV36FullRebuild(){
@@ -4241,7 +4239,7 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
     try{ entryLookupSyncScheduleWrite && entryLookupSyncScheduleWrite(); }catch(_e){}
   }, 300);
   localStorage.setItem(MIGRATION_KEY, String(Date.now()));
-  try{ console.info('[SampleHub V40] Rebuilt entryMims + entryLookup — AMBER Trim (BIRDS EYE) and Glove Swab price now present.'); }catch(_e){}
+  try{ console.info('[SampleHub V41] Rebuilt entryMims + entryLookup — AMBER Trim (BIRDS EYE) and Glove Swab price now present.'); }catch(_e){}
 })();
 
 (function entryV35FullRebuild(){
@@ -4447,6 +4445,7 @@ const ENTRY_SWAB_SHORTCUTS = [
   { key:'swab_matrix', label:'Swab matrix', action:'swabMatrix' },
   { key:'milk_swab_bundle', label:'Milk Swab Bundle', action:'milkSwabBundle' },
   { key:'night_hygiene', label:'Night Hygiene', action:'nightHygiene' },
+  { key:'amber_swab', label:'AMBER Swab', resolve: () => entryLookup.find(p => (p.name||'').toLowerCase() === 'amber swab') },
   { key:'control_swab', label:'Control Swab',
     // Must be the Investigation Swab (2SS002) with SHIFT=Trial — that's the
     // control-swab row the actual workflow uses. The Weekly variants exist
@@ -4483,30 +4482,24 @@ function entryLookupByCurrentSquare(){
     return out;
   }
   if(entryActiveSquare === 'amber'){
-    // V34: broadened filter. Instead of a static whitelist that missed new
-    // AMBER-prefixed rows (Carcase Front, Amber Amber Trim, etc.), pick up
-    // anything whose name starts with "amber" (or contains " amber " as a
-    // dash-separated qualifier) OR whose backing MIMS row has order='Amber'.
-    // That way any row you rename with the AMBER prefix in MIMS_SAVE_FILE
-    // shows up in the Amber square without a code change. Suppress the Amber
-    // Swab (Investigation Swab material) — that belongs under the Swab square.
+    // Only the 11 AMBER skin/swab entries from SISBW30, SISBW46, SISBW11,
+    // plus Rapid Trim (2SP012). Excludes Shelf Life [Amber-], CIP Validation.
     return entryLookup.filter(p => {
-      const n = (p.name||'').toLowerCase().replace(/\s+/g,' ').trim();
-      const nameHit = n.startsWith('amber ') || n.startsWith('amber-') ||
-                      n === 'amber' || n.includes(' amber ') || n.includes('amber -');
-      const m = entryMimsRowForLookup(p);
-      const orderHit = m && String(m.order||'').toLowerCase() === 'amber';
-      if(!nameHit && !orderHit) return false;
-      // Exclude Amber Swab — swab square handles that.
-      if(m && m.material === 'Investigation Swab') return false;
-      return true;
+      const n = (p.name||'').toLowerCase();
+      const suite = (p.mimsSuite||'').toUpperCase();
+      if(!n.startsWith('amber') || !p.mimsSuite) return false;
+      if(n.includes('shelf life') || n.includes('cip validation')) return false;
+      return suite==='SISBW30'||suite==='SISBW46'||suite==='SISBW11'||
+             (suite==='2SP012' && n.includes('rapid trim'));
     });
   }
   if(entryActiveSquare === 'neck_caeca'){
     // Just the two shed-level swabs — neck skin surveillance + caeca testing.
     return entryLookup.filter(p => {
       const n = (p.name||'').toLowerCase();
-      return n.includes('neck skin surveillance') || n.includes('caeca testing');
+      const suite = (p.mimsSuite||'').toLowerCase();
+      return (n.includes('neck skin surveillance') && suite === '2sl001') ||
+             (n.includes('caeca testing') && suite === '2sp045');
     });
   }
   if(entryActiveSquare === 'nutri_sl'){
@@ -4515,7 +4508,6 @@ function entryLookupByCurrentSquare(){
       { id:'sq_nutri_bundle', name:'Nutritional Bundle', barcode:'', mimsBarcode:'', product:'Product', cat:'Category 1', source:'shortcut', action:'nutritionalBundle', _shortcutLabel:'Nutritional Bundle' },
       { id:'sq_shelflife_bundle', name:'Shelf Life Bundle', barcode:'', mimsBarcode:'', product:'Product', cat:'Category 1', source:'shortcut', action:'shelfLifeBundle', _shortcutLabel:'Shelf Life Bundle' },
       { id:'sq_raw_portions', name:'Raw Portions', barcode:'', mimsBarcode:'', product:'Product', cat:'Category 1', source:'shortcut', action:'rawPortions', _shortcutLabel:'Raw Portions' },
-      { id:'sq_external_bulk', name:'External Bulk', barcode:'MIMS_0019', mimsBarcode:'MIMS_0019', product:'Prep', cat:'Category 1', source:'shortcut', action:'externalBulk', _shortcutLabel:'External Bulk' },
       { id:'sq_pmd_wholebirds', name:'PMD Wholebirds', barcode:'MIMS_0018', mimsBarcode:'MIMS_0018', product:'Prep', cat:'Category 1', source:'shortcut', action:'pmdWholebirds', _shortcutLabel:'PMD Wholebirds' }
     ];
   }
@@ -4632,7 +4624,7 @@ function entryRetailerColorClass(name){
 // anything else (product names in Raw Portions, testing details in
 // Salmonella Testing) shows through so the person can tell rows apart.
 function entryCommsIsBoilerplate(c){
-  if(!c) return true;
+  if(!c || c === '.') return true;
   const s = String(c).toLowerCase();
   // Skip anything matching the "please follow X COP for storage" family,
   // plus the fixed "2037, Scunthorpe" note that appears on many rows.
@@ -4646,7 +4638,6 @@ function entryResultSubtitle(p){
   if(p.action === 'milkSwabBundle') return 'Monthly · Milk swab bundle · opens wizard';
   if(p.action === 'nightHygiene') return 'Environmental swabs by LINE · opens picker';
   if(p.action === 'rawPortions') return 'Daily raw portions · opens wizard';
-  if(p.action === 'externalBulk') return 'External Bulk · prompts product name';
   if(p.action === 'pmdWholebirds') return 'PMD Wholebirds · prompts colour';
   if(p.action === 'nutritionalBundle') return 'Raw / Cooked with turnaround options · opens wizard';
   if(p.action === 'shelfLifeBundle') return 'K+1 through K+12 sets per retailer · opens wizard';
@@ -4733,8 +4724,12 @@ document.getElementById('entryResultsAll').addEventListener('click', e=>{
   if(picked.action === 'swabMatrix'){ entrySwabMatrixOpen(); return; }
   if(picked.action === 'milkSwabBundle'){ entryMilkSwabBundleOpen(); return; }
   if(picked.action === 'nightHygiene'){ entryNightHygieneOpen(); return; }
+  // Amber Swab: confirm card → time per entry → comments per entry
+  if(entryIsAmberSwabPick(picked)){
+    entryOpenConfirm(picked, { needsAmberSwabFlow: true });
+    return;
+  }
   if(picked.action === 'rawPortions'){ entryRawPortionsOpen(); return; }
-  if(picked.action === 'externalBulk'){ entryExternalBulkOpen(); return; }
   if(picked.action === 'pmdWholebirds'){ entryPmdWholeBirdOpen(); return; }
   if(picked.action === 'nutritionalBundle'){ entryNutritionalBundleOpen(); return; }
   if(picked.action === 'shelfLifeBundle'){ entryShelfLifeBundleOpen(); return; }
@@ -4851,11 +4846,10 @@ function entrySwabMatrixFixedItems(){
   }));
   return [
     // Packaging
-    { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'CO-OP', other_id:'Fresh Pack 1' },
-    { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'CO-OP', other_id:'Fresh Pack 2' },
-    { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'CO-OP', other_id:'Cutting' },
-    { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'',       other_id:'Fresh Pack 1' },
-    { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'',       other_id:'Fresh Pack 2' },
+    { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'CO-OP', other_id:'Fresh Pack 1', promptGroup:'coop_fp1' },
+    { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'CO-OP', other_id:'Fresh Pack 2', promptGroup:'coop_fp2' },
+    { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'',       other_id:'Fresh Pack 1', promptGroup:'noncoop_fp1' },
+    { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'',       other_id:'Fresh Pack 2', promptGroup:'noncoop_fp2' },
     // Customer crates — 7, one per customer.
     ...crates,
     // Dolav — two entries.
@@ -4871,10 +4865,10 @@ function entrySwabMatrixFixedItems(){
 // record's desc for later manual tagging.
 function entrySwabMatrixPpeItems(room){
   return [
-    { count:3, material:'PPE Swab', descrptn:'Glove Swab',        note:'Blue glove — ' + room },
-    { count:3, material:'PPE Swab', descrptn:'White  glove',      note:'White glove — ' + room },
-    { count:5, material:'Hand Swab',                              note:'Hand swab — ' + room, resolver:'roomHand' },
-    { count:1, material:'PPE Swab', descrptn:'Bump Hat Swab',     note:'Hard hat — ' + room }
+    { count:3, material:'PPE Swab', descrptn:'Glove Swab',        note:'Blue glove — ' + room,  commsOverride: room },
+    { count:3, material:'PPE Swab', descrptn:'White  glove',      note:'White glove — ' + room, commsOverride: room },
+    { count:5, material:'Hand Swab',                              note:'Hand swab — ' + room,   commsOverride: room, resolver:'roomHand' },
+    { count:1, material:'PPE Swab', descrptn:'Bump Hat Swab',     note:'Hard hat — ' + room,    commsOverride: room }
   ];
 }
 
@@ -4919,7 +4913,7 @@ function entrySwabMatrixGoStage3(){
   // 2 Overall Swabs (one per colour); the colour ends up in the record's
   // desc so it's visible in the Simplified list.
   week.pair.forEach(color =>
-    items.push({ count:1, material:'PPE Swab', descrptn:'Overall Swab', note:'Overall — ' + color })
+    items.push({ count:1, material:'PPE Swab', descrptn:'Overall Swab', note:'Overall — ' + color, commsOverride: color })
   );
   // PPE bundle for the chosen room
   entrySwabMatrixPpeItems(room).forEach(x => items.push(x));
@@ -5000,6 +4994,7 @@ function entrySwabMatrixCommit(){
   const now = new Date();
   let n = entryNextNumber();
   let pushed = 0;
+  const promptGroupNums = { coop_fp1:[], coop_fp2:[], noncoop_fp1:[], noncoop_fp2:[] };
   items.forEach(spec => {
     let mimsRow;
     if(spec.resolver === 'roomHand'){
@@ -5039,6 +5034,12 @@ function entrySwabMatrixCommit(){
       if(spec.resolver === 'roomHand' || spec.material === 'Hand Swab'){
         rec.manualCellOverrides = { DESCRIPTN: 'Hand Swab' };
       }
+      // Write commsOverride into COMMS (overall colour or PPE room).
+      if(spec.commsOverride){
+        if(!rec.manualCellOverrides) rec.manualCellOverrides = {};
+        rec.manualCellOverrides.COMMS = spec.commsOverride;
+      }
+      if(spec.promptGroup && promptGroupNums[spec.promptGroup]) promptGroupNums[spec.promptGroup].push(rec.num);
       entryRecords.push(rec);
       pushed++;
     }
@@ -5046,6 +5047,8 @@ function entrySwabMatrixCommit(){
   entrySaveLocal();
   renderEntryAll();
   entrySwabMatrixClose();
+  // Chain product/customer prompts for packaging swab groups
+  entrySwabMatrixRunPackagingPrompts(promptGroupNums);
   // Nudge feedback so the user can tell the batch went in
   const status = pushed + ' entries added to the sequence.';
   const searchEl = document.getElementById('entrySearchAll');
@@ -5056,6 +5059,34 @@ function entrySwabMatrixCommit(){
     const el = document.getElementById('entryResultsAll');
     if(el.textContent.includes('entries added')) el.innerHTML='';
   }, 3500);
+}
+
+// Post-commit packaging swab prompts:
+// CO-OP FP1/FP2 → product into COMMS
+// Non-CO-OP FP1/FP2 → customer into retailerOverride (RETAILER), then product into COMMS
+function entrySwabMatrixRunPackagingPrompts(groups){
+  // One ask per group — entryPromptSharedValue writes the same answer to all nums.
+  const steps = [];
+  if(groups.coop_fp1.length)
+    steps.push({ nums: groups.coop_fp1, title: 'CO-OP Fresh Pack 1 · Product', col: 'COMMS', placeholder: 'e.g. Large' });
+  if(groups.coop_fp2.length)
+    steps.push({ nums: groups.coop_fp2, title: 'CO-OP Fresh Pack 2 · Product', col: 'COMMS', placeholder: 'e.g. Medium' });
+  if(groups.noncoop_fp1.length){
+    steps.push({ nums: groups.noncoop_fp1, title: 'Fresh Pack 1 · Customer', col: 'RETAILER', placeholder: 'e.g. Aldi' });
+    steps.push({ nums: groups.noncoop_fp1, title: 'Fresh Pack 1 · Product', col: 'COMMS', placeholder: 'e.g. Large' });
+  }
+  if(groups.noncoop_fp2.length){
+    steps.push({ nums: groups.noncoop_fp2, title: 'Fresh Pack 2 · Customer', col: 'RETAILER', placeholder: 'e.g. Tesco' });
+    steps.push({ nums: groups.noncoop_fp2, title: 'Fresh Pack 2 · Product', col: 'COMMS', placeholder: 'e.g. Large' });
+  }
+  if(!steps.length) return;
+  let i = 0;
+  function runStep(){
+    if(i >= steps.length){ entrySaveLocal(); renderEntryAll(); return; }
+    const step = steps[i++];
+    entryPromptSharedValue(step.nums, step.title, step.col, step.placeholder, runStep);
+  }
+  runStep();
 }
 
 // Wire the wizard buttons (all inside the card; the card is hidden by default).
@@ -5516,75 +5547,77 @@ document.getElementById('entryNightHygieneClose').addEventListener('click', entr
 // Each tap adds one record for that unit; Done closes the picker.
 // ============================================================
 const RAW_PORTIONS_ITEMS = [
-  { label: 'Breast Strips',         barcode: 'MIMS_0577' },
-  { label: 'Diced Breast',          barcode: 'MIMS_0588' },
-  { label: 'Drum Fillet',           barcode: 'MIMS_0602' },
-  { label: 'Drumstick',             barcode: 'MIMS_0603' },
-  { label: 'Inner Fillets',         barcode: 'MIMS_0616' },
-  { label: 'Oyster Leg',            barcode: 'MIMS_0632' },
-  { label: 'Skinless Breast Fillet',barcode: 'MIMS_0640' },
-  { label: 'Thigh',                 barcode: 'MIMS_0680' },
-  { label: 'Thigh Fillet',          barcode: 'MIMS_0695' },
-  { label: 'Wing',                  barcode: 'MIMS_0766' }
+  { label: 'Breast Strips',          barcode: 'MIMS_0577', routineId: 'msy5bnuw8ooj' },
+  { label: 'Diced Breast',           barcode: 'MIMS_0588', routineId: 'msy5cuarub8d' },
+  { label: 'Drum Fillet',            barcode: 'MIMS_0602', routineId: 'mtspno998i0e' },
+  { label: 'Drumstick',              barcode: 'MIMS_0603', routineId: 'mtspno99ryti' },
+  { label: 'Inner Fillets',          barcode: 'MIMS_0616', routineId: 'mtspl7e6pyh5' },
+  { label: 'Oyster Leg',             barcode: 'MIMS_0632', routineId: 'mtspl7e6h1m6' },
+  { label: 'Skinless Breast Fillet', barcode: 'MIMS_0640', routineId: 'mtspl7e61ee3' },
+  { label: 'Thigh',                  barcode: 'MIMS_0680', routineId: 'msy59uqrycwp' },
+  { label: 'Thigh Fillet',           barcode: 'MIMS_0695', routineId: 'mtspno99f8g1' },
+  { label: 'Wing',                   barcode: 'MIMS_0766', routineId: 'mtspq5fiirw5' }
 ];
 let entryRpAddedThisSession = new Map();
 
 function entryRawPortionsOpen(){
   entryRpAddedThisSession = new Map();
   const grid = document.getElementById('entryRawPortionsGrid');
-  grid.innerHTML = RAW_PORTIONS_ITEMS.map(item =>
-    `<button type="button" class="entry-picker-btn" data-rp-barcode="${esc(item.barcode)}" data-rp-label="${esc(item.label)}">` +
-      `${esc(item.label)}<span class="sub" data-rp-count="${esc(item.barcode)}"></span>` +
-    `</button>`
-  ).join('');
+  grid.innerHTML = RAW_PORTIONS_ITEMS.map(item => {
+    const ticked = item.routineId ? isDone(item.routineId, 'weekly') : false;
+    const tag = ticked ? '<span style="color:var(--done);font-size:10px;margin-left:4px;">RAW</span>'
+                       : '<span style="color:#a855f7;font-size:10px;margin-left:4px;">EXT</span>';
+    return `<button type="button" class="entry-picker-btn" data-rp-barcode="${esc(item.barcode)}" data-rp-label="${esc(item.label)}" style="border-left:3px solid ${ticked?'var(--done)':'#a855f7'};">` +
+      `${esc(item.label)}${tag}<span class="sub" data-rp-count="${esc(item.barcode)}"></span>` +
+    `</button>`;
+  }).join('');
   document.getElementById('entryRawPortionsCard').classList.remove('hidden');
   document.getElementById('entryRawPortionsCard').scrollIntoView({behavior:'smooth', block:'end'});
 }
 function entryRawPortionsClose(){
   document.getElementById('entryRawPortionsCard').classList.add('hidden');
 }
-function entryRawPortionsAdd(barcode){
-  const m = entryMimsRowFor(barcode);
-  if(!m) return;
-  const now = new Date();
+function entryRawPortionsAdd(barcode, item){
+  const portionLabel = item ? item.label : '';
+  const routineId = item ? item.routineId : null;
+  // Routine tick check: if this week's External Bulk is already ticked → Raw Portions.
+  // Otherwise → External Bulk (first send of the week). Either way tick it.
+  const extAlreadySent = routineId ? isDone(routineId, 'weekly') : false;
+  const rawMims = entryMimsRowFor(barcode);
+  const extMims = entryMimsRowFor('MIMS_0019');
+  const useMims = extAlreadySent ? rawMims : (extMims || rawMims);
+  const source = extAlreadySent ? 'raw-portions' : 'external-bulk';
+  const entryDesc = extAlreadySent ? portionLabel || 'Raw Portions' : 'External Bulk';
+  if(!useMims) return;
   const num = entryNextNumber();
-  // Use comms/unit (portion name e.g. "Wing") as record desc;
-  // underlying MIMS descrptn stays 'Raw Portions' for the export.
-  const portionName = m.comms || m.unit || m.descrptn || m.material;
-  entryRecords.push({
-    num,
-    desc: portionName,
-    barcode: entryIsSyntheticBarcode(m.barcode) ? '' : m.barcode,
-    mimsBarcode: m.barcode,
-    cat: 'Category 1',
-    time: now.toISOString(),
-    source: 'raw-portions', tmpl:null, mimsRow:null
-  });
+  const now = new Date();
+  const rec = {
+    num, desc: entryDesc,
+    barcode: entryIsSyntheticBarcode(useMims.barcode) ? '' : useMims.barcode,
+    mimsBarcode: useMims.barcode, cat: 'Category 1',
+    time: now.toISOString(), source, tmpl:null, mimsRow:null
+  };
+  if(portionLabel){
+    rec.manualCellOverrides = { COMMS: portionLabel };
+  }
+  entryRecords.push(rec);
+  if(routineId && !extAlreadySent) toggleDone(routineId, 'weekly');
   entryRpAddedThisSession.set(barcode, (entryRpAddedThisSession.get(barcode)||0)+1);
   entrySaveLocal();
   renderEntryAll();
-  // Update pill inline
   const count = entryRpAddedThisSession.get(barcode);
   const pill = document.querySelector(`[data-rp-count="${CSS.escape(barcode)}"]`);
-  if(pill) pill.textContent = `+${count} added`;
+  if(pill) pill.textContent = `+${count} ${extAlreadySent?'raw':'ext bulk'}`;
   const btn = pill ? pill.closest('.entry-picker-btn') : null;
-  if(btn) btn.style.background = 'rgba(62,201,138,.18)';
+  if(btn) btn.style.background = extAlreadySent ? 'rgba(62,201,138,.18)' : 'rgba(168,85,247,.2)';
 }
 document.getElementById('entryRawPortionsGrid').addEventListener('click', e=>{
   const btn = e.target.closest('[data-rp-barcode]'); if(!btn) return;
-  entryRawPortionsAdd(btn.dataset.rpBarcode);
+  const item = RAW_PORTIONS_ITEMS.find(x => x.barcode === btn.dataset.rpBarcode);
+  entryRawPortionsAdd(btn.dataset.rpBarcode, item);
 });
 document.getElementById('entryRawPortionsClose').addEventListener('click', entryRawPortionsClose);
 
-// ============================================================
-// External Bulk — one tap adds entry then prompts "Enter Product"
-// into the COMMS column (same pattern as Salmonella Testing).
-// ============================================================
-function entryExternalBulkOpen(){
-  const lp = entryLookup.find(p => p.mimsBarcode === 'MIMS_0019');
-  if(!lp){ alert('External Bulk entry not found.'); return; }
-  entryOpenConfirm(lp, { quickCount:true, needsExternalBulkProduct:true });
-}
 
 // ============================================================
 // PMD Wholebirds direct shortcut — same as picking from search
@@ -5744,6 +5777,11 @@ function entryIsNonStandardShiftPick(p){
   const STD = ['daily','weekly','monthly','.',''];
   return !STD.includes(shift);
 }
+// AMBER Swab — needs confirm card, then per-entry time, then per-entry comments.
+function entryIsAmberSwabPick(p){
+  if(!p) return false;
+  return (p.name||'').toLowerCase().trim() === 'amber swab';
+}
 // PMD Wholebirds — prompts for a Color per entry (goes into BATCH column).
 function entryIsPmdPick(p){
   if(!p) return false;
@@ -5866,6 +5904,7 @@ function entryOpenConfirm(p, opts){
     needsKfcUseBy: !!opts.needsKfcUseBy,
     needsKfcHotWingsEol: !!opts.needsKfcHotWingsEol,
     needsExternalBulkProduct: !!opts.needsExternalBulkProduct,
+    needsAmberSwabFlow: !!opts.needsAmberSwabFlow,
     needsControlSwabFlow: !!opts.needsControlSwabFlow,
     needsEquipmentSwabFlow: !!opts.needsEquipmentSwabFlow,
     needsMeatContentFlow: !!opts.needsMeatContentFlow,
@@ -6460,7 +6499,9 @@ function entryCommit(){
     // "Aldi garlic spatchcock"). Use it for the DESCRIPTN cell across all
     // 11 records in the bundle — the reference file has the same MIMS name
     // repeated on every row of a Meat Prep bundle.
-    const authoritativeDesc = (mimsRow && mimsRow.descrptn) ? mimsRow.descrptn : entryPending.desc;
+    // Skip [ENTER...] placeholders — use the scanned product's own name instead.
+    const _mimsDesc = (mimsRow && mimsRow.descrptn) ? mimsRow.descrptn : '';
+    const authoritativeDesc = (_mimsDesc && !_mimsDesc.startsWith('[')) ? _mimsDesc : entryPending.desc;
     // Meat prep 5E+1D+5S — the middle daily row uses the scanned product's
     // own MIMS row (so its USE_BY resolves normally). The EOL / SOL rows
     // point at 2SL003E / 2SL003S which have blank use_by in MIMS. Apply the
@@ -6603,6 +6644,7 @@ function entryCommit(){
   const followUpKfcUseBy = !!entryPending.needsKfcUseBy;
   const followUpKfcHotWingsEol = !!entryPending.needsKfcHotWingsEol;
   const followUpExternalBulkProduct = !!entryPending.needsExternalBulkProduct;
+  const followUpAmberSwabFlow = !!entryPending.needsAmberSwabFlow;
   const followUpControlSwab = !!entryPending.needsControlSwabFlow;
   const followUpEquipmentSwab = !!entryPending.needsEquipmentSwabFlow;
   const followUpMeatContent = !!entryPending.needsMeatContentFlow;
@@ -6657,6 +6699,26 @@ function entryCommit(){
       placeholder: 'e.g. Chicken Breast 650g',
       hint: 'Product name for this entry',
       numeric: false
+    });
+    return;
+  }
+  if(followUpAmberSwabFlow){
+    // Amber Swab: per-entry time then per-entry comments
+    entryStartPromptLoop(newNums, {
+      title: 'Swab time (HH:MM)',
+      column: 'MANUFTIME',
+      placeholder: '__:__',
+      hint: 'Time of swab',
+      numeric: false,
+      inputmode: 'numeric'
+    }, ()=>{
+      entryStartPromptLoop(newNums, {
+        title: 'Comments',
+        column: 'COMMS',
+        placeholder: 'e.g. Pre glove',
+        hint: 'Comment for this swab entry',
+        numeric: false
+      });
     });
     return;
   }
@@ -7883,14 +7945,12 @@ function entryRenderSimplifiedRow(r){
     }
   }
   return `<tr class="${selected?'entry-row-selected':''}" data-entrynum="${r.num}">
-    <td class="mono">${numLabel}</td>
-    <td class="mono">${esc(r.barcode||'—')}</td>
-    <td>${esc(r.desc)}</td>
-    <td>${(r.cat||'').replace('Category ','C')}</td>
-    <td class="mono">${killLabel}</td>
-    <td class="mono" style="color:${r.useByOverride!=null?'var(--done)':'var(--ink-dim)'}">${ubLabel}</td>
-    <td class="mono">${timeEditable}</td>
-    <td>${entrySelectMode ? '' : `<button class="sched-del" data-entrydel="${entryRecords.indexOf(r)}">✕</button>`}</td>
+    <td class="mono" style="font-size:11px;">${numLabel}</td>
+    <td style="font-size:12px;line-height:1.25;">${esc(r.desc)}</td>
+    <td class="mono" style="font-size:11px;">${killLabel}</td>
+    <td class="mono" style="font-size:11px;color:${r.useByOverride!=null?'var(--done)':'var(--ink-dim)'}">${ubLabel}</td>
+    <td class="mono" style="font-size:11px;">${timeEditable}</td>
+    <td>${entrySelectMode ? '' : `<button class="sched-del" data-entrydel="${entryRecords.indexOf(r)}" style="padding:2px 4px;font-size:11px;">✕</button>`}</td>
   </tr>`;
 }
 
@@ -8714,13 +8774,13 @@ function entryBuildSisRow(r){
     }
     row.SAMPCOUNT = '';   // never numbered
     row.SAMDATE = entryFmtDateUK(new Date());
-    row.SAMBY = localStorage.getItem('unified.samplerName') || 'Sampler';
+    row.SAMBY = 'Birat Gautam';
     row.MANUFDATE = row.KILLDATE;
     row.ORDER = r.cat;
     // Manual overrides (SIZE / UNIT / OTHER_ID / LINE from the wizard,
     // DESCRIPTN with the product name filled in) win last.
     if(r.manualCellOverrides){
-      Object.keys(r.manualCellOverrides).forEach(h => { row[h] = r.manualCellOverrides[h]; });
+      Object.keys(r.manualCellOverrides).forEach(h => { const v=r.manualCellOverrides[h]; if(h==='COMMS' && typeof v==='string' && v.startsWith('[ENTER')) return; row[h]=v; });
     }
     return row;
   }
@@ -8787,7 +8847,7 @@ function entryBuildSisRow(r){
   }
   if(mimsRow){
     row.PRODUCT=mimsRow.product; row.MATERIAL=mimsRow.material; row.RISE=mimsRow.rise; row.UNIT=mimsRow.unit;
-    row.DESCRIPTN=mimsRow.descrptn||r.desc; row.SIZE=mimsRow.size; row.RETAILER=mimsRow.retailer;
+    row.DESCRIPTN=((mimsRow.descrptn&&!mimsRow.descrptn.startsWith("["))?mimsRow.descrptn:null)||r.desc; row.SIZE=mimsRow.size; row.RETAILER=mimsRow.retailer;
     // SHIFT priority — the user's category choice wins over the MIMS
     // default. The catalogue's MIMS.shift is a suggested default (nearly
     // every row says "Daily"), but the person ticked a specific frequency
@@ -8832,7 +8892,7 @@ function entryBuildSisRow(r){
     // and PERIOD="FAV Cuts" are baked into the reference file — without
     // this the export would leave them blank.
     if(mimsRow.supplier) row.SUPPLIER = mimsRow.supplier;
-    if(mimsRow.comms) row.COMMS = mimsRow.comms;
+    if(mimsRow.comms) row.COMMS = (mimsRow.comms === '.') ? '' : mimsRow.comms;
     if(mimsRow.location) row.LOCATION = mimsRow.location;
     if(mimsRow.period) row.PERIOD = mimsRow.period;
     if(mimsRow.conditions) row.CONDITIONS = mimsRow.conditions;
@@ -8914,7 +8974,7 @@ function entryBuildSisRow(r){
   // get displaced. r.num is null and noSampCount is set for those.
   row.SAMPCOUNT = (r.noSampCount || r.num == null) ? '' : String(r.num);
   row.SAMDATE=entryFmtDateUK(new Date());
-  row.SAMBY = localStorage.getItem('unified.samplerName') || 'Sampler';
+  row.SAMBY = 'Birat Gautam';
   row.CLIENT='SIS'; row.MANUFDATE=row.KILLDATE;
   // Per-record retailer override — currently used by the Swab-Matrix customer
   // crates block, where all 7 records hit the same MIMS row but each carries
@@ -8927,7 +8987,7 @@ function entryBuildSisRow(r){
   // person: the value they typed is what ships.
   if(r.manualCellOverrides){
     Object.keys(r.manualCellOverrides).forEach(k=>{
-      row[k] = r.manualCellOverrides[k];
+      const v=r.manualCellOverrides[k]; if(k==='COMMS' && typeof v==='string' && v.startsWith('[ENTER')) return; row[k]=v;
     });
   }
   return row;
@@ -9068,7 +9128,6 @@ function entryExportFullMims(){
   entryStyleAndWriteSisSheet(aoa, `MIMS_Full_Catalogue_${entryExportStamp()}.xlsx`);
 }
 document.getElementById('entryBtnExport').addEventListener('click', entryExportSis);
-document.getElementById('entryBtnExportAllMims').addEventListener('click', entryExportFullMims);
 
 /* ---------- MIMS upload ---------- */
 document.getElementById('entryFileMims').addEventListener('change', async e=>{
