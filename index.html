@@ -792,7 +792,7 @@
 <header>
   <div class="title-row">
     <div>
-      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v46</span></h1>
+      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v47</span></h1>
       <div class="period-note" id="periodNote"></div>
     </div>
     <button class="icon-btn" id="menuBtn">Menu</button>
@@ -3948,7 +3948,7 @@ let entryMims = JSON.parse(localStorage.getItem(LS_ENTRY_MIMS) || 'null')
   const removed = before - entryMims.length;
   if(removed > 0){
     try{ localStorage.setItem(LS_ENTRY_MIMS, JSON.stringify(entryMims)); }catch(_e){}
-    try{ console.info(`[SampleHub V46] Deduplication: removed ${removed} duplicate MIMS rows (${before} → ${entryMims.length}).`); }catch(_e){}
+    try{ console.info(`[SampleHub V47] Deduplication: removed ${removed} duplicate MIMS rows (${before} → ${entryMims.length}).`); }catch(_e){}
   }
 })();
 
@@ -4239,7 +4239,7 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
     try{ entryLookupSyncScheduleWrite && entryLookupSyncScheduleWrite(); }catch(_e){}
   }, 300);
   localStorage.setItem(MIGRATION_KEY, String(Date.now()));
-  try{ console.info('[SampleHub V46] Migration v13: rebuilt entryMims (1006 entries from updated XLS) + entryLookup. Stale MIMS rows (old suite codes) purged.'); }catch(_e){}
+  try{ console.info('[SampleHub V47] Migration v13: rebuilt entryMims (1006 entries from updated XLS) + entryLookup. Stale MIMS rows (old suite codes) purged.'); }catch(_e){}
 })();
 
 (function entryV36FullRebuild(){
@@ -4267,7 +4267,7 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
     try{ entryLookupSyncScheduleWrite && entryLookupSyncScheduleWrite(); }catch(_e){}
   }, 300);
   localStorage.setItem(MIGRATION_KEY, String(Date.now()));
-  try{ console.info('[SampleHub V46] Rebuilt entryMims + entryLookup — AMBER Trim (BIRDS EYE) and Glove Swab price now present.'); }catch(_e){}
+  try{ console.info('[SampleHub V47] Rebuilt entryMims + entryLookup — AMBER Trim (BIRDS EYE) and Glove Swab price now present.'); }catch(_e){}
 })();
 
 (function entryV35FullRebuild(){
@@ -5069,6 +5069,8 @@ function entrySwabMatrixCommit(){
       // other swab types (Overall/Glove/Bump Hat) keep their spec.descrptn.
       if(spec.resolver === 'roomHand' || spec.material === 'Hand Swab'){
         rec.manualCellOverrides = { DESCRIPTN: 'Hand Swab' };
+        // V47: Hand Swab OTHER_ID = chosen room (same text as COMMS).
+        if(spec.commsOverride) rec.manualCellOverrides.OTHER_ID = spec.commsOverride;
       }
       // Write commsOverride into COMMS (overall colour or PPE room).
       if(spec.commsOverride){
