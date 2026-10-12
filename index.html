@@ -792,7 +792,7 @@
 <header>
   <div class="title-row">
     <div>
-      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v45</span></h1>
+      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v46</span></h1>
       <div class="period-note" id="periodNote"></div>
     </div>
     <button class="icon-btn" id="menuBtn">Menu</button>
@@ -3948,7 +3948,7 @@ let entryMims = JSON.parse(localStorage.getItem(LS_ENTRY_MIMS) || 'null')
   const removed = before - entryMims.length;
   if(removed > 0){
     try{ localStorage.setItem(LS_ENTRY_MIMS, JSON.stringify(entryMims)); }catch(_e){}
-    try{ console.info(`[SampleHub V45] Deduplication: removed ${removed} duplicate MIMS rows (${before} → ${entryMims.length}).`); }catch(_e){}
+    try{ console.info(`[SampleHub V46] Deduplication: removed ${removed} duplicate MIMS rows (${before} → ${entryMims.length}).`); }catch(_e){}
   }
 })();
 
@@ -4239,7 +4239,7 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
     try{ entryLookupSyncScheduleWrite && entryLookupSyncScheduleWrite(); }catch(_e){}
   }, 300);
   localStorage.setItem(MIGRATION_KEY, String(Date.now()));
-  try{ console.info('[SampleHub V45] Migration v13: rebuilt entryMims (1006 entries from updated XLS) + entryLookup. Stale MIMS rows (old suite codes) purged.'); }catch(_e){}
+  try{ console.info('[SampleHub V46] Migration v13: rebuilt entryMims (1006 entries from updated XLS) + entryLookup. Stale MIMS rows (old suite codes) purged.'); }catch(_e){}
 })();
 
 (function entryV36FullRebuild(){
@@ -4267,7 +4267,7 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
     try{ entryLookupSyncScheduleWrite && entryLookupSyncScheduleWrite(); }catch(_e){}
   }, 300);
   localStorage.setItem(MIGRATION_KEY, String(Date.now()));
-  try{ console.info('[SampleHub V45] Rebuilt entryMims + entryLookup — AMBER Trim (BIRDS EYE) and Glove Swab price now present.'); }catch(_e){}
+  try{ console.info('[SampleHub V46] Rebuilt entryMims + entryLookup — AMBER Trim (BIRDS EYE) and Glove Swab price now present.'); }catch(_e){}
 })();
 
 (function entryV35FullRebuild(){
@@ -4880,10 +4880,12 @@ function entrySwabMatrixFixedItems(){
   }));
   return [
     // Packaging
+    // V46: order Co-op FP1 → Non-coop FP1 → Co-op FP2 → Non-coop FP2.
+    // Non-coop rows live in MIMS with retailer "[ENTER CUSTOMER]" (MIMS_0039/0040).
     { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'CO-OP', other_id:'Fresh Pack 1', promptGroup:'coop_fp1' },
+    { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'[ENTER CUSTOMER]', other_id:'Fresh Pack 1', promptGroup:'noncoop_fp1' },
     { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'CO-OP', other_id:'Fresh Pack 2', promptGroup:'coop_fp2' },
-    { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'',       other_id:'Fresh Pack 1', promptGroup:'noncoop_fp1' },
-    { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'',       other_id:'Fresh Pack 2', promptGroup:'noncoop_fp2' },
+    { count:5, material:'Packaging Swab', descrptn:'Product Packaging swabs', retailer:'[ENTER CUSTOMER]', other_id:'Fresh Pack 2', promptGroup:'noncoop_fp2' },
     // Customer crates — 7, one per customer.
     ...crates,
     // Dolav — two entries.
@@ -5073,6 +5075,10 @@ function entrySwabMatrixCommit(){
         if(!rec.manualCellOverrides) rec.manualCellOverrides = {};
         rec.manualCellOverrides.COMMS = spec.commsOverride;
       }
+      if(spec.promptGroup && spec.other_id){
+        if(!rec.manualCellOverrides) rec.manualCellOverrides = {};
+        rec.manualCellOverrides.OTHER_ID = spec.other_id;
+      }
       if(spec.promptGroup && promptGroupNums[spec.promptGroup]) promptGroupNums[spec.promptGroup].push(rec.num);
       entryRecords.push(rec);
       pushed++;
@@ -5103,12 +5109,12 @@ function entrySwabMatrixRunPackagingPrompts(groups){
   const steps = [];
   if(groups.coop_fp1.length)
     steps.push({ nums: groups.coop_fp1, title: 'CO-OP Fresh Pack 1 · Product', col: 'COMMS', placeholder: 'e.g. Large' });
-  if(groups.coop_fp2.length)
-    steps.push({ nums: groups.coop_fp2, title: 'CO-OP Fresh Pack 2 · Product', col: 'COMMS', placeholder: 'e.g. Medium' });
   if(groups.noncoop_fp1.length){
     steps.push({ nums: groups.noncoop_fp1, title: 'Fresh Pack 1 · Customer', col: 'RETAILER', placeholder: 'e.g. Aldi' });
     steps.push({ nums: groups.noncoop_fp1, title: 'Fresh Pack 1 · Product', col: 'COMMS', placeholder: 'e.g. Large' });
   }
+  if(groups.coop_fp2.length)
+    steps.push({ nums: groups.coop_fp2, title: 'CO-OP Fresh Pack 2 · Product', col: 'COMMS', placeholder: 'e.g. Medium' });
   if(groups.noncoop_fp2.length){
     steps.push({ nums: groups.noncoop_fp2, title: 'Fresh Pack 2 · Customer', col: 'RETAILER', placeholder: 'e.g. Tesco' });
     steps.push({ nums: groups.noncoop_fp2, title: 'Fresh Pack 2 · Product', col: 'COMMS', placeholder: 'e.g. Large' });
@@ -9003,7 +9009,8 @@ function entryBuildSisRow(r){
   const suppressByDesc =
        descL.includes('external intake') || mimsDescL.includes('external intake')
     || descL.includes('external bulk')   || mimsDescL.includes('external bulk')
-    || descL.includes('salmonella')      || mimsDescL.includes('salmonella')
+    || ((descL.includes('salmonella') || mimsDescL.includes('salmonella'))
+        && !descL.includes('basket') && !mimsDescL.includes('basket'))
     || descL.includes('meat content')    || mimsDescL.includes('meat content');
   const noTimeSource = r.source === 'shelf-life-bundle'
     || r.source === 'nutritional-bundle';
@@ -9034,6 +9041,29 @@ function entryBuildSisRow(r){
   // its own customer name (Tesco / KFC / M&S / Coop / Iceland / Ocado / Aldi)
   // into the export's RETAILER cell.
   if(r.retailerOverride) row.RETAILER = r.retailerOverride;
+  // V46 K+2 EOL rule. Tue–Sat only (Mon/Sun unchanged). For real product
+  // entries (PRODUCT="Product", listed retailer, shift Daily/Weekly/Monthly)
+  // whose EOL is N: if scan date − kill date is 2 or more days, EOL → Y.
+  // Monthly / EOL-shift / swabs / shelf-life untouched. MIMS not changed.
+  // A manual EOL cell edit (applied below) still wins.
+  try{
+    const mo = r.manualCellOverrides || {};
+    const pick = k => (mo[k] !== undefined && mo[k] !== null && mo[k] !== '') ? String(mo[k]) : String(row[k]||'');
+    const K2_RETAILERS = ['aldi','asda','booth','booths','co-op','coop','costco','iceland','kfc','m&s','ocado','tesco'];
+    const prodV = pick('PRODUCT').trim().toLowerCase();
+    const retV  = pick('RETAILER').trim().toLowerCase();
+    const shV   = pick('SHIFT').trim().toLowerCase();
+    const eolV  = String(row.EOL||'').trim().toUpperCase();
+    const dmy = s => { const m = String(s).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); return m ? Date.UTC(+m[3], +m[2]-1, +m[1]) : null; };
+    const kd = dmy(pick('KILLDATE'));
+    const sd = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    const dow = now.getDay(); // 0 Sun … 6 Sat
+    if(prodV === 'product' && K2_RETAILERS.includes(retV)
+       && (shV === 'daily' || shV === 'weekly' || shV === 'monthly') && eolV === 'N'
+       && dow >= 2 && dow <= 6 && kd !== null && Math.round((sd - kd)/86400000) >= 2){
+      row.EOL = 'Y';
+    }
+  }catch(_e){}
   // Manual per-cell overrides — set via tapping a cell in the export view.
   // Applied last so they win over every automatic path (including
   // retailerOverride above), which is what "manually filled" means to the
