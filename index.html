@@ -1210,9 +1210,9 @@
       <div id="entryRecordsWrap" class="entry-table-scroll">
         <table class="entry-table">
           <colgroup>
-            <col style="width:10%"><col style="width:46%"><col style="width:10%"><col style="width:10%"><col style="width:19%"><col style="width:5%">
+            <col style="width:10%"><col style="width:46%"><col style="width:10%"><col style="width:10%"><col style="width:12%"><col style="width:12%">
           </colgroup>
-          <thead><tr><th># <span id="entryCount" class="entry-count-inline">0</span></th><th>Description</th><th>Kill</th><th>UB</th><th>Time</th><th></th></tr></thead>
+          <thead><tr><th># <span id="entryCount" class="entry-count-inline">0</span></th><th>Description</th><th>Kill</th><th>UB</th><th style="padding-left:3px;padding-right:3px;">Time</th><th style="padding-left:3px;padding-right:3px;">Wt</th></tr></thead>
           <tbody id="entryTbody"></tbody>
         </table>
         <div class="empty" id="entryEmpty">No records yet.</div>
@@ -4821,8 +4821,13 @@ document.getElementById('entryResultsAll').addEventListener('click', e=>{
     entryOpenConfirm(picked, { needsBasketTimeFlow: true });
     return;
   }
-  if(entryIsPackagingSwabNonCoopPick(picked)){
-    entryOpenConfirm(picked, { needsPackagingCustomerFlow: true });
+  // V49: CO-OP packaging → ask Product (→ COMMS). Non-CO-OP → Customer
+  // (→ RETAILER) then Product (→ COMMS), same as the Swab Matrix.
+  if(entryIsPackagingSwabPick(picked)){
+    entryOpenConfirm(picked, {
+      needsPackagingCustomerFlow: entryIsPackagingSwabNonCoopPick(picked),
+      needsPackagingProductFlow: true
+    });
     return;
   }
   // Non-standard shift (EOL, Trial, Annually, etc.) — skip cat picker,
@@ -5467,7 +5472,14 @@ function entryNightHygieneRowsForLetter(letter){
     }
     return 0;
   });
-  return rows;
+  // V49: MIMS has some exact duplicate rows (e.g. H67 "Inside Luceo bin" twice).
+  // Show each LINE + description + room + suite once.
+  const seen = new Set();
+  return rows.filter(m => {
+    const k = [m.line, (m.descrptn||'').trim().toLowerCase(), m.other_id||'', m.suite||'', m.shift||''].join('|');
+    if(seen.has(k)) return false;
+    seen.add(k); return true;
+  });
 }
 
 let entryNhAddedThisSession = new Map(); // barcode → count added this session
@@ -6013,10 +6025,20 @@ function entryIsBasketSwabPick(p){
   if(mat.includes('basket swab')) return true;
   return n.includes('basket e.coli') || n.includes('basket e coli') || n.includes('basket salmonella');
 }
+// V49: is this any Product Packaging swab? (CO-OP or not)
+function entryIsPackagingSwabPick(p){
+  if(!p) return false;
+  const n = (p.name || '').toLowerCase();
+  const m = p.mimsBarcode ? entryMimsRowFor(p.mimsBarcode) : null;
+  if(m && (m.material||'') === 'Packaging Swab') return true;
+  return n.includes('packaging swab') || n.includes('retail packaging');
+}
 function entryIsPackagingSwabNonCoopPick(p){
   if(!p) return false;
   const n = (p.name || '').toLowerCase();
-  const ret = (p.mimsRetailer || p.retailer || '').toLowerCase();
+  // V49: lookup entries don't carry the retailer — read it from the MIMS row.
+  const mrow = p.mimsBarcode ? entryMimsRowFor(p.mimsBarcode) : null;
+  const ret = (p.mimsRetailer || p.retailer || (mrow && mrow.retailer) || '').toLowerCase();
   const isPkg = n.includes('packaging swab') || n.includes('retail packaging');
   if(!isPkg) return false;
   if(ret === 'co-op' || ret === 'coop') return false;
@@ -6114,7 +6136,8 @@ function entryOpenConfirm(p, opts){
     needsMeatContentFlow: !!opts.needsMeatContentFlow,
     needsFatValidationFlow: !!opts.needsFatValidationFlow,
     needsBasketTimeFlow: !!opts.needsBasketTimeFlow,
-    needsPackagingCustomerFlow: !!opts.needsPackagingCustomerFlow
+    needsPackagingCustomerFlow: !!opts.needsPackagingCustomerFlow,
+    needsPackagingProductFlow: !!opts.needsPackagingProductFlow
   };
   entryShowConfirm(sug);
   // Quick-count flow: hide the category picker, focus the Entries input, pop
@@ -6614,10 +6637,16 @@ function entryCommit(){
   // (single-entry commit only), drop the current occupant first — the
   // whole point of jump-to a used num is "this entry was wrong, put THIS
   // in its place". Leave a tombstone so paired devices reflect the removal.
+  // V49 fix: replace IN PLACE. No tombstone (a tombstone for the same num
+  // could wipe the replacement during sync), the new record takes the old
+  // one's list position (posTime) and carries a replace stamp (rev) so the
+  // sync merge always prefers it over any older copy of the same num.
+  let entryReplaceInfo = null;
   if(entryPending.entries === 1){
     const existingIdx = entryRecords.findIndex(r => r.num === n);
     if(existingIdx !== -1){
-      entryMarkDeleted([n]);
+      const old = entryRecords[existingIdx];
+      entryReplaceInfo = { idx: existingIdx, posTime: old.posTime || old.time || null, rev: new Date().toISOString() };
       entryRecords.splice(existingIdx, 1);
     }
   }
@@ -6756,6 +6785,16 @@ function entryCommit(){
       newNums.push(n+k);
     }
   }
+  if(entryReplaceInfo){
+    const ni = entryRecords.map(r => r.num).lastIndexOf(n);
+    if(ni !== -1){
+      const rec = entryRecords.splice(ni, 1)[0];
+      if(entryReplaceInfo.posTime) rec.posTime = entryReplaceInfo.posTime;
+      rec.rev = entryReplaceInfo.rev;
+      entryRecords.splice(Math.min(entryReplaceInfo.idx, entryRecords.length), 0, rec);
+    }
+    try{ entryFlashToast(`Replaced #${n}`); }catch(_e){}
+  }
   if(entryPending.barcode){
     if(entryPending.cat==='Category 2') entryTicks[entryPending.barcode]={freq:'weekly', period:weekKey()};
     if(entryPending.cat==='Category 3') entryTicks[entryPending.barcode]={freq:'monthly', period:monthKey()};
@@ -6856,6 +6895,7 @@ function entryCommit(){
   const followUpFatValidation = !!entryPending.needsFatValidationFlow;
   const followUpBasketTime = !!entryPending.needsBasketTimeFlow;
   const followUpPackagingCustomer = !!entryPending.needsPackagingCustomerFlow;
+  const followUpPackagingProduct = !!entryPending.needsPackagingProductFlow;
   entryPending=null;
   document.getElementById('entryConfirmCard').classList.add('hidden');
   document.getElementById('entrySearchAll').value='';
@@ -7022,11 +7062,19 @@ function entryCommit(){
     });
     return;
   }
-  if(followUpPackagingCustomer){
-    entryPromptSharedValue(newNums, 'Customer / Retailer (fills RETAILER)', 'RETAILER', 'e.g. Tesco', ()=>{
-      entrySaveLocal();
-      renderEntryAll();
-    });
+  if(followUpPackagingCustomer || followUpPackagingProduct){
+    const askProduct = ()=>{
+      if(!followUpPackagingProduct){ entrySaveLocal(); renderEntryAll(); return; }
+      entryPromptSharedValue(newNums, 'Packaging · Product (goes into comments)', 'COMMS', 'e.g. Large', ()=>{
+        entrySaveLocal();
+        renderEntryAll();
+      });
+    };
+    if(followUpPackagingCustomer){
+      entryPromptSharedValue(newNums, 'Customer / Retailer (fills RETAILER)', 'RETAILER', 'e.g. Tesco', askProduct);
+    } else {
+      askProduct();
+    }
     return;
   }
     if(followUpFatValidation){
@@ -8161,13 +8209,24 @@ function entryRenderSimplifiedRow(r){
       ubLabel = entryFmtDateShort(ub);
     }
   }
+  // V49: weight only for Cutting-room portion products (MIMS OTHER_ID
+  // "Cutting" with a real g/kg size) — e.g. Breast Fillet 300g vs 650g.
+  let wtLabel = '';
+  {
+    const jk = r.mimsBarcode || r.barcode;
+    const mr = jk ? entryMimsRowFor(jk) : null;
+    if(mr && String(mr.other_id||'').trim().toLowerCase() === 'cutting' && /\d\s*(g|kg)\b/i.test(String(mr.size||''))){
+      wtLabel = String(mr.size).replace(/\s+/g,'').replace(/KG$/i,'kg').replace(/G$/,'g');
+    }
+  }
+  const delBtn = entrySelectMode ? '' : `<button class="sched-del" data-entrydel="${entryRecords.indexOf(r)}" style="padding:2px 4px;font-size:11px;float:right;">✕</button>`;
   return `<tr class="${selected?'entry-row-selected':''}" data-entrynum="${r.num}">
     <td class="mono" style="font-size:11px;">${numLabel}</td>
     <td style="font-size:12px;line-height:1.25;">${esc(r.desc)}</td>
     <td class="mono" style="font-size:11px;">${killLabel}</td>
     <td class="mono" style="font-size:11px;color:${r.useByOverride!=null?'var(--done)':'var(--ink-dim)'}">${ubLabel}</td>
-    <td class="mono" style="font-size:11px;">${timeEditable}</td>
-    <td>${entrySelectMode ? '' : `<button class="sched-del" data-entrydel="${entryRecords.indexOf(r)}" style="padding:2px 4px;font-size:11px;">✕</button>`}</td>
+    <td class="mono" style="font-size:11px;padding-left:3px;padding-right:3px;">${timeEditable}</td>
+    <td style="font-size:11px;padding-left:3px;padding-right:3px;color:var(--weekly);font-weight:600;">${delBtn}${esc(wtLabel)}</td>
   </tr>`;
 }
 
@@ -8422,7 +8481,14 @@ document.getElementById('entryBtnWipe').addEventListener('click', ()=>{
 
 /* ---------- Export view: same row-builder the actual export uses,
    rendered as an on-screen table so it's checkable before exporting. ---------- */
-function renderEntryExportView(){
+function renderEntryExportView(force){
+  // V49 phone-keyboard fix: never rebuild the table while a cell editor is
+  // focused (a sync echo or other render used to destroy the input and drop
+  // the keyboard). The edit's own exit path renders with force=true.
+  if(!force){
+    const ae = document.activeElement;
+    if(ae && ae.classList && ae.classList.contains('entry-export-inline-input')) return;
+  }
   const sorted = [...entryRecords];
   const table=document.getElementById('entryExportTable');
   if(!sorted.length){ table.innerHTML='<tr><td>No records yet.</td></tr>'; return; }
@@ -8545,6 +8611,8 @@ function entryExportEditCell(num, h, initial){
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'entry-export-inline-input';
+  input.setAttribute('enterkeyhint', 'next');   // Android keyboard shows a "next" arrow
+  input.setAttribute('autocomplete', 'off');
   input.value = (initial !== undefined) ? initial : current;
   td.innerHTML = '';
   td.appendChild(input);
@@ -8557,8 +8625,10 @@ function entryExportEditCell(num, h, initial){
   }
   // Mobile: guard against spurious blur firing during keyboard navigation
   let _navCommitting = false;
-  const commit = (save, moveDir)=>{
-    if(!entryExportEditing) return;
+  let _done = false;
+  const commit = (save, moveDir, fromBlur)=>{
+    if(_done) return;
+    _done = true;
     const v = input.value;
     if(save){
       if(!rec.manualCellOverrides) rec.manualCellOverrides = {};
@@ -8587,12 +8657,11 @@ function entryExportEditCell(num, h, initial){
       }
       entrySaveLocal();
     }
+    const showText = (v !== '') ? v : current;
     if(moveDir){
-      // KEYBOARD FIX: skip re-render during navigation so the DOM stays
-      // intact and the keyboard never dismisses. Just update the current
-      // cell's text in-place, open the next cell's input directly.
-      // Full re-render happens on blur (when user taps away).
-      td.textContent = v;
+      // KEYBOARD FIX (V49): open + focus the NEXT cell's input first, then
+      // replace this cell's input with text — the keyboard never loses its
+      // focused field, so it doesn't drop. Full re-render happens on exit.
       const grid = entryExportGrid();
       let ri=-1, ci=-1;
       for(let i=0;i<grid.length;i++){
@@ -8605,15 +8674,28 @@ function entryExportEditCell(num, h, initial){
         const nr=Math.max(0,Math.min(grid.length-1,ri+moveDir.dr));
         const nc=Math.max(0,Math.min(grid[nr].length-1,ci+moveDir.dc));
         const t=grid[nr][nc];
-        entryExportSetFocus(t.num,t.h);
-        entryExportEditCell(t.num,t.h);
-        return; // keyboard stays — no re-render
+        if(!(t.num===num && t.h===h)){
+          entryExportSetFocus(t.num,t.h);
+          entryExportEditCell(t.num,t.h);
+          td.textContent = showText;
+          return; // keyboard stays — no re-render
+        }
       }
     }
-    // Blur / Escape / no next cell: now safe to fully re-render
-    entryExportEditing = false;
-    renderEntryExportView();
-    entryExportSetFocus(num, h);
+    // Exit. If the person tapped straight into another cell, that cell's
+    // editor already owns focus — just leave this cell's text in place.
+    const finishExit = ()=>{
+      const ae = document.activeElement;
+      if(ae && ae !== input && ae.classList && ae.classList.contains('entry-export-inline-input')){
+        td.textContent = showText;
+        return;
+      }
+      try{ if(document.activeElement === input) input.blur(); }catch(_e){}
+      entryExportEditing = false;
+      renderEntryExportView(true);
+      entryExportSetFocus(num, h, {scroll:false});
+    };
+    if(fromBlur) setTimeout(finishExit, 0); else finishExit();
   };
   input.addEventListener('keydown', ev=>{
     if(ev.key === 'Enter'){
@@ -8630,8 +8712,17 @@ function entryExportEditCell(num, h, initial){
       commit(false, null);
     }
   });
-  input.addEventListener('blur', ()=>{ if(!_navCommitting) commit(true, null); });
+  input.addEventListener('blur', ()=>{ if(!_navCommitting) commit(true, null, true); });
 }
+// V49: while a cell is being edited, tapping another cell must not blur the
+// current input first (that drops the phone keyboard). Cancel the focus
+// change on mousedown; the click handler then opens the new cell directly.
+document.getElementById('entryExportTable').addEventListener('mousedown', e=>{
+  if(!entryExportEditing) return;
+  if(e.target.tagName === 'INPUT') return;
+  if(!e.target.closest('td[data-num]')) return;
+  e.preventDefault();
+});
 
 document.getElementById('entryExportTable').addEventListener('click', e=>{
   const td = e.target.closest('td[data-num]');
@@ -9549,6 +9640,9 @@ function entrySyncApplyRemote(snapshot){
         // Conflict: same num, two records. Prefer the record that has more
         // fields filled in (timeOverride / kdate / pdate); if it's a tie,
         // prefer the one with the later time.
+        // V49: a jump-to replacement (rev stamp) always beats an older copy.
+        const lRev = existing.rev || '', rRev = rr.rev || '';
+        if(lRev !== rRev){ if(rRev > lRev) byNum.set(rr.num, rr); return; }
         const overrideCount = r => r.manualCellOverrides ? Object.keys(r.manualCellOverrides).length : 0;
         const localScore = (existing.timeOverride?2:0)+(existing.kdate?1:0)+(existing.pdate?1:0)+overrideCount(existing);
         const remoteScore = (rr.timeOverride?2:0)+(rr.kdate?1:0)+(rr.pdate?1:0)+overrideCount(rr);
@@ -9563,8 +9657,9 @@ function entrySyncApplyRemote(snapshot){
         // Insertion order — use time field. Shelf-life records have negative
         // synthetic nums, so sorting by num would put them at the top; sorting
         // by time keeps them where they were added.
-        const ta = new Date(a.time||0).getTime();
-        const tb = new Date(b.time||0).getTime();
+        // V49: posTime keeps a jump-to replacement in the old record's slot.
+        const ta = new Date(a.posTime||a.time||0).getTime();
+        const tb = new Date(b.posTime||b.time||0).getTime();
         return ta - tb;
       });
     }
