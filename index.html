@@ -563,6 +563,34 @@
      3 columns on mobile so 12 letters fit in 4 rows; each cell is tall enough
      for a comfortable thumb tap. */
   .entry-picker-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:6px; }
+  /* V50 Rapid page */
+  .rapid-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:2px 0 8px; }
+  .rapid-tile { aspect-ratio:1/1; background:var(--panel-2); border:1px solid var(--line); border-radius:12px;
+    color:var(--ink); font-family:inherit; font-size:12.5px; font-weight:700; line-height:1.15; padding:6px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; cursor:pointer; }
+  .rapid-tile:active { background:var(--panel); }
+  .rapid-tile .sub { display:block; font-size:9.5px; font-weight:500; color:var(--ink-dim); margin-top:3px; }
+  .rapid-tile.wide { grid-column:span 2; aspect-ratio:auto; }
+  .rapid-tile.scan { border-color:rgba(124,140,248,.45); }
+  .rapid-tile.amber { border-color:rgba(242,160,61,.45); }
+  .rapid-tile.short { border-color:rgba(56,191,138,.5); color:var(--done); }
+  .rapid-scan-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+  .rapid-scan-mode { font-size:16px; font-weight:800; }
+  .rapid-scan-next { font-size:13px; color:var(--ink-dim); } .rapid-scan-next b { color:var(--done); font-size:18px; }
+  .rapid-scan-flash { margin-top:8px; padding:10px; border-radius:10px; background:var(--panel-2); border:1px solid var(--line);
+    font-size:14px; font-weight:700; text-align:center; transition:background .2s; }
+  .rapid-scan-flash.ok { background:rgba(56,191,138,.25); border-color:var(--done); color:var(--done); }
+  .rapid-scan-flash.bad { background:rgba(229,96,77,.18); border-color:rgba(229,96,77,.5); color:var(--danger); }
+  .rapid-scan-list { margin-top:8px; max-height:160px; overflow-y:auto; font-size:12.5px; }
+  .rapid-scan-list div { padding:5px 2px; border-bottom:1px solid var(--line); }
+  .rapid-toggle { display:flex; align-items:center; gap:10px; padding:12px; margin-bottom:6px; border-radius:10px;
+    background:var(--panel-2); border:1px solid var(--line); font-size:14px; font-weight:600; cursor:pointer; }
+  .rapid-toggle.on { border-color:var(--done); background:rgba(56,191,138,.15); }
+  .rapid-toggle .tick { width:20px; text-align:center; color:var(--done); font-weight:800; }
+  .rapid-chiprow { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px; }
+  .rapid-chip { padding:9px 12px; border-radius:999px; border:1px solid var(--line); background:var(--panel-2);
+    color:var(--ink); font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  .rapid-chip.on { border-color:var(--done); background:rgba(56,191,138,.2); color:var(--done); }
   .entry-picker-btn { padding:14px 10px; background:var(--panel-2); border:1px solid var(--line);
     border-radius:10px; color:var(--ink); font-size:13.5px; font-weight:600; text-align:center;
     cursor:pointer; font-family:inherit; line-height:1.3; }
@@ -792,7 +820,7 @@
 <header>
   <div class="title-row">
     <div>
-      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v49</span></h1>
+      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v50</span></h1>
       <div class="period-note" id="periodNote"></div>
     </div>
     <button class="icon-btn" id="menuBtn">Menu</button>
@@ -971,6 +999,25 @@
       <input id="newCustName" placeholder="e.g. Waitrose" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true">
       <button class="btn primary" id="addCustBtn" style="flex:0 0 auto; padding:13px 18px;">Add</button>
     </div>
+
+    <div class="divider"></div>
+    <!-- V50: moved here from the Entry tab's old Settings page -->
+    <h2 style="font-size:15px">Reference &amp; import</h2>
+    <label class="entry-filelabel entry-filelabel-primary">
+      Import products from file
+      <input type="file" id="entryFileLookupImport" accept=".xlsx,.xls,.csv" class="hidden" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true">
+    </label>
+    <small class="hint" id="entryLookupImportStatus" style="display:block; margin:8px 0 16px;"></small>
+
+    <label class="entry-filelabel entry-filelabel-secondary">
+      Upload MIMS_SAVE_FILE
+      <input type="file" id="entryFileMims" accept=".xlsx,.xls" class="hidden" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true">
+    </label>
+    <p class="hint" id="entryMimsStatus" style="margin-top:8px;"></p>
+
+    <div class="divider"></div>
+    <div class="entry-section-head"><span>Sampled by</span></div>
+    <input id="entrySamplerName" class="entry-search" placeholder="Your name, for the export's SAMBY column" style="margin-bottom:0" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true">
 
     <div class="divider"></div>
     <div class="backup-row">
@@ -1404,6 +1451,40 @@
        adding is handled inline on the Scan tab when an unknown barcode arrives.
        Their elements are kept in the DOM (hidden) so existing JS references
        (entryLookupSearch etc.) continue to work without any code changes. ===== -->
+  <!-- ===== V50 RAPID sub-tab — one-tap bundles, rapid scanning, shortcuts ===== -->
+  <div id="entryPaneRapid" class="hidden">
+    <div class="rapid-grid" id="rapidGrid"></div>
+    <button type="button" class="btn ghost hidden" id="rapidUndoBtn" style="width:100%; margin-top:10px;"></button>
+
+    <!-- Rapid scanning panel (PK/PP, PK/Today, Fresh Kills) -->
+    <div class="card-like hidden" id="rapidScanCard">
+      <div class="rapid-scan-head">
+        <div><div class="rapid-scan-mode" id="rapidScanMode">PK/PP</div><div class="entry-hint" id="rapidScanDates"></div></div>
+        <div class="rapid-scan-next">Next <b id="rapidScanNext">#1</b></div>
+      </div>
+      <div id="rapidReader" class="entry-reader"></div>
+      <div class="rapid-scan-flash" id="rapidScanFlash">Point the camera at a barcode</div>
+      <div class="rapid-scan-list" id="rapidScanList"></div>
+      <div class="sheet-actions" style="margin-top:10px;">
+        <button class="btn ghost" id="rapidScanUndo">Undo last</button>
+        <button class="btn primary" id="rapidScanOk">OK — done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rapid: generic step card (numbers, toggles, choices, date groups) -->
+  <div class="entry-ref-overlay hidden" id="rapidOverlay">
+    <div class="entry-ref-sheet">
+      <label id="rapidOvTitle">Rapid</label>
+      <div class="entry-hint" id="rapidOvHint" style="margin-bottom:8px;"></div>
+      <div id="rapidOvBody"></div>
+      <div class="sheet-actions" style="margin-top:10px;">
+        <button class="btn ghost" id="rapidOvCancel">Cancel</button>
+        <button class="btn ghost" id="rapidOvBack">Back</button>
+      </div>
+    </div>
+  </div>
+
   <div id="entryPaneReference" class="hidden entry-ref-overlay">
    <div class="entry-ref-sheet">
     <h2>Reference<button type="button" class="icon-btn" id="entryRefDone">Done</button></h2>
@@ -1423,21 +1504,6 @@
       </div>
     </div>
 
-    <label class="entry-filelabel entry-filelabel-primary">
-      Import products from file
-      <input type="file" id="entryFileLookupImport" accept=".xlsx,.xls,.csv" class="hidden" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true">
-    </label>
-    <small class="hint" id="entryLookupImportStatus" style="display:block; margin:8px 0 16px;"></small>
-
-    <label class="entry-filelabel entry-filelabel-secondary">
-      Upload MIMS_SAVE_FILE
-      <input type="file" id="entryFileMims" accept=".xlsx,.xls" class="hidden" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true">
-    </label>
-    <p class="hint" id="entryMimsStatus" style="margin-top:8px;"></p>
-
-    <div class="divider"></div>
-    <div class="entry-section-head"><span>Sampled by</span></div>
-    <input id="entrySamplerName" class="entry-search" placeholder="Your name, for the export's SAMBY column" style="margin-bottom:0" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true">
    </div>
   </div>
 
@@ -1460,11 +1526,11 @@
       </span>
       <span>Records</span>
     </button>
-    <button type="button" class="entry-ref-btn" id="entrySubReference" title="Settings">
+    <button type="button" class="entry-ref-btn" id="entrySubReference" title="Rapid">
       <span class="entry-tabicon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 13a7.4 7.4 0 0 0 0-2l2-1.4-2-3.4-2.3.7a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.4 2.4a7.4 7.4 0 0 0-1.7 1l-2.3-.7-2 3.4L6.6 11a7.4 7.4 0 0 0 0 2l-2 1.4 2 3.4 2.3-.7a7.4 7.4 0 0 0 1.7 1l.4 2.4h4l.4-2.4a7.4 7.4 0 0 0 1.7-1l2.3.7 2-3.4-2-1.4Z"></path></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"></path></svg>
       </span>
-      <span>Settings</span>
+      <span>Rapid</span>
     </button>
   </nav>
 </div>
@@ -1476,6 +1542,7 @@ const MIMS_SEED = [
  {"barcode": "MIMS_0000", "product": "Intake", "material": "Investigation Product", "rise": "Non-food", "unit": "Caeca", "descrptn": "2S Group-1 Caeca testing of each shed", "size": "Various", "retailer": "2Sisters", "shift": "Every house", "suite": "2SP045", "price": 7.37, "eol": "N", "client": "SIS", "_syn": true},
  {"barcode": "MIMS_0001", "product": "Intake", "material": "Investigation Product", "rise": "Non-food", "unit": "Neck", "descrptn": "2S Group-8 Neck skin surveillance", "size": "1 sample", "retailer": "2Sisters", "shift": "Daily", "suite": "2SL001", "price": 11.21, "use_by": "2 D", "eol": "Y", "client": "SIS", "_syn": true},
  {"barcode": "MIMS_0002", "product": "Intake", "material": "Investigation Product", "rise": "Fresh", "descrptn": "External Intake", "size": "1 Sample", "retailer": "2Sisters", "shift": "Annually", "suite": "2SP148", "price": 4.92, "eol": "N", "client": "SIS", "_syn": true},
+ {"barcode": "MIMS_1006", "product": "Intake", "material": "Investigation Product", "rise": "Fresh", "descrptn": "Internal Intake", "size": "1 Sample", "retailer": "2Sisters", "shift": "Annually", "suite": "2SP148", "price": 4.92, "eol": "N", "client": "SIS", "_syn": true, "comms": "[ENTER Product]"},
  {"barcode": "MIMS_0003", "product": "Intake", "material": "Intake Ingredent", "rise": "Fresh", "unit": ".", "descrptn": "[ENTER NAME]", "size": "1 Sample", "retailer": "M&S", "shift": "Monthly", "other_id": "Fresh Pack 2", "suite": "2SP023", "price": 12.81, "eol": "Y", "client": "SIS", "_syn": true},
  {"barcode": "MIMS_0004", "product": "Intake", "material": "Intake Ingredent", "rise": "Fresh", "unit": "[Save + ENTER]", "descrptn": "Product - Scunthorpe Ingredients and Brine (Solids)", "size": "1 Sample", "retailer": "M&S", "shift": "Bi Annual", "other_id": "Fresh Pack 2", "suite": "2SP053", "price": 12.1, "eol": "N", "client": "SIS", "_syn": true},
  {"barcode": "MIMS_0005", "product": "Intake", "material": "Intake Ingredent", "rise": "Fresh", "unit": "Brine", "descrptn": "[ENTER NAME]", "size": "1 Sample", "retailer": "M&S", "shift": "Monthly", "other_id": "Fresh Pack 2", "suite": "2SP023", "price": 12.81, "eol": "Y", "client": "SIS", "_syn": true},
@@ -3881,7 +3948,7 @@ let entryMims = JSON.parse(localStorage.getItem(LS_ENTRY_MIMS) || 'null')
 // entryMims — the merge/heal steps above only ADD rows / fill blanks. One-time refresh from the
 // baked seed (runs BEFORE the bracket patch below so its placeholders are re-applied on top).
 (function entryRefreshMimsFromSeedV44(){
-  const FLAG='unified.mimsSeedRefresh.v49b'; // v49b: BATCH 'Intentionally Open packed' on Raw Portions / External Bulk
+  const FLAG='unified.mimsSeedRefresh.v50'; // v50: Internal Intake row // v49b: BATCH 'Intentionally Open packed' on Raw Portions / External Bulk
   try{ if(localStorage.getItem(FLAG)) return; }catch(_e){ return; }
   if(typeof MIMS_SEED==='undefined' || !Array.isArray(MIMS_SEED)) return;
   entryMims = MIMS_SEED.map(m=>({...m}));
@@ -3964,7 +4031,7 @@ let entryMims = JSON.parse(localStorage.getItem(LS_ENTRY_MIMS) || 'null')
   const removed = before - entryMims.length;
   if(removed > 0){
     try{ localStorage.setItem(LS_ENTRY_MIMS, JSON.stringify(entryMims)); }catch(_e){}
-    try{ console.info(`[SampleHub V49] Deduplication: removed ${removed} duplicate MIMS rows (${before} → ${entryMims.length}).`); }catch(_e){}
+    try{ console.info(`[SampleHub V50] Deduplication: removed ${removed} duplicate MIMS rows (${before} → ${entryMims.length}).`); }catch(_e){}
   }
 })();
 
@@ -4241,7 +4308,7 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
   // rebuild replaces entryMims with exactly the current MIMS_SEED.
   // Scan-added lookup entries are preserved by rebuilding entryLookup fresh.
   // Runs once (guarded by v13 flag).
-  const MIGRATION_KEY = 'unified.entryMigration.v26'; // V49: barcode changes (Aldi drumstick 2kg, M&S deli/piri/dine-in)
+  const MIGRATION_KEY = 'unified.entryMigration.v27'; // V50: Internal Intake row
   if(localStorage.getItem(MIGRATION_KEY)) return;
   try{
     // Don't wipe LS_ENTRY_MIMS — entryPatchMimsBracketFields (which runs
@@ -4255,7 +4322,7 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
     try{ entryLookupSyncScheduleWrite && entryLookupSyncScheduleWrite(); }catch(_e){}
   }, 300);
   localStorage.setItem(MIGRATION_KEY, String(Date.now()));
-  try{ console.info('[SampleHub V49] Migration v13: rebuilt entryMims (1006 entries from updated XLS) + entryLookup. Stale MIMS rows (old suite codes) purged.'); }catch(_e){}
+  try{ console.info('[SampleHub V50] Migration v13: rebuilt entryMims (1006 entries from updated XLS) + entryLookup. Stale MIMS rows (old suite codes) purged.'); }catch(_e){}
 })();
 
 (function entryV36FullRebuild(){
@@ -4283,7 +4350,7 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
     try{ entryLookupSyncScheduleWrite && entryLookupSyncScheduleWrite(); }catch(_e){}
   }, 300);
   localStorage.setItem(MIGRATION_KEY, String(Date.now()));
-  try{ console.info('[SampleHub V49] Rebuilt entryMims + entryLookup — AMBER Trim (BIRDS EYE) and Glove Swab price now present.'); }catch(_e){}
+  try{ console.info('[SampleHub V50] Rebuilt entryMims + entryLookup — AMBER Trim (BIRDS EYE) and Glove Swab price now present.'); }catch(_e){}
 })();
 
 (function entryV35FullRebuild(){
@@ -5698,7 +5765,9 @@ document.getElementById('entryRawPortionsClose').addEventListener('click', entry
    share it, or tap "All remaining". Repeats until every entry has a date.
    Commit: N External Intake records (MIMS_0002), COMMS = "<source> 1..N",
    KILLDATE + PACKDATE = that entry's group date. */
-const EXT_INTAKE_SOURCES = ['Sandycroft Wings', 'Flixton Butterfly Joints', 'Site D Flats', 'Site D Drumettes'];
+const EXT_INTAKE_SOURCES = ['Sandycroft Wings', 'Flixton Butterfly Joints', 'Site D Flats', 'Site D Drumettes', 'Scunthorpe Wings'];
+// V50: Scunthorpe Wings = INTERNAL intake (MIMS 'Internal Intake' row): date → 2 entries (Flats + Drumettes).
+const EXT_INTAKE_INTERNAL = 'Scunthorpe Wings';
 let entryExtIntake = null;
 function entryExtIntakeTodayStr(){
   const d = new Date();
@@ -5735,8 +5804,25 @@ function entryExtIntakeRender(){
       EXT_INTAKE_SOURCES.map(n => `<button type="button" class="entry-picker-btn" data-ei-source="${esc(n)}">${esc(n)}</button>`).join('') +
       '</div>';
     body.querySelectorAll('[data-ei-source]').forEach(b => b.addEventListener('click', ()=>{
-      st.source = b.dataset.eiSource; st.stage = 'count'; entryExtIntakeRender();
+      st.source = b.dataset.eiSource;
+      st.stage = (st.source === EXT_INTAKE_INTERNAL) ? 'internal' : 'count';
+      entryExtIntakeRender();
     }));
+    return;
+  }
+  if(st.stage === 'internal'){
+    // V50: Internal Intake — one date (kill + pack) → Apply → 2 entries.
+    label.textContent = 'Internal Intake · Scunthorpe Wings';
+    hint.textContent = 'Adds 2 entries: Scunthorpe Flats + Scunthorpe Drumettes';
+    body.innerHTML = '<label>Kill / Pack date</label>' +
+      `<input type="date" id="entryExtIntakeIntDate" value="${entryExtIntakeTodayStr()}" autocomplete="off">` +
+      '<div class="sheet-actions" style="margin-top:8px;"><button class="btn primary" id="entryExtIntakeIntApply">Apply</button></div>';
+    const di = document.getElementById('entryExtIntakeIntDate');
+    setTimeout(()=>{ try{ di.focus(); if(typeof di.showPicker === 'function') di.showPicker(); }catch(_e){} }, 80);
+    document.getElementById('entryExtIntakeIntApply').addEventListener('click', ()=>{
+      if(!di.value){ alert('Pick a date first.'); return; }
+      entryExtIntakeCommitInternal(di.value);
+    });
     return;
   }
   if(st.stage === 'count'){
@@ -5776,6 +5862,8 @@ function entryExtIntakeRender(){
     '</div>';
   const dateInp = document.getElementById('entryExtIntakeDate');
   const nInp = document.getElementById('entryExtIntakeN');
+  // V50: once a date is picked, jump straight to the count box (keyboard up).
+  dateInp.addEventListener('change', ()=>{ setTimeout(()=>{ try{ nInp.focus(); }catch(_e){} }, 60); });
   // V49: open the calendar straight away (same approach as the shared date card).
   setTimeout(()=>{
     try{ dateInp.focus(); if(typeof dateInp.showPicker === 'function') dateInp.showPicker(); }catch(_e){}
@@ -5796,6 +5884,28 @@ function entryExtIntakeRender(){
   nInp.addEventListener('keydown', e=>{
     if(e.key === 'Enter'){ e.preventDefault(); addGroup(parseInt(String(nInp.value).replace(/[^0-9]/g,''), 10)); }
   });
+}
+function entryExtIntakeCommitInternal(date){
+  const mims = entryMimsRowFor('MIMS_1006') || entryMims.find(m => (m.descrptn||'').trim().toLowerCase() === 'internal intake');
+  if(!mims){ alert('Internal Intake row not found in MIMS.'); return; }
+  const now = new Date();
+  const nums = [];
+  ['Scunthorpe Flats', 'Scunthorpe Drumettes'].forEach(prod => {
+    const num = entryNextNumber();
+    entryRecords.push({
+      num, desc: mims.descrptn || 'Internal Intake', barcode: '',
+      mimsBarcode: mims.barcode, mimsSuite: mims.suite || '', mimsShift: mims.shift || '',
+      cat: 'Category 1', time: now.toISOString(), source: 'mims', tmpl: null, mimsRow: mims,
+      kdate: date + 'T00:00:00', pdate: date + 'T00:00:00',
+      manualCellOverrides: { COMMS: prod }
+    });
+    nums.push(num);
+  });
+  entryExtIntakeClose();
+  entrySaveLocal();
+  renderEntryAll();
+  try{ rapidRememberBatch(nums, 'Internal Intake'); }catch(_e){}
+  try{ entryFlashToast(`Added #${nums[0]}–#${nums[1]} Internal Intake · Scunthorpe Flats + Drumettes`); }catch(_e){}
 }
 function entryExtIntakeCommit(){
   const st = entryExtIntake; if(!st) return;
@@ -5833,9 +5943,632 @@ document.getElementById('entryExtIntakeBack').addEventListener('click', ()=>{
   const st = entryExtIntake; if(!st) return;
   if(st.stage === 'dates' && st.groups.length){ st.groups.pop(); }
   else if(st.stage === 'dates'){ st.stage = 'count'; }
-  else if(st.stage === 'count'){ st.stage = 'source'; }
+  else if(st.stage === 'count' || st.stage === 'internal'){ st.stage = 'source'; }
   entryExtIntakeRender();
 });
+/* =====================================================================
+   V50 RAPID — a layer on top of the existing entry mechanics.
+   Fixed bundles add records directly (same record shape as the wizards);
+   scans + shortcuts drive the normal confirm/commit path programmatically
+   so routine ticks, K+2 EOL, use-by and export rules stay identical.
+   "Previous day": Monday → Saturday, every other day → yesterday.
+   ===================================================================== */
+function rapidPad(n){ return String(n).padStart(2,'0'); }
+function rapidISO(d){ return `${d.getFullYear()}-${rapidPad(d.getMonth()+1)}-${rapidPad(d.getDate())}`; }
+function rapidToday(){ return rapidISO(new Date()); }
+function rapidPrevDay(){ const d = new Date(); d.setDate(d.getDate() - (d.getDay() === 1 ? 2 : 1)); return rapidISO(d); }
+function rapidFmt(iso){ const m = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}` : iso; }
+function rapidNorm(s){ return String(s||'').trim().toLowerCase().replace(/\s+/g,' '); }
+function rapidFindMims(pred){ return entryMims.find(m => { try{ return pred(m); }catch(_e){ return false; } }) || null; }
+function rapidIsSyn(bc){ return /^MIMS_/.test(String(bc||'')); }
+function rapidCatForShift(shift){
+  const s = rapidNorm(shift);
+  return s === 'weekly' ? 'Category 2' : s === 'monthly' ? 'Category 3' : 'Category 1';
+}
+
+/* ---------- undo of the last Rapid batch ---------- */
+let rapidLastBatch = null;   // { nums:[], label }
+function rapidRememberBatch(nums, label){
+  rapidLastBatch = (nums && nums.length) ? { nums: nums.slice(), label } : null;
+  rapidRenderUndo();
+}
+function rapidRenderUndo(){
+  const b = document.getElementById('rapidUndoBtn'); if(!b) return;
+  if(!rapidLastBatch){ b.classList.add('hidden'); return; }
+  const n = rapidLastBatch.nums;
+  b.textContent = `↶ Undo last: ${rapidLastBatch.label} (#${Math.min(...n)}${n.length>1?'–#'+Math.max(...n):''})`;
+  b.classList.remove('hidden');
+}
+function rapidDeleteNums(nums){
+  const set = new Set(nums);
+  entryMarkDeleted(nums);
+  for(let i = entryRecords.length - 1; i >= 0; i--){ if(set.has(entryRecords[i].num)) entryRecords.splice(i, 1); }
+  entrySaveLocal(); renderEntryAll();
+}
+document.getElementById('rapidUndoBtn').addEventListener('click', ()=>{
+  if(!rapidLastBatch) return;
+  const n = rapidLastBatch.nums;
+  if(!confirm(`Delete ${n.length} entr${n.length===1?'y':'ies'} from "${rapidLastBatch.label}"?`)) return;
+  rapidDeleteNums(n);
+  rapidLastBatch = null; rapidRenderUndo();
+});
+
+/* ---------- direct record creation for fixed bundles ---------- */
+// spec: { mims, cat?, kdate, pdate, timeOverride?, overrides?{COL:val}, useByOverride? }
+function rapidAddRecs(specs, label){
+  const now = new Date();
+  const nums = [];
+  specs.forEach(sp => {
+    const m = sp.mims;
+    const num = entryNextNumber();
+    const rec = {
+      num, desc: m.descrptn || '', barcode: rapidIsSyn(m.barcode) ? '' : (m.barcode || ''),
+      mimsBarcode: m.barcode, mimsSuite: m.suite || '', mimsShift: m.shift || '',
+      cat: sp.cat || rapidCatForShift(m.shift), time: now.toISOString(),
+      source: 'mims', tmpl: null, mimsRow: m
+    };
+    if(sp.kdate) rec.kdate = sp.kdate + 'T00:00:00';
+    if(sp.pdate) rec.pdate = sp.pdate + 'T00:00:00';
+    if(sp.timeOverride) rec.timeOverride = sp.timeOverride;
+    if(sp.useByOverride != null) rec.useByOverride = sp.useByOverride;
+    if(sp.overrides && Object.keys(sp.overrides).length) rec.manualCellOverrides = Object.assign({}, sp.overrides);
+    entryRecords.push(rec);
+    nums.push(num);
+  });
+  entrySaveLocal();
+  renderEntryAll();
+  rapidRememberBatch(nums, label);
+  try{ entryFlashToast(`Added ${nums.length} · ${label} (#${nums[0]}${nums.length>1?'–#'+nums[nums.length-1]:''})`); }catch(_e){}
+  return nums;
+}
+
+/* ---------- generic overlay ---------- */
+let rapidOvBackFn = null;
+function rapidOvShow(title, hint, html, backFn){
+  document.getElementById('rapidOvTitle').textContent = title;
+  document.getElementById('rapidOvHint').textContent = hint || '';
+  document.getElementById('rapidOvBody').innerHTML = html;
+  rapidOvBackFn = backFn || null;
+  document.getElementById('rapidOvBack').style.display = backFn ? '' : 'none';
+  document.getElementById('rapidOverlay').classList.remove('hidden');
+}
+function rapidOvClose(){
+  try{ document.activeElement && document.activeElement.blur(); }catch(_e){}
+  document.getElementById('rapidOverlay').classList.add('hidden');
+  rapidOvBackFn = null;
+}
+document.getElementById('rapidOvCancel').addEventListener('click', ()=>{
+  rapidOvClose();
+  if(rapidScan && rapidScan.paused) rapidScanResume();
+});
+document.getElementById('rapidOvBack').addEventListener('click', ()=>{ if(rapidOvBackFn) rapidOvBackFn(); });
+function rapidFocusSoon(el){ setTimeout(()=>{ try{ el.focus(); el.select && el.select(); }catch(_e){} }, 80); }
+function rapidDigits(v){ return parseInt(String(v||'').replace(/[^0-9]/g,''), 10); }
+
+// Number card: numeric keypad comes up by itself.
+function rapidAskNumber(o){
+  rapidOvShow(o.title, o.hint,
+    `<input type="text" inputmode="numeric" id="rapidNumIn" placeholder="${esc(o.placeholder||'')}" value="${esc(o.value!=null?String(o.value):'')}" autocomplete="off" enterkeyhint="next">` +
+    '<div class="sheet-actions" style="margin-top:8px;">' +
+      (o.skipLabel ? `<button class="btn ghost" id="rapidNumSkip">${esc(o.skipLabel)}</button>` : '') +
+      `<button class="btn primary" id="rapidNumOk">${esc(o.okLabel||'Next')}</button>` +
+    '</div>', o.back);
+  const inp = document.getElementById('rapidNumIn');
+  const ok = ()=>{
+    const raw = inp.value.trim();
+    const n = rapidDigits(raw);
+    if(raw === '' || Number.isNaN(n)){ if(o.allowEmpty){ o.onOk(null, raw); } else inp.focus(); return; }
+    if(!o.allowZero && n < 1){ inp.focus(); return; }
+    if(o.max && n > o.max){ alert(`Max ${o.max}.`); return; }
+    o.onOk(n, raw);
+  };
+  document.getElementById('rapidNumOk').addEventListener('click', ok);
+  inp.addEventListener('keydown', e=>{ if(e.key === 'Enter'){ e.preventDefault(); ok(); } });
+  if(o.skipLabel) document.getElementById('rapidNumSkip').addEventListener('click', ()=> o.onSkip && o.onSkip());
+  rapidFocusSoon(inp);
+}
+// Choice card: big buttons, one tap.
+function rapidAskChoice(title, hint, choices, onPick, back){
+  rapidOvShow(title, hint,
+    `<div class="entry-picker-grid" style="grid-template-columns:repeat(${Math.min(choices.length,2)},1fr);">` +
+    choices.map((c,i)=>`<button type="button" class="entry-picker-btn" data-rc="${i}">${esc(c.label)}${c.sub?`<span class="sub">${esc(c.sub)}</span>`:''}</button>`).join('') +
+    '</div>', back);
+  document.querySelectorAll('#rapidOvBody [data-rc]').forEach(b => b.addEventListener('click', ()=> onPick(choices[+b.dataset.rc])));
+}
+// Date groups — same mechanics as the External Intake wizard.
+function rapidDateGroups(o){
+  const groups = [];
+  const render = ()=>{
+    const assigned = groups.reduce((a,g)=>a+g.count, 0);
+    const remaining = o.total - assigned;
+    const first = assigned + 1;
+    const lastDate = groups.length ? groups[groups.length-1].date : (o.defaultDate || rapidToday());
+    const done = groups.map(g => `<div class="entry-hint">${esc(o.itemLabel||'#')}${g.from}–${g.from+g.count-1} → ${esc(rapidFmt(g.date))} (${g.count})</div>`).join('');
+    rapidOvShow(o.title, `${o.total} entries · ${remaining} still need a date`,
+      done +
+      `<label style="margin-top:6px;">Kill / Pack date for entries from ${esc(o.itemLabel||'#')}${first}</label>` +
+      `<input type="date" id="rapidDgDate" value="${lastDate}" autocomplete="off">` +
+      `<label style="margin-top:8px;">How many (from ${esc(o.itemLabel||'#')}${first}) have this date?</label>` +
+      `<input type="text" inputmode="numeric" id="rapidDgN" placeholder="1–${remaining}" autocomplete="off">` +
+      '<div class="sheet-actions" style="margin-top:8px;">' +
+        '<button class="btn ghost" id="rapidDgApply">Apply</button>' +
+        `<button class="btn primary" id="rapidDgAll">All remaining (${remaining})</button>` +
+      '</div>',
+      ()=>{ if(groups.length){ groups.pop(); render(); } else if(o.back){ o.back(); } });
+    const di = document.getElementById('rapidDgDate');
+    const ni = document.getElementById('rapidDgN');
+    const add = (count)=>{
+      if(!di.value){ alert('Pick a date first.'); return; }
+      if(!count || count < 1){ ni.focus(); return; }
+      if(count > remaining){ alert(`Only ${remaining} left — enter ${remaining} or less.`); return; }
+      groups.push({ date: di.value, count, from: first });
+      if(groups.reduce((a,g)=>a+g.count,0) >= o.total){ o.onDone(groups.slice()); return; }
+      render();
+    };
+    document.getElementById('rapidDgAll').addEventListener('click', ()=> add(remaining));
+    document.getElementById('rapidDgApply').addEventListener('click', ()=> add(rapidDigits(ni.value)));
+    ni.addEventListener('keydown', e=>{ if(e.key === 'Enter'){ e.preventDefault(); add(rapidDigits(ni.value)); } });
+    di.addEventListener('change', ()=>{ setTimeout(()=>{ try{ ni.focus(); }catch(_e){} }, 60); });
+    setTimeout(()=>{ try{ di.focus(); if(typeof di.showPicker === 'function') di.showPicker(); }catch(_e){} }, 80);
+  };
+  render();
+}
+function rapidGroupDateFor(groups, i){ // i is 1-based
+  for(const g of groups){ if(i >= g.from && i < g.from + g.count) return g.date; }
+  return groups.length ? groups[groups.length-1].date : rapidToday();
+}
+
+/* ---------- 2S-G 3 / 2S-G 4 equipment swabs ---------- */
+function rapidEquipRow(){ return rapidFindMims(m => rapidNorm(m.descrptn) === '2s group-3 live collection equipment swabs'); }
+function rapidG3(){
+  const m = rapidEquipRow(); if(!m){ alert('2S Group-3 Live collection row not found in MIMS.'); return; }
+  const d = rapidPrevDay();
+  rapidAddRecs([['.','TB'],['1','MIS'],['2','MIS']].map(([line,oid]) =>
+    ({ mims:m, kdate:d, pdate:d, timeOverride:'1700', overrides:{ LINE: line, OTHER_ID: oid } })), '2S-G 3');
+}
+function rapidG4(){
+  const m = rapidEquipRow(); if(!m){ alert('2S Group-3 Live collection row not found in MIMS.'); return; }
+  const d = rapidToday();
+  const t = (new Date().getDay() === 1) ? '0230' : '0430';
+  rapidAddRecs([['1','TB'],['2','TB'],['1','MIS'],['2','MIS']].map(([line,oid]) =>
+    ({ mims:m, kdate:d, pdate:d, timeOverride:t, overrides:{ LINE: line, OTHER_ID: oid } })), '2S-G 4');
+}
+
+/* ---------- Amber Swabs (4, previous day) ---------- */
+const RAPID_AMBER_SWABS = [
+  { c:'Prestart Table',       t:'1435' },
+  { c:'Prestart PPE Glove',   t:'1440', clock:true },
+  { c:'End of Shift PPE Lid', t:'2140' },
+  { c:'End of Shift Table',   t:'2150' }
+];
+function rapidAmberSwabs(){
+  const m = rapidFindMims(m => rapidNorm(m.descrptn) === 'amber swab');
+  if(!m){ alert('AMBER Swab row not found in MIMS.'); return; }
+  const on = RAPID_AMBER_SWABS.map(()=>true);
+  const draw = ()=>{
+    rapidOvShow('Amber Swabs · previous day', 'Untick any you did not receive. Clock card number goes after "Prestart PPE Glove".',
+      RAPID_AMBER_SWABS.map((s,i)=>`<div class="rapid-toggle ${on[i]?'on':''}" data-ras="${i}"><span class="tick">${on[i]?'✓':''}</span><span>${esc(s.c)} <span class="entry-hint">· ${s.t}</span></span></div>`).join('') +
+      '<label style="margin-top:6px;">Clock card number (Prestart PPE Glove)</label>' +
+      '<input type="text" inputmode="numeric" id="rapidAsClock" placeholder="e.g. 001709 — or leave empty / Skip" autocomplete="off">' +
+      '<div class="sheet-actions" style="margin-top:8px;">' +
+        '<button class="btn ghost" id="rapidAsSkip">Skip number</button>' +
+        '<button class="btn primary" id="rapidAsApply">Apply</button>' +
+      '</div>');
+    document.querySelectorAll('#rapidOvBody [data-ras]').forEach(el => el.addEventListener('click', ()=>{
+      const i = +el.dataset.ras; on[i] = !on[i];
+      el.classList.toggle('on', on[i]); el.querySelector('.tick').textContent = on[i] ? '✓' : '';
+    }));
+    const clockIn = document.getElementById('rapidAsClock');
+    const go = (useClock)=>{
+      const clock = useClock ? clockIn.value.trim() : '';
+      const d = rapidPrevDay();
+      const specs = [];
+      RAPID_AMBER_SWABS.forEach((s,i)=>{
+        if(!on[i]) return;
+        const comm = (s.clock && clock) ? `${s.c} ${clock}` : s.c;
+        specs.push({ mims:m, kdate:d, pdate:d, timeOverride:s.t, overrides:{ COMMS: comm } });
+      });
+      if(!specs.length){ alert('Nothing selected.'); return; }
+      rapidOvClose();
+      rapidAddRecs(specs, 'Amber Swabs');
+    };
+    document.getElementById('rapidAsApply').addEventListener('click', ()=> go(true));
+    document.getElementById('rapidAsSkip').addEventListener('click', ()=> go(false));
+    clockIn.addEventListener('keydown', e=>{ if(e.key === 'Enter'){ e.preventDefault(); go(true); } });
+    rapidFocusSoon(clockIn);
+  };
+  draw();
+}
+
+/* ---------- Amber Daily / Weekly ---------- */
+const RAPID_AMBER_DAILY  = ['amber - drumsticks skin', 'amber - thighs skin', 'amber rapid trim'];
+const RAPID_AMBER_WEEKLY = ['amber carcase front', 'amber back strip', 'amber trim', 'amber breast skin'];
+function rapidAmber(weekly){
+  const fixedNames = weekly ? RAPID_AMBER_DAILY.concat(RAPID_AMBER_WEEKLY) : RAPID_AMBER_DAILY;
+  const fixed = fixedNames.map(n => rapidFindMims(m => rapidNorm(m.descrptn) === n));
+  const skinRow = rapidFindMims(m => rapidNorm(m.descrptn) === 'amber skin');
+  const missing = fixedNames.filter((n,i)=>!fixed[i]);
+  if(missing.length || !skinRow){ alert('Missing in MIMS: ' + missing.concat(skinRow?[]:['amber skin']).join(', ')); return; }
+  const title = weekly ? 'Amber Weekly' : 'Amber Daily';
+  const st = { n:0, be:null, beWidth:0 };
+  const finish = (groups)=>{
+    rapidOvClose();
+    const d = rapidPrevDay();
+    const specs = fixed.map(m => ({ mims:m, kdate:d, pdate:d }));
+    for(let i = 1; i <= st.n; i++){
+      const gd = rapidGroupDateFor(groups || [], i);
+      const sp = { mims:skinRow, kdate:gd, pdate:gd };
+      if(st.be != null) sp.overrides = { BATCH: 'BE' + String(st.be + i - 1).padStart(st.beWidth, '0') };
+      specs.push(sp);
+    }
+    rapidAddRecs(specs, title);
+  };
+  const askDates = ()=> rapidDateGroups({ title: `${title} · Amber Skin dates`, total: st.n, itemLabel:'Skin ', onDone: finish, back: askBe });
+  const askBe = ()=> rapidAskNumber({
+    title: `${title} · BE number`, hint: `First BE number — the ${st.n} Amber Skin entries count up from it (e.g. 4018 → BE4018, BE4019…)`,
+    placeholder: 'e.g. 4018', back: askCount,
+    onOk: (n, raw)=>{ const digits = String(raw).replace(/[^0-9]/g,''); st.be = n; st.beWidth = digits.length; askDates(); },
+    skipLabel: 'No BE', onSkip: ()=>{ st.be = null; askDates(); }
+  });
+  const askCount = ()=> rapidAskNumber({
+    title: `${title} · Amber Skin`, hint: `How many Amber Skin samples? (${fixed.length} fixed items are added too, dated ${rapidFmt(rapidPrevDay())})`,
+    placeholder: 'e.g. 4', allowZero: true, value: st.n || '',
+    onOk: (n)=>{ st.n = n; if(n === 0) finish([]); else askBe(); }
+  });
+  askCount();
+}
+
+/* ---------- Necks & Caeca (6 necks + N caeca, previous day) ---------- */
+function rapidNeckCaeca(){
+  const neck = rapidFindMims(m => rapidNorm(m.descrptn).includes('neck skin surveillance') && (m.suite||'').toUpperCase() === '2SL001');
+  const caeca = rapidFindMims(m => rapidNorm(m.descrptn).includes('caeca testing') && (m.suite||'').toUpperCase() === '2SP045');
+  if(!neck || !caeca){ alert('Neck / Caeca rows not found in MIMS.'); return; }
+  rapidAskNumber({
+    title: 'Necks & Caeca', hint: `6 Necks are added automatically · dated ${rapidFmt(rapidPrevDay())}. How many Caeca?`,
+    placeholder: 'e.g. 5', allowZero: true,
+    onOk: (n)=>{
+      rapidOvClose();
+      const d = rapidPrevDay();
+      const specs = [];
+      for(let i=0;i<6;i++) specs.push({ mims:neck, kdate:d, pdate:d });
+      for(let i=0;i<n;i++) specs.push({ mims:caeca, kdate:d, pdate:d });
+      const nums = rapidAddRecs(specs, 'Necks & Caeca');
+      // Existing time + line keypad (HH:MM + line), one record at a time.
+      entryStartTimeLoop(nums, { withLine:true });
+    }
+  });
+}
+
+/* ---------- imported wizards (open on the Entry page) ---------- */
+function rapidImport(fn){ entrySwitchSubTab('scan'); try{ fn(); }catch(e){ alert('Could not open: ' + e.message); } }
+
+/* ---------- Rapid scanning: PK/PP, PK/Today, Fresh Kills ---------- */
+const RAPID_SCAN_MODES = {
+  pkpp:  { label:'PK/PP · previous kill · previous pack', k:()=>rapidPrevDay(), p:()=>rapidPrevDay(), timeEach:true },
+  pktp:  { label:'PK/Today · previous kill · today pack',  k:()=>rapidPrevDay(), p:()=>rapidToday(),  timeEach:false },
+  fresh: { label:'Fresh Kills · kill = pack = today',      k:()=>rapidToday(),   p:()=>rapidToday(),  timeEach:false, meatPrepAsk:true }
+};
+let rapidScan = null;     // { mode, batches:[[nums]], busy, paused, lastCode, lastAt, lastAddAt, pend:{code,count} }
+let rapidScanner = null, rapidScanning = false;
+function rapidPauseSync(){
+  try{ if(syncUnsubscribe){ syncUnsubscribe(); syncUnsubscribe=null; } }catch(_e){}
+  try{ if(lineSyncUnsubscribe){ lineSyncUnsubscribe(); lineSyncUnsubscribe=null; } }catch(_e){}
+  try{ if(weeklySyncUnsubscribe){ weeklySyncUnsubscribe(); weeklySyncUnsubscribe=null; } }catch(_e){}
+  try{ if(entrySyncUnsubscribe){ entrySyncUnsubscribe(); entrySyncUnsubscribe=null; } }catch(_e){}
+  try{ if(entryLookupSyncUnsubscribe){ entryLookupSyncUnsubscribe(); entryLookupSyncUnsubscribe=null; } }catch(_e){}
+  try{ if(entryMimsSyncUnsubscribe){ entryMimsSyncUnsubscribe(); entryMimsSyncUnsubscribe=null; } }catch(_e){}
+}
+function rapidResumeSync(){
+  if(syncCircleId && window.__fb){
+    try{ if(!syncUnsubscribe) syncStartListening(syncCircleId); }catch(_e){}
+    try{ if(!lineSyncUnsubscribe) lineSyncStartListening(syncCircleId); }catch(_e){}
+    try{ if(!weeklySyncUnsubscribe) weeklySyncStartListening(syncCircleId); }catch(_e){}
+    try{ if(!entrySyncUnsubscribe) entrySyncStartListening(syncCircleId); }catch(_e){}
+    try{ if(!entryLookupSyncUnsubscribe) entryLookupSyncStartListening(syncCircleId); }catch(_e){}
+    try{ if(!entryMimsSyncUnsubscribe) entryMimsSyncStartListening(syncCircleId); }catch(_e){}
+  }
+}
+function rapidScanUpdateHead(){
+  if(!rapidScan) return;
+  const md = RAPID_SCAN_MODES[rapidScan.mode];
+  document.getElementById('rapidScanMode').textContent = md.label.split(' · ')[0];
+  document.getElementById('rapidScanDates').textContent = `Kill ${rapidFmt(md.k())} · Pack ${rapidFmt(md.p())}` + (md.timeEach ? ' · times asked after OK' : ' · time = scan time');
+  document.getElementById('rapidScanNext').textContent = '#' + (entryOverrideNum || entryNextNumber());
+}
+function rapidScanFlash(msg, kind){
+  const el = document.getElementById('rapidScanFlash');
+  el.textContent = msg; el.classList.remove('ok','bad'); if(kind) el.classList.add(kind);
+}
+function rapidScanRenderList(){
+  const all = [];
+  (rapidScan ? rapidScan.batches : []).forEach(b => b.forEach(n => { const r = entryRecords.find(x=>x.num===n); if(r) all.push(r); }));
+  document.getElementById('rapidScanList').innerHTML = all.slice().reverse().map(r =>
+    `<div><b>#${r.num}</b> ${esc(r.desc)} <span class="entry-hint">· ${esc(r.mimsShift||'')}</span></div>`).join('');
+}
+async function rapidScanStart(mode){
+  if(typeof Html5Qrcode === 'undefined'){ alert('Scanner library failed to load — check your connection.'); return; }
+  rapidScan = { mode, batches:[], busy:false, paused:false, lastCode:null, lastAt:0, lastAddAt:0, pend:{code:null,count:0} };
+  document.getElementById('rapidGrid').classList.add('hidden');
+  document.getElementById('rapidUndoBtn').classList.add('hidden');
+  document.getElementById('rapidScanCard').classList.remove('hidden');
+  rapidScanUpdateHead(); rapidScanRenderList();
+  rapidScanFlash('Point the camera at a barcode', '');
+  const F = Html5QrcodeSupportedFormats;
+  const FORMATS = [F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.ITF,F.QR_CODE];
+  rapidScanner = rapidScanner || new Html5Qrcode('rapidReader', {formatsToSupport:FORMATS, verbose:false});
+  rapidPauseSync();
+  try{
+    await rapidScanner.start({facingMode:'environment'}, {fps:12, qrbox:{width:280,height:160}, aspectRatio:1.4}, rapidOnScan, ()=>{});
+    rapidScanning = true;
+  }catch(e){
+    rapidScanFlash('Camera error: ' + e, 'bad');
+  }
+}
+async function rapidScanStopCam(){
+  if(rapidScanning){ try{ await rapidScanner.stop(); }catch(_e){} rapidScanning = false; }
+  rapidResumeSync();
+}
+function rapidScanPause(){ if(rapidScan){ rapidScan.paused = true; } try{ if(rapidScanning) rapidScanner.pause(true); }catch(_e){} }
+function rapidScanResume(){
+  if(rapidScan){ rapidScan.paused = false; rapidScan.busy = false; rapidScan.lastAddAt = Date.now(); }
+  try{ if(rapidScanning) rapidScanner.resume(); }catch(_e){}
+}
+function rapidResolveCode(code){
+  return entryLookup.find(p=>p.barcode===code) || (function(){
+    const pfx = entryVarWeightPrefix(code);
+    return pfx ? entryLookup.find(p=>p.barcode && String(p.barcode).startsWith(pfx)) : null;
+  })();
+}
+function rapidOnScan(code){
+  code = (code||'').trim();
+  const st = rapidScan;
+  if(!code || !st || st.busy || st.paused) return;
+  if(!entryCheckDigitValid(code)){ st.pend = {code:null,count:0}; return; }
+  // double-read like the normal camera
+  if(code !== st.pend.code){ st.pend = {code, count:1}; return; }
+  if(++st.pend.count < 2) return;
+  st.pend = {code:null, count:0};
+  const now = Date.now();
+  if(now - st.lastAddAt < 1500) return;                         // gap after every add
+  if(code === st.lastCode && now - st.lastAt < 4000) return;     // same pack still in view
+  st.lastCode = code; st.lastAt = now;
+  const match = rapidResolveCode(code);
+  if(!match){
+    if(navigator.vibrate) navigator.vibrate([30,60,30]);
+    rapidScanFlash('Not found: ' + code + ' — nothing added', 'bad');
+    st.lastAddAt = now;
+    return;
+  }
+  st.busy = true;
+  if(navigator.vibrate) navigator.vibrate(40);
+  rapidScanHandleMatch(match);
+}
+// Commit one picked product through the normal confirm/commit path.
+// Returns the nums it created.
+function rapidCommitPick(p, opts){
+  opts = opts || {};
+  const before = new Set(entryRecords.map(r=>r.num));
+  entryOpenConfirm(p);
+  if(!entryPending) return [];
+  entryPending.origin = 'rapid';
+  entryPending.entries = 1;
+  if(opts.cat) entryPending.cat = opts.cat;
+  if(opts.mimsShift) entryPending.mimsShift = opts.mimsShift;
+  if(opts.mimsSuite) entryPending.mimsSuite = opts.mimsSuite;
+  entryCommit();
+  const nums = entryRecords.filter(r => !before.has(r.num)).map(r => r.num);
+  const kd = opts.kdate, pd = opts.pdate;
+  nums.forEach(n => {
+    const r = entryRecords.find(x=>x.num===n); if(!r) return;
+    if(kd) r.kdate = kd + 'T00:00:00';
+    if(pd) r.pdate = pd + 'T00:00:00';
+    if(opts.useByOverride != null && r.mpRole !== 'eol' && r.mpRole !== 'sol') r.useByOverride = opts.useByOverride;
+  });
+  entrySaveLocal(); renderEntryAll();
+  return nums;
+}
+function rapidIsKfc79(p, mrow){
+  const n = rapidNorm((mrow && mrow.descrptn) || p.name);
+  const ret = rapidNorm(mrow && mrow.retailer);
+  return (n === '9 piece' || n === 'dark meat') && (!ret || ret === 'kfc');
+}
+function rapidIsHotWingsEol(p, mrow){
+  return rapidNorm((mrow && mrow.descrptn) || p.name) === 'hot wings' && rapidNorm((mrow && mrow.shift) || p.mimsShift) === 'eol';
+}
+function rapidScanHandleMatch(p){
+  const st = rapidScan; if(!st) return;
+  const md = RAPID_SCAN_MODES[st.mode];
+  const mrow = entryMimsRowForLookup(p);
+  const finish = (opts)=>{
+    const nums = rapidCommitPick(p, Object.assign({ kdate: md.k(), pdate: md.p() }, opts));
+    if(nums.length){
+      st.batches.push(nums);
+      const r = entryRecords.find(x=>x.num===nums[0]);
+      rapidScanFlash(`✓ #${nums[0]}${nums.length>1?'–#'+nums[nums.length-1]:''} added — ${r ? r.desc : p.name}${r && r.mimsShift ? ' · '+r.mimsShift : ''}`, 'ok');
+    } else {
+      rapidScanFlash('Nothing added', 'bad');
+    }
+    rapidScanUpdateHead(); rapidScanRenderList();
+    rapidOvClose();
+    st.lastAddAt = Date.now();
+    setTimeout(()=>{ if(rapidScan === st) rapidScanResume(); }, 900);
+  };
+  const askUb = (opts)=>{
+    if(!rapidIsKfc79(p, mrow)){
+      if(rapidIsHotWingsEol(p, mrow)) opts.useByOverride = 4;
+      finish(opts); return;
+    }
+    rapidScanPause();
+    rapidAskChoice('Use By from Kill date', p.name, [{label:'7D', v:7},{label:'9D', v:9}], c=>{ opts.useByOverride = c.v; finish(opts); });
+  };
+  const isSpatch = rapidNorm((mrow && mrow.descrptn) || p.name).includes('spatchcock');
+  if(md.meatPrepAsk && isSpatch){
+    rapidScanPause();
+    rapidAskChoice('Spatchcock — Meat Prep?', p.name, [
+      {label:'Meat Prep', sub:'5E + 1D + 5S', v:'mp'},
+      {label:'Normal entry', sub:'1 sample', v:'n'}
+    ], c=>{ const opts = c.v === 'mp' ? { cat:'Category 6' } : {}; askUb(opts); });
+    return;
+  }
+  askUb({});
+}
+document.getElementById('rapidScanUndo').addEventListener('click', ()=>{
+  if(!rapidScan || !rapidScan.batches.length){ rapidScanFlash('Nothing to undo', 'bad'); return; }
+  const nums = rapidScan.batches.pop();
+  rapidDeleteNums(nums);
+  rapidScanFlash(`Removed #${nums[0]}${nums.length>1?'–#'+nums[nums.length-1]:''}`, '');
+  rapidScanUpdateHead(); rapidScanRenderList();
+});
+document.getElementById('rapidScanOk').addEventListener('click', async ()=>{
+  const st = rapidScan; if(!st) return;
+  await rapidScanStopCam();
+  rapidScan = null;
+  document.getElementById('rapidScanCard').classList.add('hidden');
+  document.getElementById('rapidGrid').classList.remove('hidden');
+  const all = [].concat(...st.batches);
+  if(all.length) rapidRememberBatch(all, RAPID_SCAN_MODES[st.mode].label.split(' · ')[0]); else rapidRenderUndo();
+  if(RAPID_SCAN_MODES[st.mode].timeEach && all.length){
+    entryStartTimeLoop(all, { withLine:false });   // existing "Edit TIME (Each)" keypad
+  }
+});
+
+/* ---------- Shortcuts: KFC / Drum Fillet / Hot Deli ---------- */
+const RAPID_SHORTCUTS = {
+  'KFC': [
+    { label:'9 Piece',        match: m => rapidNorm(m.retailer)==='kfc' && rapidNorm(m.descrptn)==='9 piece' },
+    { label:'Dark Meat',      match: m => rapidNorm(m.retailer)==='kfc' && rapidNorm(m.descrptn)==='dark meat' },
+    { label:'9 Piece Frozen', match: m => rapidNorm(m.retailer)==='kfc' && rapidNorm(m.descrptn)==='9 piece frozen' },
+    { label:'Hot Wings',      match: m => rapidNorm(m.retailer)==='kfc' && rapidNorm(m.descrptn)==='hot wings' }
+  ],
+  'Drum Fillet': [
+    { label:'Aldi Drum Fillet 600g',  match: m => rapidNorm(m.retailer)==='aldi'  && rapidNorm(m.descrptn).includes('drum fillet') && rapidNorm(m.size).replace(/\s/g,'')==='600g' },
+    { label:'Co-op Drum Fillet 400g', match: m => rapidNorm(m.retailer)==='co-op' && rapidNorm(m.descrptn).includes('drum fillet') && rapidNorm(m.size).replace(/\s/g,'')==='400g' }
+  ],
+  'Hot Deli': [
+    { label:'Butter Basted 1.1', match: m => m.barcode === 'MSBUTTER11' },
+    { label:'Butter Basted 1.8', match: m => m.barcode === 'MSBUTTER18' },
+    { label:'Piri Piri 1.1',     match: m => m.barcode === 'MSPIRI11' },
+    { label:'Piri Piri 1.8',     match: m => m.barcode === 'MSPIRI18' }
+  ]
+};
+const RAPID_SHIFT_ORDER = ['Weekly', 'EOL', 'Monthly', 'Daily'];
+function rapidShortcutRows(item){
+  const byShift = {};
+  entryMims.forEach(m => {
+    if(rapidNorm(m.descrptn).includes('shelf life')) return;
+    let ok = false; try{ ok = item.match(m); }catch(_e){}
+    if(!ok) return;
+    const sh = RAPID_SHIFT_ORDER.find(s => rapidNorm(s) === rapidNorm(m.shift));
+    if(sh && !byShift[sh]) byShift[sh] = m;
+  });
+  return byShift;
+}
+function rapidLookupFor(m){
+  return entryLookup.find(p => p.mimsBarcode === m.barcode && (p.mimsShift||'') === (m.shift||'') && (p.mimsSuite||'') === (m.suite||''))
+    || { name: m.descrptn, barcode: rapidIsSyn(m.barcode) ? '' : m.barcode, mimsBarcode: m.barcode, mimsSuite: m.suite||'', mimsShift: m.shift||'' };
+}
+// Next due shift from the Routine tab: Weekly → EOL → Monthly (each only if
+// the product runs it and it isn't ticked this cycle), otherwise Daily.
+function rapidNextShift(byShift){
+  const any = byShift.Daily || byShift.Weekly || byShift.EOL || byShift.Monthly;
+  const p = rapidLookupFor(any);
+  const routine = entryFindRoutinesMatch({ barcode: p.barcode || '', desc: any.descrptn }, any);
+  const due = [];
+  if(routine){
+    ['Weekly','EOL','Monthly'].forEach(s => {
+      if(!byShift[s]) return;
+      if(!isDone(routine.id, s.toLowerCase())) due.push(s);
+    });
+  }
+  return { routine, due, next: due[0] || (byShift.Daily ? 'Daily' : Object.keys(byShift)[0]) };
+}
+function rapidShortcuts(){
+  rapidAskChoice('Shortcuts', 'Products without labels', Object.keys(RAPID_SHORTCUTS).map(k=>({label:k, v:k})), c => rapidShortcutGroup(c.v));
+}
+function rapidShortcutGroup(group){
+  const items = RAPID_SHORTCUTS[group];
+  rapidAskChoice(group, 'Pick the product', items.map((it,i)=>{
+    const rows = rapidShortcutRows(it);
+    const nx = Object.keys(rows).length ? rapidNextShift(rows).next : '—';
+    return { label: it.label, sub: 'next: ' + nx, v: i };
+  }), c => rapidShortcutItem(group, items[c.v]), rapidShortcuts);
+}
+function rapidShortcutItem(group, item){
+  const rows = rapidShortcutRows(item);
+  if(!Object.keys(rows).length){ alert(item.label + ' not found in MIMS.'); return; }
+  const info = rapidNextShift(rows);
+  const shifts = RAPID_SHIFT_ORDER.filter(s => rows[s]);
+  const canDouble = group === 'KFC' && rows.Weekly && rows.EOL;
+  let sel = [info.next];
+  const draw = ()=>{
+    const chips = shifts.map(s => `<button type="button" class="rapid-chip ${sel.length===1&&sel[0]===s?'on':''}" data-rs="${s}">${s}${info.due.includes(s)?' •':''}</button>`).join('') +
+      (canDouble ? `<button type="button" class="rapid-chip ${sel.length===2?'on':''}" data-rs="x2">×2 Weekly + EOL</button>` : '');
+    rapidOvShow(item.label, `Next due (Routine): ${info.next}${info.routine?'':' · no routine product'} — tap to change`,
+      `<div class="rapid-chiprow">${chips}</div>` +
+      '<div class="entry-picker-grid" style="grid-template-columns:repeat(2,1fr);">' +
+        '<button type="button" class="entry-picker-btn" data-rk="fresh">Fresh kill<span class="sub">kill = pack = today</span></button>' +
+        `<button type="button" class="entry-picker-btn" data-rk="pktp">Prev kill · Today pack<span class="sub">kill ${esc(rapidFmt(rapidPrevDay()))}</span></button>` +
+      '</div>', ()=> rapidShortcutGroup(group));
+    document.querySelectorAll('#rapidOvBody [data-rs]').forEach(b => b.addEventListener('click', ()=>{
+      sel = b.dataset.rs === 'x2' ? ['Weekly','EOL'] : [b.dataset.rs]; draw();
+    }));
+    document.querySelectorAll('#rapidOvBody [data-rk]').forEach(b => b.addEventListener('click', ()=> afterKill(b.dataset.rk)));
+  };
+  const afterKill = (kill)=>{
+    const k = kill === 'fresh' ? rapidToday() : rapidPrevDay();
+    const pd = rapidToday();
+    const doAdd = (ub)=>{
+      rapidOvClose();
+      const all = [];
+      sel.forEach(s => {
+        const m = rows[s];
+        const p = rapidLookupFor(m);
+        const opts = { cat: rapidCatForShift(s), mimsShift: m.shift, mimsSuite: m.suite, kdate:k, pdate:pd };
+        if(ub != null) opts.useByOverride = ub;
+        else if(rapidNorm(m.descrptn) === 'hot wings' && s === 'EOL') opts.useByOverride = 4;
+        all.push(...rapidCommitPick(p, opts));
+      });
+      rapidRememberBatch(all, item.label + ' · ' + sel.join(' + '));
+      try{ entryFlashToast(`Added ${item.label} · ${sel.join(' + ')} (#${all.join(', #')})`); }catch(_e){}
+    };
+    if(rapidIsKfc79({name:item.label}, rows[sel[0]])){
+      rapidAskChoice('Use By from Kill date', item.label, [{label:'7D', v:7},{label:'9D', v:9}], c => doAdd(c.v), draw);
+    } else {
+      doAdd(null);
+    }
+  };
+  draw();
+}
+
+/* ---------- the tile grid ---------- */
+const RAPID_TILES = [
+  { label:'2S-G 3',          sub:'3 equip · prev day',  run: rapidG3 },
+  { label:'2S-G 4',          sub:'4 equip · today',     run: rapidG4 },
+  { label:'Amber Swabs',     sub:'4 · prev day', cls:'amber', run: rapidAmberSwabs },
+  { label:'Night Hygiene',   run: ()=> rapidImport(entryNightHygieneOpen) },
+  { label:'Swab Matrix',     run: ()=> rapidImport(entrySwabMatrixOpen) },
+  { label:'Amber Daily',     sub:'3 + skin', cls:'amber', run: ()=> rapidAmber(false) },
+  { label:'Amber Weekly',    sub:'7 + skin', cls:'amber', run: ()=> rapidAmber(true) },
+  { label:'External Intake', run: ()=> entryExternalIntakeOpen() },
+  { label:'Necks & Caeca',   sub:'6 + N · prev day', run: rapidNeckCaeca },
+  { label:'PK/PP',           sub:'prev kill · prev pack', cls:'scan', run: ()=> rapidScanStart('pkpp') },
+  { label:'PK/Today',        sub:'prev kill · today pack', cls:'scan', run: ()=> rapidScanStart('pktp') },
+  { label:'Fresh Kills',     sub:'kill = pack = today', cls:'scan', run: ()=> rapidScanStart('fresh') },
+  { label:'PMD Wholebirds',  run: ()=> rapidImport(entryPmdWholeBirdOpen) },
+  { label:'Raw Portions',    run: ()=> rapidImport(entryRawPortionsOpen) },
+  { label:'Shortcuts',       sub:'KFC · Drum Fillet · Hot Deli', cls:'short wide', run: rapidShortcuts }
+];
+function rapidRenderGrid(){
+  const g = document.getElementById('rapidGrid');
+  g.innerHTML = RAPID_TILES.map((t,i)=>`<button type="button" class="rapid-tile ${t.cls||''}" data-rt="${i}">${esc(t.label)}${t.sub?`<span class="sub">${esc(t.sub)}</span>`:''}</button>`).join('');
+  rapidRenderUndo();
+}
+document.getElementById('rapidGrid').addEventListener('click', e=>{
+  const b = e.target.closest('[data-rt]'); if(!b) return;
+  const t = RAPID_TILES[+b.dataset.rt];
+  try{ t.run(); }catch(err){ alert('Rapid error: ' + err.message); }
+});
+
 function entryPmdWholeBirdOpen(){
   const lp = entryLookup.find(p => p.mimsBarcode === 'MIMS_0018');
   if(!lp){ alert('PMD Wholebirds entry not found.'); return; }
@@ -7214,9 +7947,13 @@ function entryShowWizardStage(){
   } else {
     const num=entryWizard.nums[entryWizard.idx];
     dateInput.classList.add('hidden'); keypadWrap.classList.remove('hidden'); nextBtn.classList.add('hidden');
+    // V50: say whether this one is a Neck or a Caeca so you stay oriented.
+    const wrec = entryRecords.find(x=>x.num===num);
+    let wkind = '';
+    try{ const u = wrec ? entryRecordUnit(wrec).toLowerCase() : ''; wkind = u==='neck' ? 'Necks · ' : u==='caeca' ? 'Caeca · ' : ''; }catch(_e){}
     label.textContent = entryWizard.withLine
-      ? `Time + line for #${num}`
-      : `Time for #${num}`;
+      ? `${wkind}Time + line for #${num}`
+      : `${wkind}Time for #${num}`;
     entryWizard.buffer='';
     entryUpdateWizardSlots();
     stageLabel.textContent=`${entryWizard.idx+1} of ${entryWizard.nums.length}`;
@@ -8129,19 +8866,25 @@ document.getElementById('entryNumHeader').addEventListener('click', e=>{
 function entrySwitchSubTab(tab){
   if(entrySubTab!=='reference' && entrySubTab!==tab) entryPrevSubTab=entrySubTab;
   if(entrySubTab==='scan' && tab!=='scan') entryStopCam();
+  // V50: leaving Rapid stops its scanner (entries already added stay).
+  if(entrySubTab==='rapid' && tab!=='rapid' && typeof rapidScan !== 'undefined' && rapidScan){
+    try{ document.getElementById('rapidScanOk').click(); }catch(_e){}
+  }
   entrySubTab=tab;
   document.getElementById('entrySubScan').classList.toggle('on', tab==='scan');
   document.getElementById('entrySubRecords').classList.toggle('on', tab==='records');
-  document.getElementById('entrySubReference').classList.toggle('on', tab==='reference');
+  document.getElementById('entrySubReference').classList.toggle('on', tab==='rapid');
   document.getElementById('entryPaneScan').classList.toggle('hidden', tab!=='scan');
   document.getElementById('entryPaneRecords').classList.toggle('hidden', tab!=='records');
   document.getElementById('entryPaneReference').classList.toggle('hidden', tab!=='reference');
+  document.getElementById('entryPaneRapid').classList.toggle('hidden', tab!=='rapid');
+  if(tab==='rapid') rapidRenderGrid();
   if(tab==='records') renderEntryRecordsView();
   if(tab==='reference') renderEntryLookupResults(entrySearchLookup(document.getElementById('entryLookupSearch').value));
 }
 document.getElementById('entrySubScan').addEventListener('click', ()=>entrySwitchSubTab('scan'));
 document.getElementById('entrySubRecords').addEventListener('click', ()=>entrySwitchSubTab('records'));
-document.getElementById('entrySubReference').addEventListener('click', ()=>entrySwitchSubTab('reference'));
+document.getElementById('entrySubReference').addEventListener('click', ()=>entrySwitchSubTab('rapid'));  // V50: Settings → Rapid
 document.getElementById('entryRefDone').addEventListener('click', ()=>entrySwitchSubTab(entryPrevSubTab));
 
 /* ============================================================
