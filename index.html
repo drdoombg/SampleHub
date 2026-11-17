@@ -6561,8 +6561,8 @@ function rapidShortcutItem(group, item){
 // row 4       : PMD Wholebirds (purple) · Shortcuts (wide, green) · Raw Portions (purple)
 const RAPID_TILES = [
   { label:'2S-G', cls:'c-green split', split:[
-      { label:'3', sub:'prev day · 1700', run: rapidG3 },
-      { label:'4', sub:'today',           run: rapidG4 } ] },
+      { label:'3', run: rapidG3 },
+      { label:'4', run: rapidG4 } ] },
   { label:'Amber Swabs',     sub:'4 · prev day',          cls:'c-green',  run: rapidAmberSwabs },
   { label:'Night Hygiene',                                cls:'c-green',  run: ()=> rapidImport(entryNightHygieneOpen) },
   { label:'Swab Matrix',                                  cls:'c-green',  run: ()=> rapidImport(entrySwabMatrixOpen) },
@@ -6582,7 +6582,7 @@ function rapidRenderGrid(){
   g.innerHTML = RAPID_TILES.map((t,i)=>{
     if(t.split){
       return `<div class="rapid-tile ${t.cls||''}"><div class="rapid-split-title">${esc(t.label)}</div><div class="rapid-split-row">` +
-        t.split.map((x,j)=>`<button type="button" data-rt="${i}" data-rsp="${j}">${esc(x.label)}<span class="sub">${esc(x.sub||'')}</span></button>`).join('') +
+        t.split.map((x,j)=>`<button type="button" data-rt="${i}" data-rsp="${j}">${esc(x.label)}</button>`).join('') +
         '</div></div>';
     }
     return `<button type="button" class="rapid-tile ${t.cls||''}" data-rt="${i}">${esc(t.label)}${t.sub?`<span class="sub">${esc(t.sub)}</span>`:''}</button>`;
