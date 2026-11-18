@@ -6050,7 +6050,8 @@ function entryExtIntakeCommitInternal(date){
 /* V50: External Intake numbers continue per SOURCE + KILL DATE and are
    remembered for 7 days on this device, so adding more for the same kill
    date later never repeats a number (e.g. Sandycroft Wings 4, 5 …). */
-const LS_EXT_INTAKE_SEQ = 'unified.extIntakeSeq.v1';
+const LS_EXT_INTAKE_SEQ = 'unified.extIntakeSeq.v2';   // v2: fresh start 18/11 (test numbers dropped)
+try{ localStorage.removeItem('unified.extIntakeSeq.v1'); }catch(_e){}
 function entryExtIntakeSeqLoad(){
   let m = {};
   try{ m = JSON.parse(localStorage.getItem(LS_EXT_INTAKE_SEQ) || '{}') || {}; }catch(_e){ m = {}; }
