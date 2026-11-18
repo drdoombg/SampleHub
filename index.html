@@ -10553,7 +10553,7 @@ function entryBuildSisRow(r){
   // its own customer name (Tesco / KFC / M&S / Coop / Iceland / Ocado / Aldi)
   // into the export's RETAILER cell.
   if(r.retailerOverride) row.RETAILER = r.retailerOverride;
-  // V46 K+2 EOL rule. Tue–Sat only (Mon/Sun unchanged). For real product
+  // V46 K+2 EOL rule. Tue–Sat: K+2+ → Y. Mon: K+3+ → Y (V50). Sun unchanged. For real product
   // entries (PRODUCT="Product", listed retailer, shift Daily/Weekly/Monthly)
   // whose EOL is N: if scan date − kill date is 2 or more days, EOL → Y.
   // Monthly / EOL-shift / swabs / shelf-life untouched. MIMS not changed.
@@ -10572,7 +10572,10 @@ function entryBuildSisRow(r){
     const dow = now.getDay(); // 0 Sun … 6 Sat
     if(prodV === 'product' && K2_RETAILERS.includes(retV)
        && (shV === 'daily' || shV === 'weekly' || shV === 'monthly') && eolV === 'N'
-       && dow >= 2 && dow <= 6 && kd !== null && Math.round((sd - kd)/86400000) >= 2){
+       && kd !== null
+       && ((dow >= 2 && dow <= 6 && Math.round((sd - kd)/86400000) >= 2)
+           // V50: Monday — Saturday kill (K+2) stays N; Friday or earlier (K+3+) → Y.
+           || (dow === 1 && Math.round((sd - kd)/86400000) >= 3))){
       row.EOL = 'Y';
     }
   }catch(_e){}
