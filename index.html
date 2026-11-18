@@ -6212,9 +6212,11 @@ function rapidOvClose(){
   document.getElementById('rapidOverlay').classList.add('hidden');
   rapidOvBackFn = null;
 }
+let rapidOvOnCancel = null;   // V50: optional hook (joint kill-date step)
 document.getElementById('rapidOvCancel').addEventListener('click', ()=>{
   rapidOvClose();
   rapidScanCancelPending();
+  if(rapidOvOnCancel){ const f = rapidOvOnCancel; rapidOvOnCancel = null; f(); }
 });
 document.getElementById('rapidOvBack').addEventListener('click', ()=>{ if(rapidOvBackFn) rapidOvBackFn(); });
 function rapidFocusSoon(el){ setTimeout(()=>{ try{ el.focus(); el.select && el.select(); }catch(_e){} }, 80); }
@@ -6764,10 +6766,45 @@ document.getElementById('rapidScanOk').addEventListener('click', async ()=>{
   document.getElementById('rapidGrid').classList.remove('hidden');
   const all = [].concat(...st.batches);
   if(all.length) rapidRememberBatch(all, RAPID_SCAN_MODES[st.mode].title); else rapidRenderUndo();
-  if(RAPID_SCAN_MODES[st.mode].timeEach && all.length){
-    entryStartTimeLoop(all, { withLine:false });   // existing "Edit TIME (Each)" keypad
-  }
+  const afterJoints = ()=>{
+    if(RAPID_SCAN_MODES[st.mode].timeEach && all.length){
+      entryStartTimeLoop(all, { withLine:false });   // existing "Edit TIME (Each)" keypad
+    }
+  };
+  rapidAskJointKills(all, afterJoints);
 });
+// V50: M&S Rotisserie / Butter Basted joints — after OK, ask the kill date of
+// each joint entry. Pack date stays as the scan mode set it.
+function rapidIsJoint(r){
+  const t = String((r && r.desc) || '');
+  return /joint/i.test(t) && /(rotisserie|butter\s*basted)/i.test(t);
+}
+function rapidAskJointKills(nums, done){
+  const joints = nums.map(n => entryRecords.find(x=>x.num===n)).filter(rapidIsJoint);
+  if(!joints.length){ done(); return; }
+  let i = 0;
+  const end = ()=>{ rapidOvOnCancel = null; rapidOvClose(); entrySaveLocal(); renderEntryAll(); done(); };
+  const step = ()=>{
+    if(i >= joints.length){ end(); return; }
+    const r = joints[i];
+    const cur = String(r.kdate||'').slice(0,10);
+    const pk = String(r.pdate||'').slice(0,10);
+    rapidOvShow(`Joint kill date · ${i+1} of ${joints.length}`, `#${r.num} ${r.desc} · pack ${rapidFmt(pk)}`,
+      '<label style="margin-top:6px;">Tap the kill date</label><div id="rapidJkCal"></div>',
+      i ? ()=>{ i--; step(); } : null);
+    rapidOvOnCancel = end;    // Cancel → keep the remaining kill dates as scanned
+    let used = false;
+    rapidCalendar(document.getElementById('rapidJkCal'), {
+      value: cur || rapidPrevDay(),
+      onPick: iso => {
+        if(used) return; used = true;
+        r.kdate = iso + 'T00:00:00';
+        i++; step();
+      }
+    });
+  };
+  step();
+}
 
 /* ---------- Shortcuts ----------
    9 Piece · Aldi 600 · M&S BB · Others (Dark Meat, Hot Wings, M&S Piri Piri, Co-op 400).
