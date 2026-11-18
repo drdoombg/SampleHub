@@ -592,14 +592,28 @@
   body.rapid-on { --bg:#141518; --panel:#1d1f22; --panel-2:#26282c; --line:#36393e; background:#141518; }
   body.rapid-on .entry-ref-sheet { background:#1d1f22; }
   .rapid-tile.split .rapid-split-title { font-size:14.5px; }
-  .rapid-reader-off { opacity:.15; transition:opacity .25s; }
-  #rapidReader { transition:opacity .25s; }
+  .rapid-reader-off { opacity:.15; transition:opacity .12s; }
+  #rapidReader { transition:opacity .12s; }
+  /* V50 in-page calendar: one tap on a day = picked (no OK), so calendars can chain */
+  .rcal { background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:8px; margin-top:6px; }
+  .rcal-h { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .rcal-h b { font-size:14px; }
+  .rcal-h button { background:none; border:1px solid var(--line); color:var(--ink); border-radius:8px; width:40px; height:34px; font-size:18px; font-family:inherit; cursor:pointer; }
+  .rcal-w, .rcal-g { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:4px; text-align:center; }
+  .rcal-w span { font-size:10.5px; color:var(--ink-dim); font-weight:700; }
+  .rcal-g button { height:38px; border-radius:8px; border:1px solid transparent; background:var(--panel); color:var(--ink);
+    font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; padding:0; }
+  .rcal-g button.today { border-color:var(--ink-dim); }
+  .rcal-g button.sel { background:var(--done); color:#0b1a12; font-weight:800; }
+  .rcal-g button.future { opacity:.35; }
+  .rapid-pick-sum { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 2px; }
+  .rapid-pick-sum span { font-size:12px; padding:4px 8px; border-radius:999px; background:rgba(56,191,138,.15); color:var(--done); font-weight:700; }
   .rapid-coop { background:linear-gradient(180deg,#f1a640 0%,#eea233 55%,#e0973a 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
   #rapidHost .card-like { margin-bottom:10px; }
   .ei-blue { color:#5aa9f2; }
   .ei-center { grid-column:1 / -1; justify-self:center; width:calc(50% - 4px); }
   .nh-water-btn { grid-column:1 / -1; color:#5aa9f2; border-color:rgba(90,169,242,.55) !important; }
-  .nh-water-grid .entry-picker-btn { font-size:12.5px; padding:6px 4px; min-height:0; }
+  .nh-water-grid .entry-picker-btn { font-size:13px; padding:9px 2px; min-height:0; }
   .nh-water-grid .entry-picker-btn .sub { font-size:9.5px; line-height:1.15; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .nh-water-grid .entry-picker-btn .nh-grid-count { display:block; -webkit-line-clamp:unset; color:var(--done); }
   #entryNhWaterFilter { margin:6px 0; }
@@ -1048,6 +1062,7 @@
     <div class="entry-section-head"><span>Sampled by</span></div>
     <input id="entrySamplerName" class="entry-search" placeholder="Your name, for the export's SAMBY column" style="margin-bottom:0" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true">
 
+    <button type="button" class="btn ghost hidden" id="entryRestoreDayBtn" style="width:100%; margin-top:10px;"></button>
     <div class="divider"></div>
     <div class="backup-row">
       <button class="btn ghost" id="exportBtn">⬇ Backup to file</button>
@@ -4092,7 +4107,7 @@ function entryIsTombstoned(rec, tombstones){
   const t = tombstones[String(rec.num)];
   if(!t) return false;
   const deletedAt = new Date(t).getTime();
-  const committedAt = new Date(rec.time || 0).getTime();
+  const committedAt = Math.max(new Date(rec.time || 0).getTime(), rec.restoredAt ? new Date(rec.restoredAt).getTime() : 0);
   return deletedAt >= committedAt;
 }
 
@@ -5620,34 +5635,48 @@ function entryNightHygieneOpen(){
 let entryNhViewMode = 'grid';   // 'list' | 'grid' — grid default for rapid tap-through
 let entryNhCurrentLetter = null;
 
+let entryNhWaterQuery = '';
 function entryNightHygieneShowWater(){
   const rows = entryNhWaterRows();
   const el = document.getElementById('entryNightHygieneEntries');
-  el.classList.add('entry-nh-gridwrap', 'nh-water-grid');
-  el.innerHTML = '<input type="text" id="entryNhWaterFilter" class="entry-search" placeholder="Filter: code, place or point (e.g. BH, sink, KFC)" autocomplete="off" style="grid-column:1/-1; margin:0;">' +
-    rows.map(m => {
-      const added = entryNhAddedThisSession.get(m.barcode) || 0;
-      const code = (m.line||'').trim();
-      const place = [m.descrptn, m.other_id].filter(Boolean).join(' · ');
-      const hay = (code + ' ' + place + ' ' + (m.material||'')).toLowerCase();
+  const grid = entryNhViewMode === 'grid';
+  el.classList.add('nh-water-grid');
+  el.classList.toggle('entry-nh-gridwrap', grid);
+  const filt = `<input type="text" id="entryNhWaterFilter" class="entry-search" placeholder="Filter: code, place or point (e.g. BH, sink, KFC)" autocomplete="off" value="${esc(entryNhWaterQuery)}" style="grid-column:1/-1; margin:${grid?'0':'4px 6px 6px'}; width:${grid?'auto':'calc(100% - 12px)'};">`;
+  el.innerHTML = filt + rows.map(m => {
+    const added = entryNhAddedThisSession.get(m.barcode) || 0;
+    const code = (m.line||'').trim();
+    const place = [m.descrptn, m.other_id].filter(Boolean).join(' · ');
+    const hay = (code + ' ' + place + ' ' + (m.material||'')).toLowerCase();
+    if(grid){
+      // V50: code only on the tiles; use List view to check the place.
       return `<button type="button" class="entry-picker-btn${added?' entry-nh-grid-added':''}" data-nh-barcode="${esc(m.barcode)}" data-nh-hay="${esc(hay)}">` +
-        `${esc(code || (m.descrptn||'Water'))}<span class="sub">${esc(code ? place : (m.material||''))}</span>` +
-        `<span class="sub nh-grid-count" data-nh-count="${esc(m.barcode)}">${added?`+${added} added`:''}</span></button>`;
-    }).join('');
-  el.style.display = 'grid';
-  el.style.gridTemplateColumns = 'repeat(3, minmax(0,1fr))';
-  el.style.gap = '6px';
-  el.style.padding = '6px';
+        `${esc(code || (m.descrptn||'Water'))}<span class="sub nh-grid-count" data-nh-count="${esc(m.barcode)}">${added?`+${added} added`:''}</span></button>`;
+    }
+    return `<div class="entry-nh-row" data-nh-barcode="${esc(m.barcode)}" data-nh-hay="${esc(hay)}">
+       <span class="entry-nh-line">${esc(code || '—')}</span>
+       <span class="entry-nh-desc">${esc(m.descrptn || m.material || '')}${m.other_id ? ` <span style="color:var(--ink-dim)">· ${esc(m.other_id)}</span>` : ''}</span>
+       <span class="entry-nh-added" data-nh-count="${esc(m.barcode)}">${added?`+${added}`:''}</span>
+     </div>`;
+  }).join('');
+  el.style.display = grid ? 'grid' : '';
+  el.style.gridTemplateColumns = grid ? 'repeat(4, minmax(0,1fr))' : '';
+  el.style.gap = grid ? '6px' : '';
+  el.style.padding = grid ? '6px' : '';
   const f = document.getElementById('entryNhWaterFilter');
-  f.addEventListener('input', ()=>{
-    const q = f.value.trim().toLowerCase();
+  const applyFilter = ()=>{
+    const q = f.value.trim().toLowerCase(); entryNhWaterQuery = f.value;
     el.querySelectorAll('[data-nh-hay]').forEach(b => { b.style.display = (!q || b.dataset.nhHay.includes(q)) ? '' : 'none'; });
-  });
+  };
+  f.addEventListener('input', applyFilter);
   f.addEventListener('click', e=> e.stopPropagation());
+  if(entryNhWaterQuery) applyFilter();
   document.getElementById('entryNightHygieneLetters').classList.add('hidden');
   document.getElementById('entryNightHygieneEntries').classList.remove('hidden');
   document.getElementById('entryNightHygieneBack').classList.remove('hidden');
-  document.getElementById('entryNightHygieneToggleView').classList.add('hidden');
+  const tb = document.getElementById('entryNightHygieneToggleView');
+  tb.classList.remove('hidden');
+  tb.textContent = grid ? 'List view' : 'Grid view';
   document.getElementById('entryNightHygieneTitle').textContent = 'Water · ' + rows.length + ' points';
   document.getElementById('entryNightHygieneHint').textContent = 'Tap a point to add it. Type in the filter to find a code or place.';
   document.getElementById('entryNightHygieneCard').scrollIntoView({behavior:'smooth', block:'end'});
@@ -6215,10 +6244,58 @@ function rapidAskChoice(title, hint, choices, onPick, back){
     '</div>', back);
   document.querySelectorAll('#rapidOvBody [data-rc]').forEach(b => b.addEventListener('click', ()=> onPick(choices[+b.dataset.rc])));
 }
+// V50: in-page calendar. Tapping a day picks it immediately and calls onPick
+// — no native picker, so one calendar can open the next without an extra tap.
+const RCAL_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function rapidCalendar(el, opts){
+  const sel = opts.value || '';
+  const cur = new Date(((sel || rapidToday())) + 'T00:00:00'); cur.setDate(1);
+  const draw = ()=>{
+    const y = cur.getFullYear(), m = cur.getMonth();
+    const startDow = (new Date(y, m, 1).getDay() + 6) % 7;      // Monday first
+    const days = new Date(y, m + 1, 0).getDate();
+    const today = rapidToday();
+    let cells = '';
+    for(let i = 0; i < startDow; i++) cells += '<span></span>';
+    for(let d = 1; d <= days; d++){
+      const iso = `${y}-${rapidPad(m+1)}-${rapidPad(d)}`;
+      const cls = [iso === today ? 'today' : '', iso === sel ? 'sel' : '', iso > today ? 'future' : ''].join(' ');
+      cells += `<button type="button" class="${cls}" data-rcal="${iso}">${d}</button>`;
+    }
+    el.innerHTML = `<div class="rcal"><div class="rcal-h"><button type="button" data-rnav="-1">‹</button><b>${RCAL_MONTHS[m]} ${y}</b><button type="button" data-rnav="1">›</button></div>` +
+      '<div class="rcal-w"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>' +
+      `<div class="rcal-g">${cells}</div></div>`;
+    el.querySelectorAll('[data-rnav]').forEach(b => b.addEventListener('click', ()=>{ cur.setMonth(cur.getMonth() + (+b.dataset.rnav)); draw(); }));
+    el.querySelectorAll('[data-rcal]').forEach(b => b.addEventListener('click', ()=> opts.onPick(b.dataset.rcal)));
+  };
+  draw();
+}
+// V50: keep bottom sheets above the phone keyboard (the keyboard used to cover
+// the BE / count box now and then).
+(function(){
+  const vv = window.visualViewport; if(!vv) return;
+  const fix = ()=>{
+    const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+    document.querySelectorAll('.entry-ref-overlay').forEach(o => {
+      if(o.classList.contains('hidden')) return;
+      o.style.paddingBottom = kb > 60 ? kb + 'px' : '';
+      const sh = o.querySelector('.entry-ref-sheet');
+      if(sh) sh.style.maxHeight = kb > 60 ? Math.round(vv.height * 0.92) + 'px' : '';
+    });
+    const ae = document.activeElement;
+    if(kb > 60 && ae && ae.closest && ae.closest('.entry-ref-overlay') && /INPUT|TEXTAREA/.test(ae.tagName)){
+      setTimeout(()=>{ try{ ae.scrollIntoView({block:'center'}); }catch(_e){} }, 30);
+    }
+  };
+  vv.addEventListener('resize', fix);
+  vv.addEventListener('scroll', fix);
+})();
+
 // Date groups — same mechanics as the External Intake wizard.
 // o.pair = true → separate Kill date and Pack date per group: the kill
 // calendar opens by itself, then the pack calendar, then the count box.
 function rapidDateGroups(o){
+  if(o.pair) return rapidDateGroupsPair(o);
   const groups = [];
   const L = o.itemLabel || '#';
   const render = ()=>{
@@ -6264,6 +6341,63 @@ function rapidDateGroups(o){
       di.addEventListener('change', ()=>{ setTimeout(()=>{ try{ ni.focus(); }catch(_e){} }, 60); });
     }
     setTimeout(()=>{ try{ di.focus(); if(typeof di.showPicker === 'function') di.showPicker(); }catch(_e){} }, 80);
+  };
+  render();
+}
+// V50: Kill calendar → Pack calendar → count (keyboard up) → repeat until all have dates.
+function rapidDateGroupsPair(o){
+  const groups = [];
+  const L = o.itemLabel || '#';
+  let stage = 'kill', kill = '', pack = '';
+  const assigned = ()=> groups.reduce((a,g)=>a+g.count, 0);
+  const summary = ()=> groups.map(g => `<div class="entry-hint">${esc(L)}${g.from}–${g.from+g.count-1} → Kill ${esc(rapidFmt(g.kill))} · Pack ${esc(rapidFmt(g.pack))} (${g.count})</div>`).join('');
+  const back = ()=>{
+    if(stage === 'count'){ stage = 'pack'; render(); }
+    else if(stage === 'pack'){ stage = 'kill'; render(); }
+    else if(groups.length){ const g = groups.pop(); kill = g.kill; pack = g.pack; stage = 'count'; render(); }
+    else if(o.back) o.back();
+  };
+  const render = ()=>{
+    const remaining = o.total - assigned();
+    const first = assigned() + 1;
+    const hint = `${o.total} entries · ${remaining} still need dates`;
+    if(stage === 'kill' || stage === 'pack'){
+      const isKill = stage === 'kill';
+      const def = isKill ? (kill || (groups.length ? groups[groups.length-1].kill : rapidPrevDay())) : (pack || kill);
+      rapidOvShow(o.title, hint,
+        summary() +
+        (isKill ? '' : `<div class="rapid-pick-sum"><span>Kill ${esc(rapidFmt(kill))}</span></div>`) +
+        `<label style="margin-top:6px;">${isKill ? 'KILL' : 'PACK'} date for ${esc(L)}${first} onwards — tap a day</label><div id="rapidDgCal"></div>`, back);
+      rapidCalendar(document.getElementById('rapidDgCal'), { value: def, onPick: iso => {
+        if(isKill){ kill = iso; if(!pack || pack < kill) pack = kill; stage = 'pack'; }
+        else { pack = iso; stage = 'count'; }
+        render();
+      }});
+      return;
+    }
+    // count stage
+    rapidOvShow(o.title, hint,
+      summary() +
+      `<div class="rapid-pick-sum"><span>Kill ${esc(rapidFmt(kill))}</span><span>Pack ${esc(rapidFmt(pack))}</span></div>` +
+      `<label style="margin-top:8px;">How many (from ${esc(L)}${first}) have these dates?</label>` +
+      `<input type="text" inputmode="numeric" id="rapidDgN" placeholder="1–${remaining}" autocomplete="off" enterkeyhint="done">` +
+      '<div class="sheet-actions" style="margin-top:8px;">' +
+        '<button class="btn ghost" id="rapidDgApply">Apply</button>' +
+        `<button class="btn primary" id="rapidDgAll">All remaining (${remaining})</button>` +
+      '</div>', back);
+    const ni = document.getElementById('rapidDgN');
+    const add = (count)=>{
+      if(!count || count < 1){ ni.focus(); return; }
+      if(count > remaining){ alert(`Only ${remaining} left — enter ${remaining} or less.`); return; }
+      groups.push({ kill, pack, date: kill, count, from: first });
+      if(assigned() >= o.total){ o.onDone(groups.slice()); return; }
+      stage = 'kill'; render();
+    };
+    document.getElementById('rapidDgAll').addEventListener('click', ()=> add(remaining));
+    document.getElementById('rapidDgApply').addEventListener('click', ()=> add(rapidDigits(ni.value)));
+    ni.addEventListener('keydown', e=>{ if(e.key === 'Enter'){ e.preventDefault(); add(rapidDigits(ni.value)); } });
+    try{ ni.focus(); }catch(_e){}        // the day tap is a real tap, so the keypad opens
+    rapidFocusSoon(ni);
   };
   render();
 }
@@ -6419,7 +6553,14 @@ function rapidImport(fn, cardIds){
   (cardIds || []).forEach(rapidAdopt);
   try{ fn(); }catch(e){ alert('Could not open: ' + e.message); }
   const host = document.getElementById('rapidHost');
-  setTimeout(()=>{ try{ host.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_e){} }, 60);
+  // V50: land the card just below the sticky header (it was cut off at the top).
+  setTimeout(()=>{
+    try{
+      const hdr = document.querySelector('header');
+      const off = (hdr ? hdr.offsetHeight : 0) + 8;
+      window.scrollTo({ top: host.getBoundingClientRect().top + window.scrollY - off, behavior:'smooth' });
+    }catch(_e){}
+  }, 80);
 }
 
 /* ---------- Rapid scanning: PK/PP, PK/Today, Fresh Kills ----------
@@ -6522,7 +6663,7 @@ async function rapidOnScan(code){
   if(!match){
     if(navigator.vibrate) navigator.vibrate([30,60,30]);
     rapidScanFlash('Not found: ' + code + ' — nothing added', 'bad');
-    rapidScanReopen(900);
+    rapidScanReopen(500);
     return;
   }
   rapidScanHandleMatch(match);
@@ -6533,7 +6674,7 @@ function rapidScanReopen(delay){
     if(rapidScan !== st) return;
     st.handling = false;
     await rapidCamOpen();
-  }, delay == null ? 700 : delay);
+  }, delay == null ? 250 : delay);
 }
 // Commit one picked product through the normal confirm/commit path.
 function rapidCommitPick(p, opts){
@@ -6578,7 +6719,7 @@ function rapidScanHandleMatch(p){
       rapidScanFlash('Nothing added', 'bad');
     }
     rapidScanUpdateHead(); rapidScanRenderList();
-    rapidScanReopen(700);
+    rapidScanReopen(250);
   };
   const askUb = (opts)=>{
     if(!rapidIsKfc79(p, mrow)){
@@ -6766,23 +6907,20 @@ function rapidHotWings(){
       const kills = [];
       const step = ()=>{
         const i = kills.length;
-        rapidOvShow(`Hot Wings · kill date ${i+1} of ${n}`, kills.length ? kills.map((d,j)=>`#${j+1} ${rapidFmt(d)}`).join(' · ') : 'Pick the kill date — the next calendar opens by itself',
-          `<label>Kill date for Hot Wings ${i+1}</label>` +
-          `<input type="date" id="rapidHwDate" value="" autocomplete="off">` +
-          '<div class="sheet-actions" style="margin-top:8px;"><button class="btn primary" id="rapidHwNext">Next</button></div>',
+        // V50: in-page calendar — tap a day and the next calendar is there straight away.
+        rapidOvShow(`Hot Wings · kill date ${i+1} of ${n}`, 'Tap the kill date · pack date ' + rapidFmt(rapidPrevDay()),
+          (kills.length ? `<div class="rapid-pick-sum">${kills.map((d,j)=>`<span>#${j+1} ${esc(rapidFmt(d))}</span>`).join('')}</div>` : '') +
+          `<label style="margin-top:6px;">Kill date for Hot Wings ${i+1}</label><div id="rapidHwCal"></div>`,
           ()=>{ if(kills.length){ kills.pop(); step(); } else rapidHotWings(); });
-        const di = document.getElementById('rapidHwDate');
-        let used = false;   // one date per calendar, even if change + Next both fire
-        const go = ()=>{
-          if(used) return;
-          if(!di.value){ try{ di.showPicker(); }catch(_e){ di.focus(); } return; }
-          used = true;
-          kills.push(di.value);
-          if(kills.length >= n) finish(); else step();
-        };
-        di.addEventListener('change', ()=>{ if(di.value) setTimeout(go, 120); });
-        document.getElementById('rapidHwNext').addEventListener('click', go);
-        setTimeout(()=>{ try{ di.focus(); if(typeof di.showPicker === 'function') di.showPicker(); }catch(_e){} }, 80);
+        let used = false;
+        rapidCalendar(document.getElementById('rapidHwCal'), {
+          value: kills.length ? kills[kills.length-1] : rapidPrevDay(),
+          onPick: iso => {
+            if(used) return; used = true;
+            kills.push(iso);
+            if(kills.length >= n) finish(); else step();
+          }
+        });
       };
       const finish = ()=>{
         rapidOvClose();
@@ -9502,6 +9640,62 @@ document.getElementById('entryBtnWipe').addEventListener('click', ()=>{
     entrySaveLocal(); renderEntryAll();
   }
 });
+
+/* ---------- V50: new day = fresh list ----------
+   At midnight (checked on open, when the app comes back to the front, and
+   every minute) every entry added BEFORE today is cleared, the same way
+   Delete all does it. The cleared entries are kept on this device so Menu →
+   "Restore …" can bring them back if they were still needed. */
+const LS_ENTRY_DAYKEY = 'unified.entryDayKey.v1';
+const LS_ENTRY_DAYARCHIVE = 'unified.entryDayArchive.v1';
+function entryDayCheck(){
+  const today = rapidToday();
+  let last = null;
+  try{ last = localStorage.getItem(LS_ENTRY_DAYKEY); }catch(_e){}
+  if(!last){ try{ localStorage.setItem(LS_ENTRY_DAYKEY, today); }catch(_e){} return; }
+  if(last === today) return;
+  const startOfToday = new Date(today + 'T00:00:00').getTime();
+  const old = entryRecords.filter(r => new Date(r.time || 0).getTime() < startOfToday);
+  if(old.length){
+    try{ localStorage.setItem(LS_ENTRY_DAYARCHIVE, JSON.stringify({ day: last, at: new Date().toISOString(), records: old, ticks: entryTicks })); }catch(_e){}
+    entryMarkDeleted(old.map(r => r.num));
+    const keep = new Set(old.map(r => r.num));
+    entryRecords = entryRecords.filter(r => !keep.has(r.num));
+    if(!entryRecords.length) entryTicks = {};
+    entrySaveLocal();
+    try{ renderEntryAll(); }catch(_e){}
+    try{ entryFlashToast(`New day — cleared ${old.length} entries from ${last.split('-').reverse().slice(0,2).join('/')}`); }catch(_e){}
+  }
+  try{ localStorage.setItem(LS_ENTRY_DAYKEY, today); }catch(_e){}
+  entryRenderRestoreBtn();
+}
+function entryRenderRestoreBtn(){
+  const b = document.getElementById('entryRestoreDayBtn'); if(!b) return;
+  let a = null; try{ a = JSON.parse(localStorage.getItem(LS_ENTRY_DAYARCHIVE) || 'null'); }catch(_e){}
+  if(!a || !a.records || !a.records.length){ b.classList.add('hidden'); return; }
+  b.textContent = `↶ Restore ${a.records.length} entries cleared at midnight (${a.day.split('-').reverse().slice(0,2).join('/')})`;
+  b.classList.remove('hidden');
+}
+document.getElementById('entryRestoreDayBtn').addEventListener('click', ()=>{
+  let a = null; try{ a = JSON.parse(localStorage.getItem(LS_ENTRY_DAYARCHIVE) || 'null'); }catch(_e){}
+  if(!a || !a.records) return;
+  const clash = a.records.filter(r => entryRecords.some(x => x.num === r.num)).length;
+  if(!confirm(`Bring back ${a.records.length} entries from ${a.day}?` + (clash ? `\n${clash} of them share a # with today's entries — those keep today's version.` : ''))) return;
+  const now = new Date().toISOString();
+  a.records.forEach(r => {
+    if(entryRecords.some(x => x.num === r.num)) return;
+    delete entryDeleted[String(r.num)];
+    r.restoredAt = now;
+    entryRecords.push(r);
+  });
+  entryRecords.sort((x,y) => (x.num||0) - (y.num||0));
+  try{ localStorage.removeItem(LS_ENTRY_DAYARCHIVE); }catch(_e){}
+  entrySaveLocal(); renderEntryAll(); entryRenderRestoreBtn();
+});
+setTimeout(entryDayCheck, 1500);
+setInterval(entryDayCheck, 60000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) entryDayCheck(); });
+setTimeout(entryRenderRestoreBtn, 1600);
 
 /* ---------- Export view: same row-builder the actual export uses,
    rendered as an on-screen table so it's checkable before exporting. ---------- */
