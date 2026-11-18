@@ -890,7 +890,7 @@
 </header>
 
 <nav class="bottom-nav">
-  <button class="mtab active" data-tab="routine">
+  <button class="mtab" data-tab="routine">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="M8 12.5l2.5 2.5L16 9"></path></svg>
     <span>Routine</span>
   </button>
@@ -906,7 +906,7 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6h17M3.5 12h17M3.5 18h10"></path><circle cx="16" cy="6" r="1.6" fill="currentColor" stroke="none"></circle><circle cx="9" cy="12" r="1.6" fill="currentColor" stroke="none"></circle><circle cx="19" cy="18" r="1.6" fill="currentColor" stroke="none"></circle></svg>
     <span>Line Timeline</span>
   </button>
-  <button class="mtab mtab-entry" data-tab="entry">
+  <button class="mtab mtab-entry active" data-tab="entry">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 5v14M8 5v14M11 5v14M13.5 5v14M17 5v14M20 5v14"></path></svg>
     <span>Entry</span>
   </button>
@@ -2858,7 +2858,7 @@ let sorting = false;
 let openSet = new Set(
   state.customers.filter(c=>c.other || state.products.some(p=>p.customer===c.name)).map(c=>c.name)
 );
-let currentTab = 'routine';         // 'routine' | 'nutri' | 'shelf' | 'line'
+let currentTab = 'entry';   // V50: the app opens on Entry (Rapid)         // 'routine' | 'nutri' | 'shelf' | 'line'
 let remainingOnly = true;           // routine view filter
 let testRemainingOnly = true;       // test view filter
 let viewMonth = new Date().getMonth(); // 0-11, for nutritional/shelf tabs
@@ -11206,6 +11206,8 @@ document.getElementById('expandAll').addEventListener('click',()=>{
 document.getElementById('collapseAll').addEventListener('click',()=>{ openSet.clear(); render(); });
 
 // main tabs
+// V50: app opens on Entry → Rapid.
+setTimeout(()=>{ try{ if(currentTab==='entry'){ entrySwitchSubTab('rapid'); rapidSyncBodyClass(); } }catch(_e){} }, 0);
 document.querySelectorAll('.mtab').forEach(t=>t.addEventListener('click',()=>{
   document.querySelectorAll('.mtab').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
