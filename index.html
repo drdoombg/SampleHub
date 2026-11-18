@@ -6684,6 +6684,7 @@ function rapidQuickAdd(key, extra){
   const d = (extra && extra.kdate) ? { k: extra.kdate, p: extra.pdate } : rapidEightAmDates();
   const opts = { cat: rapidCatForShift(sh), mimsShift: m.shift, mimsSuite: m.suite, kdate: d.k, pdate: d.p };
   if(extra && extra.timeOverride) opts.timeOverride = extra.timeOverride;
+  if(extra && extra.useByOverride != null) opts.useByOverride = extra.useByOverride;
   if(rapidNorm(m.descrptn) === 'hot wings' && sh === 'EOL') opts.useByOverride = 4;
   const nums = rapidCommitPick(rapidLookupFor(m), opts);
   return nums.length ? { sh, nums } : null;
@@ -6731,13 +6732,22 @@ function rapidShortcutsOthers(){
 function rapidScBind(redraw){
   document.querySelectorAll('#rapidOvBody [data-sc]').forEach(b => b.addEventListener('click', ()=>{
     const key = b.dataset.sc;
-    const res = rapidQuickAdd(key);
-    if(res){
-      rapidRememberBatch(res.nums, `${RAPID_SC[key].label} · ${res.sh}`);
-      rapidScLast = `✓ #${res.nums[0]} ${RAPID_SC[key].label} · ${res.sh} added`;
-      try{ entryFlashToast(rapidScLast); }catch(_e){}
+    const add = (extra)=>{
+      const res = rapidQuickAdd(key, extra);
+      if(res){
+        rapidRememberBatch(res.nums, `${RAPID_SC[key].label} · ${res.sh}`);
+        rapidScLast = `✓ #${res.nums[0]} ${RAPID_SC[key].label} · ${res.sh}${extra && extra.useByOverride ? ' · ' + extra.useByOverride + 'D' : ''} added`;
+        try{ entryFlashToast(rapidScLast); }catch(_e){}
+      }
+      redraw();   // refresh "next:" labels — card stays open for the next tap
+    };
+    // V50: 9 Piece + Dark Meat → 7D / 9D straight after the tap.
+    if(key === 'nine' || key === 'dark'){
+      rapidAskChoice(`${RAPID_SC[key].label} · Use By from Kill date`, 'Pick 7D or 9D — the entry is added straight away',
+        [{label:'7D', v:7},{label:'9D', v:9}], c => add({ useByOverride: c.v }), redraw);
+      return;
     }
-    redraw();   // refresh "next:" labels — card stays open for the next tap
+    add();
   }));
   document.querySelectorAll('#rapidOvBody [data-scg]').forEach(b => b.addEventListener('click', ()=>{
     const g = b.dataset.scg;
