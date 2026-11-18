@@ -588,6 +588,10 @@
   .rapid-split-row button:active { background:rgba(56,191,138,.32); }
   .rapid-split-row button .sub { font-size:8.5px; font-weight:500; color:var(--ink-dim); margin-top:2px; }
   #entryPaneRapid { padding-bottom:150px; }
+  /* Rapid scanner: keep Undo / OK floating just above the Entry icon bar. */
+  #rapidScanCard .sheet-actions { position:sticky; bottom:calc(140px + env(safe-area-inset-bottom)); z-index:36;
+    background:var(--panel); padding:8px 0 2px; border-radius:12px; }
+  #rapidScanCard .rapid-scan-flash { position:sticky; bottom:calc(206px + env(safe-area-inset-bottom)); z-index:36; }
   /* V50: Rapid page sits on dark grey instead of blue so the tile colours read clearly */
   body.rapid-on { --bg:#141518; --panel:#1d1f22; --panel-2:#26282c; --line:#36393e; background:#141518; }
   body.rapid-on .entry-ref-sheet { background:#1d1f22; }
