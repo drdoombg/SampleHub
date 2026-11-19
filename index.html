@@ -4127,6 +4127,43 @@ const ENTRY_TEMPLATES = (typeof TEMPLATES_SEED!=='undefined') ? TEMPLATES_SEED :
 // Mark records as deleted. Called by both the single-record delete button and
 // the Delete all wipe, so every removal leaves a tombstone that can travel to
 // the other device.
+// V51: an entry you DELETE (Records delete / select-delete, Rapid ↶ undo,
+// Night Hygiene ↶, jump-to replace) gives back the Routine tick it made, so
+// re-entering it on the right shift ticks again. NOT used for the midnight
+// clear, "Delete ALL", or deletions arriving by sync — those keep the ticks.
+// A tick is only taken back if it is still the one this entry set, and no
+// other remaining entry for the same routine row this period shares it.
+function entryRestoreTicksFor(nums){
+  const del = new Set((nums||[]).map(Number));
+  const going = entryRecords.filter(r => del.has(Number(r.num)) && Array.isArray(r.autoTicks));
+  if(!going.length) return;
+  const staying = entryRecords.filter(r => !del.has(Number(r.num)) && Array.isArray(r.autoTicks));
+  const restored = [];
+  let changed = false, btChanged = false;
+  going.forEach(r => r.autoTicks.forEach(t => {
+    if(t.k){
+      if(!t.owner) return;
+      if(state.ticks[t.k] !== t.period) return;                 // changed since — leave it
+      let heir = null;
+      staying.some(o => o.autoTicks.some(x => { if(x.k === t.k && x.period === t.period){ heir = x; return true; } return false; }));
+      if(heir){ heir.owner = true; heir.prev = t.prev; heir.prevDate = t.prevDate; t.owner = false; return; }
+      if(t.prev == null) state.ticks[t.k] = null; else state.ticks[t.k] = t.prev;
+      if(t.prevDate) state.tickDates[t.k] = t.prevDate; else delete state.tickDates[t.k];
+      t.owner = false;
+      restored.push(t.name || 'routine'); changed = true;
+    } else if(t.bc && !t.claim){
+      const cur = entryTicks[t.bc];
+      if(!cur || cur.freq !== t.freq || cur.period !== t.period) return;
+      const shared = staying.find(o => o.autoTicks.some(x => x.bc === t.bc && x.freq === t.freq && x.period === t.period));
+      if(shared){ shared.autoTicks.forEach(x => { if(x.bc === t.bc){ x.claim = false; x.prevBt = t.prevBt; } }); t.claim = true; return; }
+      if(t.prevBt) entryTicks[t.bc] = t.prevBt; else delete entryTicks[t.bc];
+      t.claim = true; btChanged = true;
+    }
+  }));
+  if(changed){ try{ save(); }catch(_e){} }
+  if(btChanged){ try{ entrySaveLocal(); }catch(_e){} }
+  if(restored.length){ try{ entryFlashToast('Routine tick removed: ' + restored.join(', ')); }catch(_e){} }
+}
 function entryMarkDeleted(nums){
   const now = new Date().toISOString();
   nums.forEach(n => { entryDeleted[String(n)] = now; });
@@ -5847,6 +5884,7 @@ document.getElementById('entryNightHygieneClose').addEventListener('click', entr
 document.getElementById('entryNightHygieneUndo').addEventListener('click', ()=>{
   const last = entryNhUndoStack.pop();
   if(!last){ try{ entryFlashToast('Nothing to undo'); }catch(_e){} return; }
+  entryRestoreTicksFor([last.num]);
   entryMarkDeleted([last.num]);
   const i = entryRecords.findIndex(r => r.num === last.num);
   if(i !== -1) entryRecords.splice(i, 1);
@@ -6197,6 +6235,7 @@ function rapidRenderUndo(){
 }
 function rapidDeleteNums(nums){
   const set = new Set(nums);
+  entryRestoreTicksFor(nums);
   entryMarkDeleted(nums);
   for(let i = entryRecords.length - 1; i >= 0; i--){ if(set.has(entryRecords[i].num)) entryRecords.splice(i, 1); }
   entrySaveLocal(); renderEntryAll();
@@ -8049,11 +8088,13 @@ function entryCommit(){
     const existingIdx = entryRecords.findIndex(r => r.num === n);
     if(existingIdx !== -1){
       const old = entryRecords[existingIdx];
+      try{ entryRestoreTicksFor([old.num]); }catch(_e){}      // V51: the wrong entry gives its routine tick back
       entryReplaceInfo = { idx: existingIdx, posTime: old.posTime || old.time || null, rev: new Date().toISOString() };
       entryRecords.splice(existingIdx, 1);
     }
   }
 
+  const recsBeforeCommit = new Set(entryRecords);   // V51: to know which records this commit made
   const now=new Date();
   const lookupEntry = entryPending.lookupEntry;
   const joinKey = entryPending.mimsBarcode || entryPending.barcode;
@@ -8198,9 +8239,16 @@ function entryCommit(){
     }
     try{ entryFlashToast(`Replaced #${n}`); }catch(_e){}
   }
+  const newRecs = entryRecords.filter(r => !recsBeforeCommit.has(r));
+  const autoTicks = [];   // V51: routine ticks this commit made (or shares) — undone if the entry is deleted
   if(entryPending.barcode){
-    if(entryPending.cat==='Category 2') entryTicks[entryPending.barcode]={freq:'weekly', period:weekKey()};
-    if(entryPending.cat==='Category 3') entryTicks[entryPending.barcode]={freq:'monthly', period:monthKey()};
+    const bt = entryPending.cat==='Category 2' ? {freq:'weekly', period:weekKey()}
+             : entryPending.cat==='Category 3' ? {freq:'monthly', period:monthKey()} : null;
+    if(bt){
+      const prevBt = entryTicks[entryPending.barcode] ? Object.assign({}, entryTicks[entryPending.barcode]) : null;
+      entryTicks[entryPending.barcode] = bt;
+      autoTicks.push({ bc: entryPending.barcode, freq: bt.freq, period: bt.period, prevBt });
+    }
   }
   // Cross-tab correlation: if this scan corresponds to a Routines product
   // that's currently unticked, tick it. With barcodes on routine products
@@ -8260,9 +8308,16 @@ function entryCommit(){
         const pendShift = (entryPending.mimsShift||'').toUpperCase();
         if(pendShift === 'EOL') targetFreq = 'eol';
       }
-      if(!targetFreq || isDone(match.id, targetFreq)) continue;
+      if(!targetFreq) continue;
+      if(isDone(match.id, targetFreq)){
+        // Already ticked: remember the claim, so if the tick's owner is deleted this entry keeps it.
+        const k0 = tickKey(match.id, targetFreq);
+        autoTicks.push({ k: k0, period: state.ticks[k0], owner: false, name: match.name });
+        continue;
+      }
       const k = tickKey(match.id, targetFreq);
       const period = (targetFreq === 'weekly' || targetFreq === 'eol') ? weekKey() : monthKey();
+      autoTicks.push({ k, period, owner: true, prev: state.ticks[k] == null ? null : state.ticks[k], prevDate: state.tickDates[k] || null, name: match.name });
       state.ticks[k] = period;
       state.tickDates[k] = new Date().toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
       tickedNames.push(match.name);
@@ -8271,6 +8326,11 @@ function entryCommit(){
       save();
       try{ entryFlashToast('Also ticked in Routines: ' + tickedNames.join(', ')); }catch(_e){}
     }
+  }
+  if(autoTicks.length && newRecs.length){
+    // One owner per tick: the first record of this commit carries it.
+    newRecs[0].autoTicks = autoTicks;
+    newRecs.slice(1).forEach(r => { r.autoTicks = autoTicks.map(t => t.k ? { k:t.k, period:t.period, owner:false, name:t.name } : { bc:t.bc, freq:t.freq, period:t.period, claim:true }); });
   }
   if(!lookupEntry && entryPending.barcode && entryPending.desc){
     entryLookup.push({
@@ -9682,6 +9742,7 @@ document.getElementById('entryTbody').addEventListener('click', e=>{
   if(delBtn){
     const i=+delBtn.dataset.entrydel;
     if(confirm('Delete record #'+entryRecords[i].num+'?')){
+      entryRestoreTicksFor([entryRecords[i].num]);
       entryMarkDeleted([entryRecords[i].num]);
       entryRecords.splice(i,1); entrySaveLocal(); renderEntryAll();
     }
@@ -9807,6 +9868,7 @@ document.getElementById('entryBtnBulkDelete').addEventListener('click', ()=>{
   const nums=[...entrySelectedNums];
   const count = nums.length;
   if(!confirm(`Delete ${count} selected record${count===1?'':'s'}? This cannot be undone.`)) return;
+  entryRestoreTicksFor(nums);
   entryMarkDeleted(nums);
   const remove = new Set(nums);
   entryRecords = entryRecords.filter(r => !remove.has(r.num));
