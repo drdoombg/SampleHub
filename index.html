@@ -605,7 +605,12 @@
   .entry-bottombar > button.rapid-ok .entry-tabicon, .entry-bottombar > button.rapid-ok.on .entry-tabicon { border-color:var(--done); color:var(--done); background:rgba(56,191,138,.18); }
   .entry-bottombar > button.rapid-ok.on { color:var(--done); }
   .entry-bottombar > button.rapid-ok:active .entry-tabicon, .entry-bottombar > button.rapid-ok.on:active .entry-tabicon { background:var(--done); color:#0b1a12; }
-  .rapid-ico { display:inline-block; vertical-align:middle; margin-left:5px; }
+  /* V51: tile icons hang on the text baseline without changing the line height, so all tile labels sit level */
+  .rapid-ico-w { position:relative; display:inline-block; width:1.85em; height:.7em; margin-left:6px; vertical-align:baseline; }
+  .rapid-ico-w > svg, .rapid-ico-w > .rapid-emo { position:absolute; left:0; bottom:0; }
+  .rapid-ico-w > svg { bottom:-0.27em; }
+  .rapid-ico { width:1.85em; height:1.75em; display:block; }
+  .rapid-emo { font-size:1.55em; line-height:1; display:block; bottom:-0.05em !important; }
   .rapid-srch-res { overflow-y:auto; display:flex; flex-direction:column-reverse; margin-bottom:8px; }
   .nh-recheck { position:absolute; top:10px; right:10px; width:40px; height:40px; border-radius:50%;
     border:1.5px solid var(--line); background:var(--panel-2); color:var(--ink-dim); font-family:inherit;
@@ -7185,8 +7190,8 @@ function rapidHotWings(){
    row 2       : Amber Daily, Amber Weekly (yellow) · External Intake (blue) · Necks & Caeca (red)
    row 3 plain : PK/PP · Fresh Kills (wide) · PK/Today
    row 4       : PMD Wholebirds (purple) · Shortcuts (wide, green) · Raw Portions (purple) */
-const RAPID_ICO_CAGE = '<svg class="rapid-ico" width="20" height="20" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="3" rx="1" fill="#7b8a99"/><rect x="2" y="19" width="20" height="3" rx="1" fill="#7b8a99"/><g fill="#7b8a99"><rect x="4" y="8" width="16" height="1.6"/><rect x="4" y="12" width="16" height="1.6"/><rect x="4" y="16" width="16" height="1.6"/></g><g fill="#c7d2dc"><rect x="4" y="5" width="2" height="14"/><rect x="8.5" y="5" width="2" height="14"/><rect x="13.5" y="5" width="2" height="14"/><rect x="18" y="5" width="2" height="14"/></g></svg>';
-const RAPID_ICO_BASKET = '<svg class="rapid-ico" width="22" height="20" viewBox="0 0 26 24"><path d="M4 9 L8 3 M22 9 L18 3" stroke="#2e7d32" stroke-width="2.2" stroke-linecap="round" fill="none"/><rect x="2" y="8" width="22" height="3" rx="1.2" fill="#66bb6a"/><path d="M3.5 11 H22.5 L20.5 22 H5.5 Z" fill="#43a047"/><g fill="#1b5e20" opacity=".55"><rect x="7" y="13" width="2" height="7" rx="1"/><rect x="11" y="13" width="2" height="7" rx="1"/><rect x="15" y="13" width="2" height="7" rx="1"/><rect x="19" y="13" width="1.6" height="6" rx=".8"/></g></svg>';
+const RAPID_ICO_CAGE = '<svg class="rapid-ico" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="3" rx="1" fill="#7b8a99"/><rect x="2" y="19" width="20" height="3" rx="1" fill="#7b8a99"/><g fill="#7b8a99"><rect x="4" y="8" width="16" height="1.6"/><rect x="4" y="12" width="16" height="1.6"/><rect x="4" y="16" width="16" height="1.6"/></g><g fill="#c7d2dc"><rect x="4" y="5" width="2" height="14"/><rect x="8.5" y="5" width="2" height="14"/><rect x="13.5" y="5" width="2" height="14"/><rect x="18" y="5" width="2" height="14"/></g></svg>';
+const RAPID_ICO_BASKET = '<svg class="rapid-ico" viewBox="0 0 26 24"><path d="M4 9 L8 3 M22 9 L18 3" stroke="#2e7d32" stroke-width="2.2" stroke-linecap="round" fill="none"/><rect x="2" y="8" width="22" height="3" rx="1.2" fill="#66bb6a"/><path d="M3.5 11 H22.5 L20.5 22 H5.5 Z" fill="#43a047"/><g fill="#1b5e20" opacity=".55"><rect x="7" y="13" width="2" height="7" rx="1"/><rect x="11" y="13" width="2" height="7" rx="1"/><rect x="15" y="13" width="2" height="7" rx="1"/><rect x="19" y="13" width="1.6" height="6" rx=".8"/></g></svg>';
 const RAPID_TILES = [
   { label:'2S-G', cls:'c-green split', split:[ { label:'3', run: rapidG3 }, { label:'4', run: rapidG4 } ] },
   { label:'Amber\nSwabs',     cls:'c-green',  run: rapidAmberSwabs },
@@ -7210,7 +7215,7 @@ function rapidRenderGrid(){
         t.split.map((x,j)=>`<button type="button" data-rt="${i}" data-rsp="${j}">${esc(x.label)}</button>`).join('') +
         '</div></div>';
     }
-    return `<button type="button" class="rapid-tile ${t.cls||''}" data-rt="${i}"><span>${rapidTileLabel(t.label)}${t.icon ? (t.icon.startsWith('<') ? t.icon : ' ' + t.icon) : ''}</span></button>`;
+    return `<button type="button" class="rapid-tile ${t.cls||''}" data-rt="${i}"><span class="${t.icon ? 'rapid-lbl-ico' : ''}" style="white-space:nowrap">${rapidTileLabel(t.label)}${t.icon ? ('<span class="rapid-ico-w">' + (t.icon.startsWith('<') ? t.icon : '<span class="rapid-emo">' + t.icon + '</span>') + '</span>') : ''}</span></button>`;
   }).join('');
   rapidRenderUndo();
 }
