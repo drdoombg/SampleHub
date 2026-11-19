@@ -589,10 +589,21 @@
   .rapid-split-row button .sub { font-size:8.5px; font-weight:500; color:var(--ink-dim); margin-top:2px; }
   #entryPaneRapid { padding-bottom:150px; }
   /* Rapid scanner: keep Undo / OK floating just above the Entry icon bar. */
-  #rapidScanCard .sheet-actions { position:sticky; bottom:calc(140px + env(safe-area-inset-bottom)); z-index:36;
-    background:var(--panel); padding:8px 0 2px; border-radius:12px; }
+  /* V51: Undo / OK + in-session buttons float just above the Entry icon bar. */
+  #rapidScanCard .rapid-scan-foot { position:sticky; bottom:calc(140px + env(safe-area-inset-bottom)); z-index:36;
+    background:var(--panel); padding:8px 0 2px; border-radius:12px; margin-top:6px; }
+  #rapidScanCard .rapid-scan-foot .sheet-actions { margin-top:0; }
   #rapidScanCard .rapid-scan-flash:empty { display:none; }
-  #rapidScanCard .rapid-scan-flash { position:sticky; bottom:calc(206px + env(safe-area-inset-bottom)); z-index:36; }
+  #rapidScanCard .rapid-scan-flash { position:sticky; bottom:calc(266px + env(safe-area-inset-bottom)); z-index:36; }
+  .rapid-scan-extra { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:8px; }
+  .rapid-scan-extra:empty { display:none; }
+  .rapid-scan-extra .rapid-tile { aspect-ratio:auto; height:50px; font-size:13px; line-height:1.1; padding:2px 4px; }
+  .rapid-scan-extra .rapid-tile.mid { grid-column:2; }
+  #rapidReaderWrap { overflow:hidden; }
+  #rapidReader.rapid-shrunk { transform-origin:top center; }
+  .rapid-scan-search { align-self:center; margin:0 8px; padding:8px 12px; border-radius:10px; border:1px solid var(--line);
+    background:var(--panel-2); color:var(--ink); font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .rapid-scan-search:active { background:var(--line); }
   /* V50: Rapid page sits on dark grey instead of blue so the tile colours read clearly */
   body.rapid-on { --bg:#141518; --panel:#1d1f22; --panel-2:#26282c; --line:#36393e; background:#141518; }
   body.rapid-on .entry-ref-sheet { background:#1d1f22; }
@@ -868,7 +879,7 @@
 <header>
   <div class="title-row">
     <div>
-      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v50</span></h1>
+      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v51</span></h1>
       <div class="period-note" id="periodNote"></div>
     </div>
     <button class="icon-btn" id="menuBtn">Menu</button>
@@ -1511,15 +1522,19 @@
     <div class="card-like hidden" id="rapidScanCard">
       <div class="rapid-scan-head">
         <div><div class="rapid-scan-mode" id="rapidScanMode">PK/PP</div><div class="entry-hint" id="rapidScanDates"></div></div>
+        <button type="button" class="rapid-scan-search" id="rapidScanSearch">🔍 Search</button>
         <div class="rapid-scan-next">Next <b id="rapidScanNext">#1</b></div>
       </div>
-      <div id="rapidReader" class="entry-reader"></div>
+      <div id="rapidReaderWrap"><div id="rapidReader" class="entry-reader"></div></div>
       <div class="rapid-scan-flash" id="rapidScanFlash"></div>
-      <div class="rapid-scan-list" id="rapidScanList"></div>
-      <div class="sheet-actions" style="margin-top:10px;">
-        <button class="btn ghost" id="rapidScanUndo">Undo last</button>
-        <button class="btn primary" id="rapidScanOk">OK — done</button>
+      <div class="rapid-scan-foot">
+        <div class="sheet-actions">
+          <button class="btn ghost" id="rapidScanUndo">Undo last</button>
+          <button class="btn primary" id="rapidScanOk">OK — done</button>
+        </div>
+        <div class="rapid-scan-extra" id="rapidScanExtra"></div>
       </div>
+      <div class="rapid-scan-list" id="rapidScanList"></div>
     </div>
   </div>
 
@@ -6303,7 +6318,7 @@ function rapidCalendar(el, opts){
 // o.pair = true → separate Kill date and Pack date per group: the kill
 // calendar opens by itself, then the pack calendar, then the count box.
 function rapidDateGroups(o){
-  if(o.pair) return rapidDateGroupsPair(o);
+  if(o.pair || o.killOnly) return rapidDateGroupsPair(o);
   const groups = [];
   const L = o.itemLabel || '#';
   const render = ()=>{
@@ -6360,7 +6375,7 @@ function rapidDateGroupsPair(o){
   const assigned = ()=> groups.reduce((a,g)=>a+g.count, 0);
   const summary = ()=> groups.map(g => `<div class="entry-hint">${esc(L)}${g.from}–${g.from+g.count-1} → Kill ${esc(rapidFmt(g.kill))} · Pack ${esc(rapidFmt(g.pack))} (${g.count})</div>`).join('');
   const back = ()=>{
-    if(stage === 'count'){ stage = 'pack'; render(); }
+    if(stage === 'count'){ stage = o.killOnly ? 'kill' : 'pack'; render(); }
     else if(stage === 'pack'){ stage = 'kill'; render(); }
     else if(groups.length){ const g = groups.pop(); kill = g.kill; pack = g.pack; stage = 'count'; render(); }
     else if(o.back) o.back();
@@ -6375,9 +6390,11 @@ function rapidDateGroupsPair(o){
       rapidOvShow(o.title, hint,
         summary() +
         (isKill ? '' : `<div class="rapid-pick-sum"><span>Kill ${esc(rapidFmt(kill))}</span></div>`) +
+        (o.killOnly ? `<div class="entry-hint">Pack date = ${esc(rapidFmt(rapidPrevDay()))} (previous day)</div>` : '') +
         `<label style="margin-top:6px;">${isKill ? 'KILL' : 'PACK'} date for ${esc(L)}${first} onwards — tap a day</label><div id="rapidDgCal"></div>`, back);
       rapidCalendar(document.getElementById('rapidDgCal'), { value: def, onPick: iso => {
-        if(isKill){ kill = iso; if(!pack || pack < kill) pack = kill; stage = 'pack'; }
+        if(isKill && o.killOnly){ kill = iso; pack = rapidPrevDay(); stage = 'count'; }   // V51: pack = previous day
+        else if(isKill){ kill = iso; if(!pack || pack < kill) pack = kill; stage = 'pack'; }
         else { pack = iso; stage = 'count'; }
         render();
       }});
@@ -6503,7 +6520,7 @@ function rapidAmber(weekly){
     }
     rapidAddRecs(specs, title);
   };
-  const askDates = ()=> rapidDateGroups({ title: `${title} · Amber Skin dates`, total: st.n, itemLabel:'Skin ', pair:true, onDone: finish, back: askBe });
+  const askDates = ()=> rapidDateGroups({ title: `${title} · Amber Skin kill dates`, total: st.n, itemLabel:'Skin ', killOnly:true, onDone: finish, back: askBe });
   const askBe = ()=> rapidAskNumber({
     title: `${title} · BE number`, hint: `First BE number — the ${st.n} Amber Skin entries count up from it (e.g. 4018 → BE4018, BE4019…)`,
     placeholder: 'e.g. 4018', back: askCount,
@@ -6647,9 +6664,120 @@ async function rapidScanStart(mode){
   const F = Html5QrcodeSupportedFormats;
   const FORMATS = [F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.ITF,F.QR_CODE];
   rapidScanner = rapidScanner || new Html5Qrcode('rapidReader', {formatsToSupport:FORMATS, verbose:false});
+  rapidScanRenderExtra();
   rapidPauseSync();
   await rapidCamOpen();
 }
+// V51: viewfinder shrunk on screen only (CSS scale) — the camera, its size
+// and the decoding stay exactly as the regular scanner.
+function rapidFitReader(){
+  const r = document.getElementById('rapidReader'), w = document.getElementById('rapidReaderWrap');
+  if(!r || !w) return;
+  r.style.transform = ''; r.classList.remove('rapid-shrunk');
+  const h = r.offsetHeight;
+  if(h < 60) return;          // camera between scans — keep the last size (no jump)
+  const target = Math.max(150, Math.min(320, window.innerHeight - 470));
+  const sc = Math.min(1, target / h);
+  if(sc < 1){ r.classList.add('rapid-shrunk'); r.style.transform = `scale(${sc})`; }
+  w.style.height = Math.round(h * sc) + 'px';
+}
+try{
+  new ResizeObserver(()=>{ if(rapidScan) requestAnimationFrame(rapidFitReader); }).observe(document.getElementById('rapidReader'));
+}catch(_e){}
+window.addEventListener('resize', ()=>{ if(rapidScan) rapidFitReader(); });
+// V51: in-session buttons under OK — PK/PP + PK/Today: Shortcuts; Fresh Kills: PMD · Shortcuts · Raw.
+function rapidScanRenderExtra(){
+  const el = document.getElementById('rapidScanExtra');
+  if(!rapidScan){ el.innerHTML = ''; return; }
+  const sc = '<button type="button" class="rapid-tile c-green mid" data-rx="sc">Shortcuts</button>';
+  el.innerHTML = rapidScan.mode === 'fresh'
+    ? '<button type="button" class="rapid-tile c-purple" data-rx="pmd">PMD<br>Wholebirds</button>' + sc +
+      '<button type="button" class="rapid-tile c-purple" data-rx="raw">Raw<br>Portions</button>'
+    : sc;
+}
+// Pause the camera while a sub-step (search / shortcuts / wizard) is open.
+async function rapidScanPause(){
+  const st = rapidScan; if(!st) return null;
+  st.handling = true; st.sub = true;
+  await rapidCamClose();
+  return st;
+}
+function rapidScanResume(msg, kind){
+  const st = rapidScan; if(!st) return;
+  st.sub = false;
+  if(msg != null) rapidScanFlash(msg, kind || '');
+  rapidScanUpdateHead(); rapidScanRenderList();
+  rapidScanReopen(250);
+}
+// Entries made by a sub-step go into the session batch (Undo, list, times after OK).
+function rapidScanTake(nums){
+  if(rapidScan && nums && nums.length){ rapidScan.batches.push(nums.slice()); rapidScanUpdateHead(); rapidScanRenderList(); }
+}
+document.getElementById('rapidScanExtra').addEventListener('click', async e=>{
+  const b = e.target.closest('[data-rx]'); if(!b || !rapidScan || rapidScan.handling) return;
+  const k = b.dataset.rx;
+  await rapidScanPause();
+  if(k === 'sc'){ rapidShortcuts(); return; }
+  // PMD / Raw: the wizard card opens in place of the scanner; when it is
+  // finished (or closed) the scanner comes straight back.
+  const card = k === 'pmd' ? 'entryConfirmCard' : 'entryRawPortionsCard';
+  const before = new Set(entryRecords.map(r=>r.num));
+  document.getElementById('rapidScanCard').classList.add('hidden');
+  rapidImport(k === 'pmd' ? entryPmdWholeBirdOpen : entryRawPortionsOpen, [card]);
+  const el = document.getElementById(card);
+  let seen = false;
+  const tick = setInterval(()=>{
+    if(!rapidScan){ clearInterval(tick); return; }
+    const open = el && !el.classList.contains('hidden');
+    const busy = open || entryPending || document.querySelector('.entry-ref-overlay:not(.hidden)');
+    if(open) seen = true;
+    if(seen && !busy){
+      clearInterval(tick);
+      const nums = entryRecords.filter(r=>!before.has(r.num)).map(r=>r.num);
+      rapidScanTake(nums);
+      document.getElementById('rapidScanCard').classList.remove('hidden');
+      try{ window.scrollTo({top:0}); }catch(_e){}
+      rapidScanResume(nums.length ? `✓ #${nums[0]}${nums.length>1?'–#'+nums[nums.length-1]:''} added — ${k==='pmd'?'PMD Wholebirds':'Raw Portions'}` : 'Nothing added', nums.length ? 'ok' : '');
+    }
+  }, 300);
+});
+// V51: Search inside the session — same search as the regular Entry page.
+function rapidSearchList(q){
+  q = String(q||'').trim().toLowerCase();
+  if(!q) return [];
+  const raw = entryLookup.filter(p => p.source !== 'seed' && !p._nhRow && !p.action && entryLookupMatches(p,q)).slice(0,60);
+  const norm = s => (s||'').toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
+  const mimsNameSet = new Set(raw.filter(p=>p.source==='mims').map(p=>norm(p.name)));
+  return raw.filter(p => p.source === 'mims' || !mimsNameSet.has(norm(p.name)));
+}
+document.getElementById('rapidScanSearch').addEventListener('click', async ()=>{
+  if(!rapidScan || rapidScan.handling) return;
+  await rapidScanPause();
+  const md = RAPID_SCAN_MODES[rapidScan.mode];
+  rapidOvShow(`Search · ${md.title}`, `Kill ${rapidFmt(md.k())} · Pack ${rapidFmt(md.p())} — tap a result to add it`,
+    '<input id="rapidSrchIn" class="entry-search" placeholder="Search Barcode or Name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true" style="width:100%; height:56px; font-size:16px;">' +
+    '<div id="rapidSrchRes" style="margin-top:8px;"></div>');
+  const inp = document.getElementById('rapidSrchIn'), res = document.getElementById('rapidSrchRes');
+  let list = [];
+  const draw = ()=>{
+    const v = inp.value.trim();
+    list = rapidSearchList(v);
+    const exact = v && entryLookup.find(p=>p.barcode===v);
+    if(exact && !list.includes(exact)) list.unshift(exact);
+    res.innerHTML = list.map((p,i)=>`<div class="entry-result-row" data-i="${i}"><div>
+      <div class="entry-result-title">${esc(p.name)}</div><div class="entry-result-sub">${entryResultSubtitle(p)}</div></div>
+      ${p.barcode ? entryTickLabel(p.barcode) : ''}</div>`).join('');
+  };
+  inp.addEventListener('input', draw);
+  inp.addEventListener('keydown', e=>{ if(e.key === 'Enter'){ e.preventDefault(); if(list.length === 1) pick(list[0]); } });
+  const pick = (p)=>{
+    rapidOvClose();
+    if(rapidScan) rapidScan.sub = false;
+    rapidScanHandleMatch(p);      // same as a scan: session dates, 7D/9D, Meat Prep asks
+  };
+  res.addEventListener('click', e=>{ const row = e.target.closest('[data-i]'); if(row) pick(list[+row.dataset.i]); });
+  rapidFocusSoon(inp);
+});
 function rapidResolveCode(code){
   return entryLookup.find(p=>p.barcode===code) || (function(){
     const pfx = entryVarWeightPrefix(code);
@@ -6748,6 +6876,7 @@ function rapidScanHandleMatch(p){
 }
 // Cancel on a question during scanning → nothing added, camera back on.
 function rapidScanCancelPending(){
+  if(rapidScan && rapidScan.sub){ rapidScanResume(); return; }
   if(rapidScan && rapidScan.handling){ rapidScanFlash('Cancelled — nothing added', ''); rapidScanReopen(300); }
 }
 document.getElementById('rapidScanUndo').addEventListener('click', ()=>{
@@ -6761,6 +6890,7 @@ document.getElementById('rapidScanOk').addEventListener('click', async ()=>{
   const st = rapidScan; if(!st) return;
   rapidScan = null;
   await rapidCamClose();
+  rapidScanRenderExtra();
   rapidResumeSync();
   document.getElementById('rapidScanCard').classList.add('hidden');
   document.getElementById('rapidGrid').classList.remove('hidden');
@@ -6883,7 +7013,8 @@ function rapidScBtn(key){
 }
 let rapidScLast = '';
 function rapidShortcuts(){
-  rapidOvShow('Shortcuts', 'One tap adds one entry · before 08:00 kill = prev day',
+  const md = rapidScan ? RAPID_SCAN_MODES[rapidScan.mode] : null;
+  rapidOvShow(md ? `Shortcuts · ${md.title}` : 'Shortcuts', md ? `One tap adds one entry · Kill ${rapidFmt(md.k())} · Pack ${rapidFmt(md.p())}` : 'One tap adds one entry · before 08:00 kill = prev day',
     '<div class="entry-picker-grid" style="grid-template-columns:repeat(2,1fr);">' +
       rapidScBtn('nine') + rapidScBtn('aldi600') +
       '<button type="button" class="entry-picker-btn" data-scg="bb"><span style="color:#5aa9f2">M&amp;S BB</span><span class="sub">1.1 · 1.8</span></button>' +
@@ -6917,8 +7048,11 @@ function rapidScBind(redraw){
   document.querySelectorAll('#rapidOvBody [data-sc]').forEach(b => b.addEventListener('click', ()=>{
     const key = b.dataset.sc;
     const add = (extra)=>{
+      // V51: opened from a scan session → the session's kill / pack dates.
+      if(rapidScan){ const md = RAPID_SCAN_MODES[rapidScan.mode]; extra = Object.assign({ kdate: md.k(), pdate: md.p() }, extra || {}); }
       const res = rapidQuickAdd(key, extra);
       if(res){
+        if(rapidScan) rapidScanTake(res.nums); else
         rapidRememberBatch(res.nums, `${RAPID_SC[key].label} · ${res.sh}`);
         rapidScLast = `✓ #${res.nums[0]} ${RAPID_SC[key].label} · ${res.sh}${extra && extra.useByOverride ? ' · ' + extra.useByOverride + 'D' : ''} added`;
         try{ entryFlashToast(rapidScLast); }catch(_e){}
@@ -6944,14 +7078,14 @@ function rapidScBind(redraw){
 // Hot Wings: count → kill date per pack (calendar after calendar) → add.
 function rapidHotWings(){
   rapidAskNumber({
-    title: 'Hot Wings', hint: `How many packs? Pack date = ${rapidFmt(rapidPrevDay())} · times from 1800`,
+    title: 'Hot Wings', hint: `How many packs? Pack date = ${rapidFmt(rapidScan ? RAPID_SCAN_MODES[rapidScan.mode].p() : rapidPrevDay())} · times from 1800`,
     placeholder: 'e.g. 3', max: 6, back: rapidShortcutsOthers,
     onOk: (n)=>{
       const kills = [];
       const step = ()=>{
         const i = kills.length;
         // V50: in-page calendar — tap a day and the next calendar is there straight away.
-        rapidOvShow(`Hot Wings · kill date ${i+1} of ${n}`, 'Tap the kill date · pack date ' + rapidFmt(rapidPrevDay()),
+        rapidOvShow(`Hot Wings · kill date ${i+1} of ${n}`, 'Tap the kill date · pack date ' + rapidFmt(rapidScan ? RAPID_SCAN_MODES[rapidScan.mode].p() : rapidPrevDay()),
           (kills.length ? `<div class="rapid-pick-sum">${kills.map((d,j)=>`<span>#${j+1} ${esc(rapidFmt(d))}</span>`).join('')}</div>` : '') +
           `<label style="margin-top:6px;">Kill date for Hot Wings ${i+1}</label><div id="rapidHwCal"></div>`,
           ()=>{ if(kills.length){ kills.pop(); step(); } else rapidHotWings(); });
@@ -6967,7 +7101,7 @@ function rapidHotWings(){
       };
       const finish = ()=>{
         rapidOvClose();
-        const pd = rapidPrevDay();
+        const pd = rapidScan ? RAPID_SCAN_MODES[rapidScan.mode].p() : rapidPrevDay();
         const all = [], shifts = [];
         kills.forEach((kd, i) => {
           const t = String((18 + i) % 24).padStart(2,'0') + '00';
@@ -6975,10 +7109,12 @@ function rapidHotWings(){
           if(res){ all.push(...res.nums); shifts.push(res.sh); }
         });
         if(all.length){
+          if(rapidScan) rapidScanTake(all); else
           rapidRememberBatch(all, `Hot Wings ×${all.length}`);
           rapidScLast = `✓ Hot Wings #${all.join(', #')} · ${shifts.join(', ')}`;
           try{ entryFlashToast(rapidScLast); }catch(_e){}
         }
+        if(rapidScan && rapidScan.sub) rapidScanResume(all.length ? rapidScLast : 'Nothing added', all.length ? 'ok' : '');
       };
       step();
     }
