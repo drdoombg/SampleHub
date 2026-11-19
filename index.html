@@ -661,8 +661,9 @@
     font-size:14px; font-weight:700; text-align:center; transition:background .2s; }
   .rapid-scan-flash.ok { background:rgba(56,191,138,.25); border-color:var(--done); color:var(--done); }
   .rapid-scan-flash.bad { background:rgba(229,96,77,.18); border-color:rgba(229,96,77,.5); color:var(--danger); }
-  .rapid-scan-list { margin-top:8px; max-height:160px; overflow-y:auto; font-size:12.5px; }
+  .rapid-scan-list { margin-top:8px; font-size:12.5px; }
   .rapid-scan-list div { padding:5px 2px; border-bottom:1px solid var(--line); }
+  .rapid-scan-list div.rapid-new, .rapid-scan-list div.rapid-new b { color:var(--done); }
   .rapid-toggle { display:flex; align-items:center; gap:10px; padding:12px; margin-bottom:6px; border-radius:10px;
     background:var(--panel-2); border:1px solid var(--line); font-size:14px; font-weight:600; cursor:pointer; }
   .rapid-toggle.on { border-color:var(--done); background:rgba(56,191,138,.15); }
@@ -6315,7 +6316,11 @@ function rapidCalendar(el, opts){
       '<div class="rcal-w"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>' +
       `<div class="rcal-g">${cells}</div></div>`;
     el.querySelectorAll('[data-rnav]').forEach(b => b.addEventListener('click', ()=>{ cur.setMonth(cur.getMonth() + (+b.dataset.rnav)); draw(); }));
-    el.querySelectorAll('[data-rcal]').forEach(b => b.addEventListener('click', ()=>{ b.classList.add('sel'); opts.onPick(b.dataset.rcal); }));
+    el.querySelectorAll('[data-rcal]').forEach(b => b.addEventListener('click', ()=>{
+      if(el._rcalBusy) return; el._rcalBusy = true;
+      b.classList.add('sel');                                   // V51: tapped day lights green first
+      setTimeout(()=>{ el._rcalBusy = false; opts.onPick(b.dataset.rcal); }, 220);
+    }));
   };
   draw();
 }
@@ -6491,10 +6496,10 @@ function rapidAmberSwabs(){
   if(!m){ alert('AMBER Swab row not found in MIMS.'); return; }
   const on = RAPID_AMBER_SWABS.map(()=>true);
   const draw = ()=>{
-    rapidOvShow('Amber Swabs · previous day', 'Untick any you did not receive. Clock card number goes after "Prestart PPE Glove".',
+    rapidOvShow('Amber Swabs', '',
       RAPID_AMBER_SWABS.map((s,i)=>`<div class="rapid-toggle ${on[i]?'on':''}" data-ras="${i}"><span class="tick">${on[i]?'✓':''}</span><span>${esc(s.c)} <span class="entry-hint">· ${s.t}</span></span></div>`).join('') +
-      '<label style="margin-top:6px;">Clock card number (Prestart PPE Glove)</label>' +
-      '<input type="text" inputmode="numeric" id="rapidAsClock" placeholder="e.g. 001709 — or leave empty / Skip" autocomplete="off">' +
+      '<label style="margin-top:6px;">Clock card</label>' +
+      '<input type="text" inputmode="numeric" id="rapidAsClock" placeholder="e.g. 001709" autocomplete="off">' +
       '<div class="sheet-actions" style="margin-top:8px;">' +
         '<button class="btn ghost" id="rapidAsSkip">Skip number</button>' +
         '<button class="btn primary" id="rapidAsApply">Apply</button>' +
@@ -6624,7 +6629,7 @@ function rapidImport(fn, cardIds){
    is the visual "ready for the next pack" reset. */
 const RAPID_SCAN_MODES = {
   pkpp:  { title:'PK/PP',       k:()=>rapidPrevDay(), p:()=>rapidPrevDay(), timeEach:true },
-  pktp:  { title:'PK/Today',    k:()=>rapidPrevDay(), p:()=>rapidToday(),   timeEach:false },
+  pktp:  { title:'PK/TP',    k:()=>rapidPrevDay(), p:()=>rapidToday(),   timeEach:false },
   fresh: { title:'Fresh Kills', k:()=>rapidToday(),   p:()=>rapidToday(),   timeEach:false, meatPrepAsk:true }
 };
 let rapidScan = null;     // { mode, batches:[[nums]], pendCode, pendCount, handling }
@@ -6655,14 +6660,18 @@ function rapidScanUpdateHead(){
   document.getElementById('rapidScanNext').textContent = '#' + (entryOverrideNum || entryNextNumber());
 }
 function rapidScanFlash(msg, kind){
+  // V51: no feedback bar any more — the newest entries turn green in the list.
+  // Only problems (not found / camera error) pop up as a short floating toast.
   const el = document.getElementById('rapidScanFlash');
-  el.textContent = msg; el.classList.remove('ok','bad'); if(kind) el.classList.add(kind);
+  el.textContent = ''; el.classList.remove('ok','bad');
+  if(kind === 'bad' && msg && !/^Nothing to undo/.test(msg)){ try{ entryFlashToast(msg); }catch(_e){} }
 }
 function rapidScanRenderList(){
   const all = [];
   (rapidScan ? rapidScan.batches : []).forEach(b => b.forEach(n => { const r = entryRecords.find(x=>x.num===n); if(r) all.push(r); }));
+  const lastB = rapidScan && rapidScan.batches.length ? new Set(rapidScan.batches[rapidScan.batches.length-1]) : new Set();
   document.getElementById('rapidScanList').innerHTML = all.slice().reverse().map(r =>
-    `<div><b>#${r.num}</b> ${esc(r.desc)} <span class="entry-hint">· ${esc(r.mimsShift||'')}</span></div>`).join('');
+    `<div class="${lastB.has(r.num) ? 'rapid-new' : ''}"><b>#${r.num}</b> ${esc(r.desc)} <span class="entry-hint">· ${esc(r.mimsShift||'')}</span></div>`).join('');
 }
 async function rapidCamOpen(){
   if(!rapidScan) return;
@@ -7119,7 +7128,7 @@ function rapidScBind(redraw){
         if(rapidScan) rapidScanTake(res.nums); else
         rapidRememberBatch(res.nums, `${RAPID_SC[key].label} · ${res.sh}`);
         rapidScLast = `✓ #${res.nums[0]} ${RAPID_SC[key].label} · ${res.sh}${extra && extra.useByOverride ? ' · ' + extra.useByOverride + 'D' : ''} added`;
-        try{ entryFlashToast(rapidScLast); }catch(_e){}
+        if(!rapidScan){ try{ entryFlashToast(rapidScLast); }catch(_e){} }
       }
       redraw();   // refresh "next:" labels — card stays open for the next tap
     };
@@ -7176,7 +7185,7 @@ function rapidHotWings(){
           if(rapidScan) rapidScanTake(all); else
           rapidRememberBatch(all, `Hot Wings ×${all.length}`);
           rapidScLast = `✓ Hot Wings #${all.join(', #')} · ${shifts.join(', ')}`;
-          try{ entryFlashToast(rapidScLast); }catch(_e){}
+          if(!rapidScan){ try{ entryFlashToast(rapidScLast); }catch(_e){} }
         }
         if(rapidScan && rapidScan.sub) rapidScanResume(all.length ? rapidScLast : 'Nothing added', all.length ? 'ok' : '');
       };
@@ -7203,7 +7212,7 @@ const RAPID_TILES = [
   { label:'Necks &\nCaeca',   cls:'c-red',    run: rapidNeckCaeca },
   { label:'PK/PP',     icon: RAPID_ICO_CAGE,   run: ()=> rapidScanStart('pkpp') },
   { label:'Fresh Kills', icon: '🐔', cls:'wide', run: ()=> rapidScanStart('fresh') },
-  { label:'PK/Today',  icon: RAPID_ICO_BASKET, run: ()=> rapidScanStart('pktp') }
+  { label:'PK/TP',     icon: RAPID_ICO_BASKET, run: ()=> rapidScanStart('pktp') }
   // V51b: PMD Wholebirds, Shortcuts, Raw Portions now live inside the scan sessions.
 ];
 function rapidTileLabel(s){ return esc(s).replace(/\n/g, '<br>'); }
