@@ -4744,8 +4744,8 @@ function entryLookupByCurrentSquare(){
       { id:'sq_shelflife_bundle', name:'Shelf Life Bundle', barcode:'', mimsBarcode:'', product:'Product', cat:'Category 1', source:'shortcut', action:'shelfLifeBundle', _shortcutLabel:'Shelf Life Bundle' },
       { id:'sq_external_intake', name:'External Intake', barcode:'MIMS_0002', mimsBarcode:'MIMS_0002', product:'Intake', cat:'Category 1', source:'shortcut', action:'externalIntake', _shortcutLabel:'External Intake' },
       { id:'sq_raw_portions', name:'Raw Portions', barcode:'', mimsBarcode:'', product:'Product', cat:'Category 1', source:'shortcut', action:'rawPortions', _shortcutLabel:'Raw Portions' },
+      { id:'sq_pmd_wholebirds', name:'PMD Wholebirds', barcode:'MIMS_0018', mimsBarcode:'MIMS_0018', product:'Prep', cat:'Category 1', source:'shortcut', action:'pmdWholebirds', _shortcutLabel:'PMD Wholebirds' },
       { id:'sq_rapid_shortcuts', name:'Shortcuts', barcode:'', mimsBarcode:'', product:'Product', cat:'Category 1', source:'shortcut', action:'rapidShortcuts', _shortcutLabel:'Shortcuts' },   // V52
-      { id:'sq_pmd_wholebirds', name:'PMD Wholebirds', barcode:'MIMS_0018', mimsBarcode:'MIMS_0018', product:'Prep', cat:'Category 1', source:'shortcut', action:'pmdWholebirds', _shortcutLabel:'PMD Wholebirds' }
     ];
   }
   return null;
@@ -4935,7 +4935,7 @@ function entryRenderAllResults(list){
       : '';
     let titleStyle = '';
     if(p.action === 'nutritionalBundle' || p.action === 'shelfLifeBundle' || p.action === 'rapidShortcuts') titleStyle = 'color:var(--done);';
-    else if(p.action === 'externalIntake') titleStyle = 'color:#7fb3f0;';   // V52: blue like Rapid
+    else if(p.action === 'externalIntake') titleStyle = 'color:#4aa3ff;';   // V52: blue like Rapid
     else if(p.action === 'rawPortions' || p.action === 'pmdWholebirds') titleStyle = 'color:#a855f7;';
     return `<div class="entry-result-row" data-idx="${i}">
       <div>
