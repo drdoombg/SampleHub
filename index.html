@@ -696,7 +696,7 @@
     background:var(--panel-2); border-radius:6px; padding:3px 8px; flex-shrink:0; min-width:38px; text-align:center; }
   .entry-nh-desc { font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
   .entry-nh-added { font-size:10.5px; color:var(--done); flex-shrink:0; }
-  .entry-results { max-height:280px; overflow-y:auto; border-radius:10px; border:1px solid var(--line); margin-bottom:12px; }
+  .entry-results { max-height:400px; overflow-y:auto; border-radius:10px; border:1px solid var(--line); margin-bottom:12px; }
   .entry-result-row { padding:10px 12px; border-bottom:1px solid var(--line); cursor:pointer;
     display:flex; justify-content:space-between; align-items:center; gap:8px; background:var(--panel); }
   .entry-result-row:last-child { border-bottom:none; }
@@ -4744,6 +4744,7 @@ function entryLookupByCurrentSquare(){
       { id:'sq_shelflife_bundle', name:'Shelf Life Bundle', barcode:'', mimsBarcode:'', product:'Product', cat:'Category 1', source:'shortcut', action:'shelfLifeBundle', _shortcutLabel:'Shelf Life Bundle' },
       { id:'sq_external_intake', name:'External Intake', barcode:'MIMS_0002', mimsBarcode:'MIMS_0002', product:'Intake', cat:'Category 1', source:'shortcut', action:'externalIntake', _shortcutLabel:'External Intake' },
       { id:'sq_raw_portions', name:'Raw Portions', barcode:'', mimsBarcode:'', product:'Product', cat:'Category 1', source:'shortcut', action:'rawPortions', _shortcutLabel:'Raw Portions' },
+      { id:'sq_rapid_shortcuts', name:'Shortcuts', barcode:'', mimsBarcode:'', product:'Product', cat:'Category 1', source:'shortcut', action:'rapidShortcuts', _shortcutLabel:'Shortcuts' },   // V52
       { id:'sq_pmd_wholebirds', name:'PMD Wholebirds', barcode:'MIMS_0018', mimsBarcode:'MIMS_0018', product:'Prep', cat:'Category 1', source:'shortcut', action:'pmdWholebirds', _shortcutLabel:'PMD Wholebirds' }
     ];
   }
@@ -4874,6 +4875,7 @@ function entryResultSubtitle(p){
   if(p.action === 'milkSwabBundle') return 'Monthly · Milk swab bundle · opens wizard';
   if(p.action === 'nightHygiene') return 'Environmental swabs by LINE · opens picker';
   if(p.action === 'rawPortions') return 'Daily raw portions · opens wizard';
+  if(p.action === 'rapidShortcuts') return '9 Piece · Aldi 600 · M&S BB · Others';
   if(p.action === 'pmdWholebirds') return 'PMD Wholebirds · prompts colour';
   if(p.action === 'externalIntake') return 'External Intake · wizard (source → number → dates)';
   if(p.action === 'nutritionalBundle') return 'Raw / Cooked with turnaround options · opens wizard';
@@ -4932,7 +4934,8 @@ function entryRenderAllResults(list){
       ? ` <span style="font-size:10px;font-weight:700;color:#a855f7;background:rgba(168,85,247,.15);border-radius:3px;padding:1px 5px;vertical-align:middle;">${esc(p.mimsShift.toUpperCase())}</span>`
       : '';
     let titleStyle = '';
-    if(p.action === 'nutritionalBundle' || p.action === 'shelfLifeBundle') titleStyle = 'color:var(--done);';
+    if(p.action === 'nutritionalBundle' || p.action === 'shelfLifeBundle' || p.action === 'rapidShortcuts') titleStyle = 'color:var(--done);';
+    else if(p.action === 'externalIntake') titleStyle = 'color:#7fb3f0;';   // V52: blue like Rapid
     else if(p.action === 'rawPortions' || p.action === 'pmdWholebirds') titleStyle = 'color:#a855f7;';
     return `<div class="entry-result-row" data-idx="${i}">
       <div>
@@ -4970,6 +4973,7 @@ document.getElementById('entryResultsAll').addEventListener('click', e=>{
     return;
   }
   if(picked.action === 'rawPortions'){ entryRawPortionsOpen(); return; }
+  if(picked.action === 'rapidShortcuts'){ rapidShortcuts(); return; }
   if(picked.action === 'pmdWholebirds'){ entryPmdWholeBirdOpen(); return; }
   if(picked.action === 'externalIntake'){ entryExternalIntakeOpen(); return; }
   if(picked.action === 'nutritionalBundle'){ entryNutritionalBundleOpen(); return; }
