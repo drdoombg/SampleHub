@@ -7029,9 +7029,12 @@ function rapidAskJointKills(nums, done){
     const r = joints[i];
     const cur = String(r.kdate||'').slice(0,10);
     const pk = String(r.pdate||'').slice(0,10);
-    rapidOvShow(`Kill date · ${i+1} of ${joints.length}`, `#${r.num} ${r.desc} · pack ${rapidFmt(pk)}`,
+    rapidOvShow(`Kill date · ${i+1} of ${joints.length}`, `${r.desc} · pack ${rapidFmt(pk)}`,
       '<label style="margin-top:6px;">Tap the kill date</label><div id="rapidJkCal"></div>',
       i ? ()=>{ i--; step(); } : null);
+    // V52: entry number in green, easy to see
+    document.getElementById('rapidOvTitle').innerHTML =
+      `Kill date · ${i+1} of ${joints.length} · <b style="color:var(--done); font-size:1.25em;">#${r.num}</b>`;
     rapidOvOnCancel = end;    // Cancel → keep the remaining kill dates as scanned
     let used = false;
     rapidCalendar(document.getElementById('rapidJkCal'), {
