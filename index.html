@@ -901,7 +901,7 @@
 <header>
   <div class="title-row">
     <div>
-      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v51</span></h1>
+      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v52</span></h1>
       <div class="period-note" id="periodNote"></div>
     </div>
     <div class="hdr-right">
@@ -6041,8 +6041,9 @@ function entryExtIntakeRender(){
     // V50: Internal Intake — one date (kill + pack) → Apply → 2 entries.
     label.textContent = 'Internal Intake · Scunthorpe Wings';
     hint.textContent = 'Adds 2 entries: Scunthorpe Flats + Scunthorpe Drumettes';
-    body.innerHTML = '<label>Kill / Pack date</label>' +
-      `<input type="date" id="entryExtIntakeIntDate" value="${entryExtIntakeTodayStr()}" autocomplete="off">` +
+    // V52: ask the KILL date only — pack date = previous day; same kill date for Flats + Drumettes.
+    body.innerHTML = `<div class="entry-hint">Pack date = ${esc(rapidFmt(rapidPrevDay()))} (previous day)</div><label>Kill date</label>` +
+      `<input type="date" id="entryExtIntakeIntDate" value="${rapidPrevDay()}" autocomplete="off">` +
       '<div class="sheet-actions" style="margin-top:8px;"><button class="btn primary" id="entryExtIntakeIntApply">Apply</button></div>';
     const di = document.getElementById('entryExtIntakeIntDate');
     setTimeout(()=>{ try{ di.focus(); if(typeof di.showPicker === 'function') di.showPicker(); }catch(_e){} }, 80);
@@ -6123,7 +6124,7 @@ function entryExtIntakeCommitInternal(date){
       num, desc: mims.descrptn || 'Internal Intake', barcode: '',
       mimsBarcode: mims.barcode, mimsSuite: mims.suite || '', mimsShift: mims.shift || '',
       cat: 'Category 1', time: now.toISOString(), source: 'mims', tmpl: null, mimsRow: mims,
-      kdate: date + 'T00:00:00', pdate: date + 'T00:00:00',
+      kdate: date + 'T00:00:00', pdate: rapidPrevDay() + 'T00:00:00',   // V52: pack = previous day
       manualCellOverrides: { COMMS: prod }
     });
     nums.push(num);
@@ -7015,6 +7016,7 @@ function rapidHdrSync(){
 // each joint entry. Pack date stays as the scan mode set it.
 function rapidIsJoint(r){
   const t = String((r && r.desc) || '');
+  if(/salt\s*(&|and)\s*pepper\s*crown/i.test(t)) return true;     // V52: Ocado Salt & Pepper Crown
   return /joint/i.test(t) && /(rotisserie|butter\s*basted)/i.test(t);
 }
 function rapidAskJointKills(nums, done){
@@ -7027,7 +7029,7 @@ function rapidAskJointKills(nums, done){
     const r = joints[i];
     const cur = String(r.kdate||'').slice(0,10);
     const pk = String(r.pdate||'').slice(0,10);
-    rapidOvShow(`Joint kill date · ${i+1} of ${joints.length}`, `#${r.num} ${r.desc} · pack ${rapidFmt(pk)}`,
+    rapidOvShow(`Kill date · ${i+1} of ${joints.length}`, `#${r.num} ${r.desc} · pack ${rapidFmt(pk)}`,
       '<label style="margin-top:6px;">Tap the kill date</label><div id="rapidJkCal"></div>',
       i ? ()=>{ i--; step(); } : null);
     rapidOvOnCancel = end;    // Cancel → keep the remaining kill dates as scanned
@@ -7171,8 +7173,14 @@ function rapidScBind(redraw){
       }
       redraw();   // refresh "next:" labels — card stays open for the next tap
     };
-    // V50: 9 Piece + Dark Meat → 7D / 9D straight after the tap.
-    if(key === 'nine' || key === 'dark'){
+    // V52: Dark Meat → 7D / 9D, then Hot Wings mechanics (count → kill date per pack).
+    if(key === 'dark'){
+      rapidAskChoice(`${RAPID_SC[key].label} · Use By from Kill date`, 'Pick 7D or 9D',
+        [{label:'7D', v:7},{label:'9D', v:9}], c => rapidHotWings({ key:'dark', useBy:c.v }), redraw);
+      return;
+    }
+    // V50: 9 Piece → 7D / 9D straight after the tap.
+    if(key === 'nine'){
       rapidAskChoice(`${RAPID_SC[key].label} · Use By from Kill date`, 'Pick 7D or 9D — the entry is added straight away',
         [{label:'7D', v:7},{label:'9D', v:9}], c => add({ useByOverride: c.v }), redraw);
       return;
@@ -7188,19 +7196,24 @@ function rapidScBind(redraw){
   }));
 }
 // Hot Wings: count → kill date per pack (calendar after calendar) → add.
-function rapidHotWings(){
+// V52: also used by Dark Meat (o.key='dark', o.useBy = 7 or 9; no fixed times).
+function rapidHotWings(o){
+  o = o || {};
+  const key = o.key || 'wings';
+  const L = key === 'dark' ? `Dark Meat ${o.useBy}D` : 'Hot Wings';
+  const again = ()=> rapidHotWings(o);
   rapidAskNumber({
-    title: 'Hot Wings', hint: `How many packs? Pack date = ${rapidFmt(rapidScan ? RAPID_SCAN_MODES[rapidScan.mode].p() : rapidPrevDay())} · times from 1800`,
+    title: L, hint: `How many packs? Pack date = ${rapidFmt(rapidScan ? RAPID_SCAN_MODES[rapidScan.mode].p() : rapidPrevDay())}` + (key === 'wings' ? ' · times from 1800' : ''),
     placeholder: 'e.g. 3', max: 6, back: rapidShortcutsOthers,
     onOk: (n)=>{
       const kills = [];
       const step = ()=>{
         const i = kills.length;
         // V50: in-page calendar — tap a day and the next calendar is there straight away.
-        rapidOvShow(`Hot Wings · kill date ${i+1} of ${n}`, 'Tap the kill date · pack date ' + rapidFmt(rapidScan ? RAPID_SCAN_MODES[rapidScan.mode].p() : rapidPrevDay()),
+        rapidOvShow(`${L} · kill date ${i+1} of ${n}`, 'Tap the kill date · pack date ' + rapidFmt(rapidScan ? RAPID_SCAN_MODES[rapidScan.mode].p() : rapidPrevDay()),
           (kills.length ? `<div class="rapid-pick-sum">${kills.map((d,j)=>`<span>#${j+1} ${esc(rapidFmt(d))}</span>`).join('')}</div>` : '') +
-          `<label style="margin-top:6px;">Kill date for Hot Wings ${i+1}</label><div id="rapidHwCal"></div>`,
-          ()=>{ if(kills.length){ kills.pop(); step(); } else rapidHotWings(); });
+          `<label style="margin-top:6px;">Kill date for ${L} ${i+1}</label><div id="rapidHwCal"></div>`,
+          ()=>{ if(kills.length){ kills.pop(); step(); } else again(); });
         let used = false;
         rapidCalendar(document.getElementById('rapidHwCal'), {
           value: kills.length ? kills[kills.length-1] : rapidPrevDay(),
@@ -7216,14 +7229,16 @@ function rapidHotWings(){
         const pd = rapidScan ? RAPID_SCAN_MODES[rapidScan.mode].p() : rapidPrevDay();
         const all = [], shifts = [];
         kills.forEach((kd, i) => {
-          const t = String((18 + i) % 24).padStart(2,'0') + '00';
-          const res = rapidQuickAdd('wings', { kdate: kd, pdate: pd, timeOverride: t });
+          const ex = { kdate: kd, pdate: pd };
+          if(key === 'wings') ex.timeOverride = String((18 + i) % 24).padStart(2,'0') + '00';
+          else ex.useByOverride = o.useBy;
+          const res = rapidQuickAdd(key, ex);
           if(res){ all.push(...res.nums); shifts.push(res.sh); }
         });
         if(all.length){
           if(rapidScan) rapidScanTake(all); else
-          rapidRememberBatch(all, `Hot Wings ×${all.length}`);
-          rapidScLast = `✓ Hot Wings #${all.join(', #')} · ${shifts.join(', ')}`;
+          rapidRememberBatch(all, `${L} ×${all.length}`);
+          rapidScLast = `✓ ${L} #${all.join(', #')} · ${shifts.join(', ')}`;
           if(!rapidScan){ try{ entryFlashToast(rapidScLast); }catch(_e){} }
         }
         if(rapidScan && rapidScan.sub) rapidScanResume(all.length ? rapidScLast : 'Nothing added', all.length ? 'ok' : '');
