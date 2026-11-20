@@ -7203,7 +7203,7 @@ function rapidHotWings(o){
   const L = key === 'dark' ? `Dark Meat ${o.useBy}D` : 'Hot Wings';
   const again = ()=> rapidHotWings(o);
   rapidAskNumber({
-    title: L, hint: `How many packs? Pack date = ${rapidFmt(rapidScan ? RAPID_SCAN_MODES[rapidScan.mode].p() : rapidPrevDay())}` + (key === 'wings' ? ' · times from 1800' : ''),
+    title: L, hint: `How many packs? Pack date = ${rapidFmt(rapidScan ? RAPID_SCAN_MODES[rapidScan.mode].p() : rapidPrevDay())}`,
     placeholder: 'e.g. 3', max: 6, back: rapidShortcutsOthers,
     onOk: (n)=>{
       const kills = [];
@@ -7230,8 +7230,7 @@ function rapidHotWings(o){
         const all = [], shifts = [];
         kills.forEach((kd, i) => {
           const ex = { kdate: kd, pdate: pd };
-          if(key === 'wings') ex.timeOverride = String((18 + i) % 24).padStart(2,'0') + '00';
-          else ex.useByOverride = o.useBy;
+          if(key === 'dark') ex.useByOverride = o.useBy;   // V52: no fixed Hot Wings times — scan time / PK/PP time prompt
           const res = rapidQuickAdd(key, ex);
           if(res){ all.push(...res.nums); shifts.push(res.sh); }
         });
