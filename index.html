@@ -901,7 +901,7 @@
 <header>
   <div class="title-row">
     <div>
-      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v52</span></h1>
+      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v53</span></h1>
       <div class="period-note" id="periodNote"></div>
     </div>
     <div class="hdr-right">
@@ -4601,12 +4601,37 @@ let entryLookup = JSON.parse(localStorage.getItem(LS_ENTRY_LOOKUP) || 'null') ||
 })();
 
 let entryOverrideNum = null;
+let entryOverrideOld = null;   // V53: the record that held the jump-to number when it was set
 let entryPending = null;
 let entrySubTab = 'scan';        // 'scan' | 'records' | 'reference'
 let entryPrevSubTab = 'scan';    // last non-reference tab, so the Reference sheet's Done button returns to it
 let entryRecordsView = 'simplified'; // 'simplified' | 'export'
 
+// V53: once a new record has taken the jump-to number, finish the jump:
+// if that number belonged to an old record, the new one replaces it IN
+// PLACE (old list position, rev stamp so sync prefers it, ticks given back).
+function entryJumpConsume(){
+  const v = entryOverrideNum; if(!v) return;
+  const taken = entryRecords.filter(r => r.num === v && r !== entryOverrideOld);
+  if(!taken.length) return;
+  const old = entryOverrideOld;
+  if(old && entryRecords.includes(old)){
+    try{ entryRestoreTicksFor([old.num]); }catch(_e){}
+    // keep the new records — entryRestoreTicksFor works by num, so only the old one's ticks matter
+    entryRecords.splice(entryRecords.indexOf(old), 1);
+    const nr = taken[0];
+    nr.posTime = old.posTime || old.time || nr.posTime;
+    nr.rev = new Date().toISOString();
+  }
+  entryOverrideNum = null; entryOverrideOld = null;
+  try{
+    document.getElementById('entryNextNumEdit').value = '';
+    document.getElementById('entryJumpReplaceBadge').classList.add('hidden');
+    document.getElementById('entryNextNum').textContent = entryNextNumber();
+  }catch(_e){}
+}
 function entrySaveLocal(){
+  try{ entryJumpConsume(); }catch(_e){}
   localStorage.setItem(LS_ENTRY_RECORDS, JSON.stringify(entryRecords));
   localStorage.setItem(LS_ENTRY_TICKS, JSON.stringify(entryTicks));
   localStorage.setItem(LS_ENTRY_DELETED, JSON.stringify(entryDeleted));
@@ -4620,6 +4645,10 @@ function entrySaveLookup(){
 }
 
 function entryNextNumber(){
+  // V53: a jump-to number (# box) is used by EVERY way of adding — scan,
+  // search, Amber tap-add, Night Hygiene, Rapid bundles, wizards — until a
+  // record actually takes it (see entryJumpConsume in entrySaveLocal).
+  if(entryOverrideNum) return entryOverrideNum;
   // Numbered records only — shelf-life records carry either a null num or a
   // synthetic negative num (see entryShelfCommit); the noSampCount flag is
   // the authoritative "leave SAMPCOUNT blank" signal. Skip all of those.
@@ -8093,7 +8122,8 @@ function entryCommit(){
   if(!entryPending.desc && !liveDesc){ alert('Enter a name for this product first.'); return; }
   if(liveDesc) entryPending.desc = liveDesc;
   let n = entryOverrideNum || entryNextNumber();
-  entryOverrideNum=null;
+  const jumpOld = entryOverrideOld;
+  entryOverrideNum=null; entryOverrideOld=null;
   document.getElementById('entryNextNumEdit').value='';
   document.getElementById('entryJumpReplaceBadge').classList.add('hidden');
   // Jump-to replace: if the person specifically jumped to an existing num
@@ -8112,6 +8142,7 @@ function entryCommit(){
       try{ entryRestoreTicksFor([old.num]); }catch(_e){}      // V51: the wrong entry gives its routine tick back
       entryReplaceInfo = { idx: existingIdx, posTime: old.posTime || old.time || null, rev: new Date().toISOString() };
       entryRecords.splice(existingIdx, 1);
+      if(old === entryOverrideOld) entryOverrideOld = null;
     }
   }
 
@@ -9527,11 +9558,32 @@ document.getElementById('entryWizardSkip').addEventListener('click', ()=>{
     else entryShowWizardStage();
   }
 });
+function entryJumpApply(){
+  const el = document.getElementById('entryNextNumEdit');
+  const raw = String(el.value||'').trim();
+  const v = parseInt(raw,10);
+  const badge = document.getElementById('entryJumpReplaceBadge');
+  if(!raw || !v || v < 1){             // empty → cancel the jump
+    entryOverrideNum = null; entryOverrideOld = null;
+    badge.classList.add('hidden');
+    document.getElementById('entryNextNum').textContent = entryNextNumber();
+    try{ rapidScanUpdateHead(); }catch(_e){}
+    return;
+  }
+  entryOverrideNum = v;
+  entryOverrideOld = entryRecords.find(r => r.num === v) || null;
+  document.getElementById('entryNextNum').textContent = v;
+  try{ if(rapidScan) rapidScanUpdateHead(); }catch(_e){}
+  try{ entryFlashToast(entryOverrideOld ? `Next entry replaces #${v}` : `Next entry = #${v}`); }catch(_e){}
+}
+// V53: Enter / Go on the phone keyboard applies the number and closes the box.
+document.getElementById('entryNextNumEdit').addEventListener('keydown', e=>{
+  if(e.key === 'Enter' || e.keyCode === 13){ e.preventDefault(); e.target.blur(); }
+});
 document.getElementById('entryNextNumEdit').addEventListener('change', e=>{
-  const v=parseInt(e.target.value,10);
-  if(!v||v<1) return;
-  entryOverrideNum=v;
-  document.getElementById('entryNextNum').textContent=v;
+  entryJumpApply();
+  const v = entryOverrideNum;
+  if(!v) return;
   // If a record with this num already exists, tell the user they're in
   // replace mode. The next commit will overwrite it (single-entry commits
   // only — a bulk commit that would spill into occupied nums still just
@@ -9548,6 +9600,7 @@ document.getElementById('entryNextNumEdit').addEventListener('change', e=>{
 // Jump-to input hides itself once used or when it loses focus, so the compact
 // header goes back to just showing "Entry N" again.
 document.getElementById('entryNextNumEdit').addEventListener('blur', e=>{
+  if(String(e.target.value||'').trim() && parseInt(e.target.value,10) !== entryOverrideNum) entryJumpApply();   // V53: blur always applies
   e.target.classList.add('hidden');
 });
 
