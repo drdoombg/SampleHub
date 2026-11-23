@@ -613,6 +613,10 @@
   .rapid-tile.rt-2line { line-height:1.55; }
   .rapid-tile.rt-2line .rapid-emo { font-size:1.3em; }
   .rapid-emo { font-size:1.55em; line-height:1; display:block; bottom:-0.05em !important; }
+  .rapid-sc-status { margin-top:8px; color:var(--done) !important; font-weight:700; font-size:14px; }
+  .rapid-sc-btn { position:relative; }
+  .rapid-sc-plus { position:absolute; top:6px; right:8px; background:var(--done); color:#0b1a12; font-size:12px;
+    font-weight:800; line-height:1; padding:4px 7px; border-radius:999px; }
   .rapid-srch-res { overflow-y:auto; display:flex; flex-direction:column-reverse; margin-bottom:8px; }
   .nh-recheck { position:absolute; top:10px; right:10px; width:40px; height:40px; border-radius:50%;
     border:1.5px solid var(--line); background:var(--panel-2); color:var(--ink-dim); font-family:inherit;
@@ -6768,6 +6772,7 @@ async function rapidCamClose(){
 async function rapidScanStart(mode){
   if(typeof Html5Qrcode === 'undefined'){ alert('Scanner library failed to load — check your connection.'); return; }
   rapidScan = { mode, batches:[], pendCode:null, pendCount:0, handling:false };
+  rapidScCounts = {}; rapidScLast = '';   // V53: +N counts are per scan session
   document.getElementById('rapidGrid').classList.add('hidden');
   document.getElementById('rapidUndoBtn').classList.add('hidden');
   document.getElementById('rapidScanCard').classList.remove('hidden');
@@ -7157,31 +7162,41 @@ function rapidScBtn(key){
   const nx = Object.keys(rows).length ? rapidNextShift(rows).next : '—';
   const style = it.color === 'coop' ? '' : (it.color ? `style="color:${it.color}"` : '');
   const cls = it.color === 'coop' ? 'rapid-coop' : '';
-  return `<button type="button" class="entry-picker-btn" data-sc="${key}"><span class="${cls}" ${style}>${esc(it.label)}</span><span class="sub">next: ${esc(nx)}</span></button>`;
+  return `<button type="button" class="entry-picker-btn rapid-sc-btn" data-sc="${key}">${rapidScPlus([key])}<span class="${cls}" ${style}>${esc(it.label)}</span><span class="sub">next: ${esc(nx)}</span></button>`;
 }
 let rapidScLast = '';
+// V53: +N on each shortcut button = how many you've added with it (this scan
+// session, or this time the Shortcuts panel was opened). Groups show their total.
+let rapidScCounts = {};
+function rapidScCount(key, n){ rapidScCounts[key] = (rapidScCounts[key] || 0) + (n || 1); }
+function rapidScPlus(keys){
+  const n = keys.reduce((a,k) => a + (rapidScCounts[k] || 0), 0);
+  return n ? `<span class="rapid-sc-plus">+${n}</span>` : '';
+}
 function rapidShortcuts(){
+  // Fresh open outside a scan session → start the +N counts again.
+  if(!rapidScan && document.getElementById('rapidOverlay').classList.contains('hidden')){ rapidScCounts = {}; rapidScLast = ''; }
   const md = rapidScan ? RAPID_SCAN_MODES[rapidScan.mode] : null;
   rapidOvShow(md ? `Shortcuts · ${md.title}` : 'Shortcuts', md ? `One tap adds one entry · Kill ${rapidFmt(md.k())} · Pack ${rapidFmt(md.p())}` : 'One tap adds one entry · before 08:00 kill = prev day',
     '<div class="entry-picker-grid" style="grid-template-columns:repeat(2,1fr);">' +
       rapidScBtn('nine') + rapidScBtn('aldi600') +
-      '<button type="button" class="entry-picker-btn" data-scg="bb"><span style="color:#5aa9f2">M&amp;S BB</span><span class="sub">1.1 · 1.8</span></button>' +
-      '<button type="button" class="entry-picker-btn" data-scg="others">Others<span class="sub">Dark · Wings · Piri · Co-op</span></button>' +
-    '</div>' + `<div class="entry-hint" id="rapidScStatus" style="margin-top:8px;">${esc(rapidScLast)}</div>`);
+      '<button type="button" class="entry-picker-btn rapid-sc-btn" data-scg="bb">' + rapidScPlus(['bb11','bb18']) + '<span style="color:#5aa9f2">M&amp;S BB</span><span class="sub">1.1 · 1.8</span></button>' +
+      '<button type="button" class="entry-picker-btn rapid-sc-btn" data-scg="others">' + rapidScPlus(['dark','wings','piri11','piri18','coop400']) + 'Others<span class="sub">Dark · Wings · Piri · Co-op</span></button>' +
+    '</div>' + `<div class="entry-hint rapid-sc-status" id="rapidScStatus">${esc(rapidScLast)}</div>`);
   rapidScBind(rapidShortcuts);
   document.getElementById('rapidOvCancel').textContent = 'OK';
 }
 function rapidShortcutsBB(){
   rapidOvShow('M&S Butter Basted', 'Tap adds one entry',
     '<div class="entry-picker-grid" style="grid-template-columns:repeat(2,1fr);">' + rapidScBtn('bb11') + rapidScBtn('bb18') + '</div>' +
-    `<div class="entry-hint" id="rapidScStatus" style="margin-top:8px;">${esc(rapidScLast)}</div>`, rapidShortcuts);
+    `<div class="entry-hint rapid-sc-status" id="rapidScStatus">${esc(rapidScLast)}</div>`, rapidShortcuts);
   rapidScBind(rapidShortcutsBB);
   document.getElementById('rapidOvCancel').textContent = 'OK';
 }
 function rapidShortcutsPiri(){
   rapidOvShow('M&S Piri Piri', 'Tap adds one entry',
     '<div class="entry-picker-grid" style="grid-template-columns:repeat(2,1fr);">' + rapidScBtn('piri11') + rapidScBtn('piri18') + '</div>' +
-    `<div class="entry-hint" id="rapidScStatus" style="margin-top:8px;">${esc(rapidScLast)}</div>`, rapidShortcutsOthers);
+    `<div class="entry-hint rapid-sc-status" id="rapidScStatus">${esc(rapidScLast)}</div>`, rapidShortcutsOthers);
   rapidScBind(rapidShortcutsPiri);
   document.getElementById('rapidOvCancel').textContent = 'OK';
 }
@@ -7189,10 +7204,10 @@ function rapidShortcutsOthers(){
   rapidOvShow('Others', 'Tap adds one entry · Hot Wings asks how many',
     '<div class="entry-picker-grid" style="grid-template-columns:repeat(2,1fr);">' +
       rapidScBtn('dark') +
-      '<button type="button" class="entry-picker-btn" data-scg="wings"><span style="color:#f2c94c">Hot Wings</span><span class="sub">how many → kill dates</span></button>' +
-      '<button type="button" class="entry-picker-btn" data-scg="piri"><span style="color:#c08a5b">M&amp;S Piri Piri</span><span class="sub">1.1 · 1.8</span></button>' +
+      '<button type="button" class="entry-picker-btn rapid-sc-btn" data-scg="wings">' + rapidScPlus(['wings']) + '<span style="color:#f2c94c">Hot Wings</span><span class="sub">how many → kill dates</span></button>' +
+      '<button type="button" class="entry-picker-btn rapid-sc-btn" data-scg="piri">' + rapidScPlus(['piri11','piri18']) + '<span style="color:#c08a5b">M&amp;S Piri Piri</span><span class="sub">1.1 · 1.8</span></button>' +
       rapidScBtn('coop400') +
-    '</div>' + `<div class="entry-hint" id="rapidScStatus" style="margin-top:8px;">${esc(rapidScLast)}</div>`, rapidShortcuts);
+    '</div>' + `<div class="entry-hint rapid-sc-status" id="rapidScStatus">${esc(rapidScLast)}</div>`, rapidShortcuts);
   rapidScBind(rapidShortcutsOthers);
   document.getElementById('rapidOvCancel').textContent = 'OK';
 }
@@ -7206,8 +7221,9 @@ function rapidScBind(redraw){
       if(res){
         if(rapidScan) rapidScanTake(res.nums); else
         rapidRememberBatch(res.nums, `${RAPID_SC[key].label} · ${res.sh}`);
+        rapidScCount(key, res.nums.length);
         rapidScLast = `✓ #${res.nums[0]} ${RAPID_SC[key].label} · ${res.sh}${extra && extra.useByOverride ? ' · ' + extra.useByOverride + 'D' : ''} added`;
-        if(!rapidScan){ try{ entryFlashToast(rapidScLast); }catch(_e){} }
+        // V53: the green line in the panel is the feedback — no pop-up over the buttons
       }
       redraw();   // refresh "next:" labels — card stays open for the next tap
     };
@@ -7275,6 +7291,7 @@ function rapidHotWings(o){
         if(all.length){
           if(rapidScan) rapidScanTake(all); else
           rapidRememberBatch(all, `${L} ×${all.length}`);
+          rapidScCount(key, all.length);
           rapidScLast = `✓ ${L} #${all.join(', #')} · ${shifts.join(', ')}`;
           if(!rapidScan){ try{ entryFlashToast(rapidScLast); }catch(_e){} }
         }
