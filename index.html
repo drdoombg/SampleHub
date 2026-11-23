@@ -7302,8 +7302,8 @@ const RAPID_TILES = [
   { label:'External\nIntake', cls:'c-blue',   run: ()=> entryExternalIntakeOpen() },
   { label:'Necks &\nCaeca',   cls:'c-red',    run: rapidNeckCaeca },
   { label:'PK/PP',     icon: RAPID_ICO_CAGE,   run: ()=> rapidScanStart('pkpp') },
-  { label:'PK/TP',     icon: RAPID_ICO_BASKET, cls:'wide', run: ()=> rapidScanStart('pktp') },
-  { label:'Fresh\nKills', icon: '🐔', cls:'rt-2line', run: ()=> rapidScanStart('fresh') }   // V53: chronological left → right
+  { label:'PK/TP',     icon: RAPID_ICO_BASKET, run: ()=> rapidScanStart('pktp') },
+  { label:'Fresh Kills', icon: '🐔', cls:'wide', run: ()=> rapidScanStart('fresh') }   // V53: chronological left → right
   // V51b: PMD Wholebirds, Shortcuts, Raw Portions now live inside the scan sessions.
 ];
 function rapidTileLabel(s){ return esc(s).replace(/\n/g, '<br>'); }
