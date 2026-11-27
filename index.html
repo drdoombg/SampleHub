@@ -613,6 +613,7 @@
   .rapid-tile.rt-2line { line-height:1.55; }
   .rapid-tile.rt-2line .rapid-emo { font-size:1.3em; }
   .rapid-emo { font-size:1.55em; line-height:1; display:block; bottom:-0.05em !important; }
+  .num-hi { color:var(--done); font-weight:800; text-shadow:0 0 8px rgba(56,191,138,.65); }
   .rapid-sc-grid { margin-bottom:8px; }
   .rapid-sc-grid .entry-picker-btn { min-height:58px; padding:8px 4px; }
   .rapid-round-wrap { grid-column:1/-1; display:flex; flex-direction:column; align-items:center; gap:4px; margin-top:10px; }
@@ -6009,6 +6010,8 @@ function entryRawPortionsAdd(barcode, item){
   if(portionLabel){
     rec.manualCellOverrides = { COMMS: portionLabel };
   }
+  // V53: Raw Portions are always Fresh Kills — kill = pack = today.
+  { const t = rapidToday() + 'T00:00:00'; rec.kdate = t; rec.pdate = t; rec.rapidFresh = true; }
   entryRecords.push(rec);
   if(routineId && !extAlreadySent) toggleDone(routineId, 'weekly');
   entryRpAddedThisSession.set(barcode, (entryRpAddedThisSession.get(barcode)||0)+1);
@@ -6130,9 +6133,9 @@ function entryExtIntakeRender(){
   const lastDate = st.groups.length ? st.groups[st.groups.length-1].date : entryExtIntakeTodayStr();
   const done = st.groups.map(g => `<div class="entry-hint">#${g.from}–${g.from+g.count-1} → ${esc(entryExtIntakeFmt(g.date))} (${g.count})</div>`).join('');
   body.innerHTML = done +
-    `<label style="margin-top:6px;">Date for entries from #${first}</label>` +
+    `<label style="margin-top:6px;">Date for entries from <span class="num-hi">#${first}</span></label>` +
     `<input type="date" id="entryExtIntakeDate" value="${lastDate}" autocomplete="off">` +
-    `<label style="margin-top:8px;">How many (from #${first}) have this date?</label>` +
+    `<label style="margin-top:8px;">How many (from <span class="num-hi">#${first}</span>) have this date?</label>` +
     `<input type="text" inputmode="numeric" id="entryExtIntakeN" placeholder="1–${remaining}" autocomplete="off">` +
     // V49: Apply (plain) on the left, All remaining (green) on the right — always.
     '<div class="sheet-actions" style="margin-top:8px;">' +
@@ -6331,9 +6334,13 @@ function rapidAddRecs(specs, label){
 
 /* ---------- generic overlay ---------- */
 let rapidOvBackFn = null;
+// V53: every "#123" (or "#12–#15") in a prompt is shown in glowing green.
+function entryHiNums(text){
+  return esc(String(text == null ? '' : text)).replace(/#\d+(?:\s*[–-]\s*#?\d+)?/g, m => `<span class="num-hi">${m}</span>`);
+}
 function rapidOvShow(title, hint, html, backFn){
   document.getElementById('rapidOvCancel').textContent = 'Cancel';
-  document.getElementById('rapidOvTitle').textContent = title;
+  document.getElementById('rapidOvTitle').innerHTML = entryHiNums(title);
   document.getElementById('rapidOvHint').textContent = hint || '';
   document.getElementById('rapidOvBody').innerHTML = html;
   rapidOvBackFn = backFn || null;
@@ -6833,10 +6840,7 @@ function rapidScanRenderExtra(){
   const el = document.getElementById('rapidScanExtra');
   if(!rapidScan){ el.innerHTML = ''; return; }
   const sc = '<button type="button" class="rapid-tile c-green mid" data-rx="sc">Shortcuts</button>';
-  el.innerHTML = rapidScan.mode === 'fresh'
-    ? '<button type="button" class="rapid-tile c-purple" data-rx="pmd">PMD<br>Wholebirds</button>' + sc +
-      '<button type="button" class="rapid-tile c-purple" data-rx="raw">Raw<br>Portions</button>'
-    : sc;
+  el.innerHTML = sc;   // V53: PMD / Raw now live in the Shortcuts list
 }
 // Pause the camera while a sub-step (search / shortcuts / wizard) is open.
 async function rapidScanPause(){
@@ -6881,6 +6885,10 @@ function rapidScanRunWizard(k){
     if(seen && !busy){
       clearInterval(tick);
       const nums = entryRecords.filter(r=>!before.has(r.num)).map(r=>r.num);
+      // V53: PMD / Raw are always Fresh Kills (kill = pack = today, scan time) — whatever session they came from.
+      const tIso = rapidToday() + 'T00:00:00';
+      entryRecords.forEach(r => { if(nums.includes(r.num)){ r.kdate = tIso; r.pdate = tIso; r.rapidFresh = true; } });
+      if(nums.length) entrySaveLocal();
       rapidScanTake(nums);
       document.getElementById('rapidScanCard').classList.remove('hidden');
       try{ window.scrollTo({top:0}); }catch(_e){}
@@ -7053,8 +7061,10 @@ async function rapidScanFinish(){
   const all = [].concat(...st.batches);
   if(all.length) rapidRememberBatch(all, RAPID_SCAN_MODES[st.mode].title); else rapidRenderUndo();
   const afterJoints = ()=>{
-    if(RAPID_SCAN_MODES[st.mode].timeEach && all.length){
-      entryStartTimeLoop(all, { withLine:false });   // existing "Edit TIME (Each)" keypad
+    // V53: PMD / Raw (Fresh Kills) keep their scan time — not asked.
+    const timed = all.filter(n => { const r = entryRecords.find(x=>x.num===n); return !(r && r.rapidFresh); });
+    if(RAPID_SCAN_MODES[st.mode].timeEach && timed.length){
+      entryStartTimeLoop(timed, { withLine:false });   // existing "Edit TIME (Each)" keypad
     }
   };
   rapidAskJointKills(all, afterJoints);
@@ -8827,9 +8837,9 @@ function entryShowWizardStage(){
     const wrec = entryRecords.find(x=>x.num===num);
     let wkind = '';
     try{ const u = wrec ? entryRecordUnit(wrec).toLowerCase() : ''; wkind = u==='neck' ? 'Necks · ' : u==='caeca' ? 'Caeca · ' : ''; }catch(_e){}
-    label.textContent = entryWizard.withLine
+    label.innerHTML = entryHiNums(entryWizard.withLine
       ? `${wkind}Time + line for #${num}`
-      : `${wkind}Time for #${num}`;
+      : `${wkind}Time for #${num}`);
     entryWizard.buffer='';
     entryUpdateWizardSlots();
     stageLabel.textContent=`${entryWizard.idx+1} of ${entryWizard.nums.length}`;
@@ -8977,8 +8987,8 @@ function entryPromptLoopShow(){
   const total = st.nums.length;
   const rec = entryRecords.find(x => x.num === num);
   const desc = rec ? rec.desc : '';
-  document.getElementById('entryPromptLoopLabel').textContent =
-    `${st.config.title} — #${num} (${st.idx+1} of ${total})`;
+  document.getElementById('entryPromptLoopLabel').innerHTML =
+    entryHiNums(`${st.config.title} — #${num} (${st.idx+1} of ${total})`);
   document.getElementById('entryPromptLoopHint').textContent =
     st.config.hint ? `${st.config.hint} · ${desc}` : desc;
   const input = document.getElementById('entryPromptLoopInput');
@@ -9122,8 +9132,8 @@ function entryChoiceLoopShow(){
   const total = st.nums.length;
   const rec = entryRecords.find(x => x.num === num);
   const desc = rec ? rec.desc : '';
-  document.getElementById('entryChoiceLoopLabel').textContent =
-    `${st.config.title} — #${num} (${st.idx+1} of ${total})`;
+  document.getElementById('entryChoiceLoopLabel').innerHTML =
+    entryHiNums(`${st.config.title} — #${num} (${st.idx+1} of ${total})`);
   document.getElementById('entryChoiceLoopHint').textContent = desc;
   const btnWrap = document.getElementById('entryChoiceLoopButtons');
   btnWrap.innerHTML = st.config.choices.map(c =>
