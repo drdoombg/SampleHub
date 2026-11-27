@@ -623,6 +623,11 @@
   .rapid-sc-btn .chip-name { flex:none; font-size:inherit; font-weight:700; }
   .rapid-rem-h { font-size:13px; font-weight:800; margin:6px 0 4px; }
   .rapid-tesco { color:#d6c317; }   /* Tesco's customer colour */
+  .pmd-col-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:6px; }
+  .pmd-col { height:58px; border-radius:12px; border:2px solid var(--pc); background:transparent; color:var(--pc);
+    font-family:inherit; font-size:17px; font-weight:800; cursor:pointer; transition:background .12s; }
+  .pmd-col.on, .pmd-col:active { background:var(--pc); color:#111; }
+  .pmd-col:disabled { opacity:.22; cursor:default; }
   .num-hi { color:var(--done); font-weight:800; text-shadow:0 0 8px rgba(56,191,138,.65); }
   .rapid-sc-grid { margin-bottom:8px; }
   .rapid-sc-grid .entry-picker-btn { min-height:58px; padding:8px 4px; }
@@ -930,7 +935,7 @@
 <header>
   <div class="title-row">
     <div>
-      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v54</span></h1>
+      <h1>SampleHub<span style="font-size:10px;font-weight:400;opacity:.45;margin-left:6px;vertical-align:middle;letter-spacing:.04em;">v55</span></h1>
       <div class="period-note" id="periodNote"></div>
     </div>
     <div class="hdr-right">
@@ -6879,6 +6884,15 @@ document.getElementById('rapidScanExtra').addEventListener('click', async e=>{
 });
 // V53: PMD / Raw from inside a scan session (also used by the Shortcuts list).
 function rapidScanRunWizard(k){
+  if(k === 'pmd'){
+    // V55: PMD adds 2 entries straight away, then the colour card; back to the scanner after.
+    entryPmdWholeBirdOpen(nums => {
+      if(!rapidScan) return;
+      rapidScanTake(nums);
+      if(rapidScan.sub) rapidScanResume(nums.length ? `✓ #${nums[0]}–#${nums[nums.length-1]} PMD Wholebirds` : 'Nothing added', nums.length ? 'ok' : '');
+    });
+    return;
+  }
   // PMD / Raw: the wizard card opens in place of the scanner; when it is
   // finished (or closed) the scanner comes straight back.
   const card = k === 'pmd' ? 'entryConfirmCard' : 'entryRawPortionsCard';
@@ -7377,8 +7391,9 @@ function rapidScBind(redraw){
     rapidOvOnCancel = null;
     rapidOvClose();
     if(rapidScan){ rapidScan.sub = true; rapidScanRunWizard(k); return; }
-    const fn = k === 'pmd' ? entryPmdWholeBirdOpen : entryRawPortionsOpen;
-    if(entrySubTab === 'rapid') rapidImport(fn, [k === 'pmd' ? 'entryConfirmCard' : 'entryRawPortionsCard']);
+    if(k === 'pmd'){ entryPmdWholeBirdOpen(); return; }   // V55: no card — 2 entries + colour picker
+    const fn = entryRawPortionsOpen;
+    if(entrySubTab === 'rapid') rapidImport(fn, ['entryRawPortionsCard']);
     else fn();
   }));
 }
@@ -7485,10 +7500,57 @@ function rapidSyncBodyClass(){
   try{ rapidHdrSync(); }catch(_e){}
 }
 
-function entryPmdWholeBirdOpen(){
+// V55: PMD Wholebirds = always 2 entries, added straight away (Fresh Kills
+// dates), then a colour card for each — two different colours.
+function entryPmdWholeBirdOpen(done){
   const lp = entryLookup.find(p => p.mimsBarcode === 'MIMS_0018');
-  if(!lp){ alert('PMD Wholebirds entry not found.'); return; }
-  entryOpenConfirm(lp, { quickCount:true, needsPmdColor:true });
+  if(!lp){ alert('PMD Wholebirds entry not found.'); if(typeof done === 'function') done([]); return; }
+  const before = new Set(entryRecords.map(r=>r.num));
+  entryOpenConfirm(lp);
+  if(!entryPending){ if(typeof done === 'function') done([]); return; }
+  entryPending.entries = 2;
+  entryCommit();
+  const nums = entryRecords.filter(r => !before.has(r.num)).map(r => r.num);
+  const t = rapidToday() + 'T00:00:00';
+  nums.forEach(n => { const r = entryRecords.find(x=>x.num===n); if(r){ r.kdate = t; r.pdate = t; r.rapidFresh = true; } });
+  entrySaveLocal(); renderEntryAll();
+  entryPmdColourPick(nums, done);
+}
+const PMD_COLOURS = [
+  { n:'Green',  c:'#3ec98a' }, { n:'Blue',   c:'#4a9bff' },
+  { n:'Yellow', c:'#f2c94c' }, { n:'White',  c:'#e9edf2' },
+  { n:'Purple', c:'#b07cff' }, { n:'Red',    c:'#ff5a2e' }    // reddish orange
+];
+function entryPmdColourPick(nums, done){
+  const used = [];
+  let i = 0;
+  const finish = ()=>{
+    rapidOvOnCancel = null; rapidOvClose();
+    entrySaveLocal(); renderEntryAll();
+    if(typeof done === 'function') done(nums);
+    else { try{ rapidRememberBatch(nums, 'PMD Wholebirds'); }catch(_e){} }
+  };
+  const step = ()=>{
+    if(i >= nums.length){ finish(); return; }
+    const num = nums[i];
+    rapidOvShow(`PMD Wholebirds · colour for #${num}`, `${i+1} of ${nums.length}` + (used.length ? ` · ${used.join(', ')} already used` : ''),
+      '<div class="pmd-col-grid">' + PMD_COLOURS.map(o => {
+        const off = used.includes(o.n);
+        return `<button type="button" class="pmd-col" data-pmdc="${o.n}" style="--pc:${o.c}" ${off ? 'disabled' : ''}>${o.n}</button>`;
+      }).join('') + '</div>',
+      i ? ()=>{ i--; used.pop(); step(); } : null);
+    rapidOvOnCancel = finish;   // Cancel → entries stay, remaining colours left blank
+    let busy = false;
+    document.querySelectorAll('#rapidOvBody [data-pmdc]').forEach(b => b.addEventListener('click', ()=>{
+      if(busy || b.disabled) return; busy = true;
+      b.classList.add('on');
+      const r = entryRecords.find(x=>x.num===num);
+      if(r){ r.manualCellOverrides = r.manualCellOverrides || {}; r.manualCellOverrides.BATCH = b.dataset.pmdc; }
+      used.push(b.dataset.pmdc);
+      setTimeout(()=>{ i++; step(); }, 220);
+    }));
+  };
+  step();
 }
 
 
@@ -8599,13 +8661,7 @@ function entryCommit(){
     return;
   }
   if(followUpPmdColor){
-    entryStartPromptLoop(newNums, {
-      title: 'Color',
-      column: 'BATCH',
-      placeholder: 'e.g. Yellow',
-      hint: 'Color for this bird',
-      numeric: false   // color name is text, not a number
-    });
+    entryPmdColourPick(newNums);   // V55: colour buttons instead of typing
     return;
   }
   if(followUpExternalBulkProduct){
