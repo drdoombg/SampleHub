@@ -622,7 +622,7 @@
   .rapid-round-r .rapid-sc-plus { top:-6px; right:-10px; }
   .rapid-sc-btn .chip-name { flex:none; font-size:inherit; font-weight:700; }
   .rapid-rem-h { font-size:13px; font-weight:800; margin:6px 0 4px; }
-  .rapid-tesco { color:#5aa9ff; }
+  .rapid-tesco { color:#d6c317; }   /* Tesco's customer colour */
   .num-hi { color:var(--done); font-weight:800; text-shadow:0 0 8px rgba(56,191,138,.65); }
   .rapid-sc-grid { margin-bottom:8px; }
   .rapid-sc-grid .entry-picker-btn { min-height:58px; padding:8px 4px; }
@@ -7297,9 +7297,8 @@ function rapidShortcuts(){
 // Kills (kill = pack = today).
 let rapidRemList = null;
 function rapidRemaining(){
-  if(!rapidRemList){
-    rapidRemList = state.products.filter(p => !p.delisted && /^(co-?op|tesco)$/i.test(p.customer||'') && !isDone(p.id, 'weekly'));
-  }
+  // V54: only what is still un-ticked — a tapped product drops off the list.
+  rapidRemList = state.products.filter(p => !p.delisted && /^(co-?op|tesco)$/i.test(p.customer||'') && !isDone(p.id, 'weekly'));
   const md = rapidScan ? RAPID_SCAN_MODES[rapidScan.mode] : null;
   const d = md ? { k: md.k(), p: md.p() } : { k: rapidToday(), p: rapidToday() };
   const byCust = {};
