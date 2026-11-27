@@ -6619,11 +6619,12 @@ function rapidAmber(weekly){
   const missing = fixedNames.filter((n,i)=>!fixed[i]);
   if(missing.length || !skinRow){ alert('Missing in MIMS: ' + missing.concat(skinRow?[]:['amber skin']).join(', ')); return; }
   const title = weekly ? 'Amber Weekly' : 'Amber Daily';
-  const st = { n:0, be:null, beWidth:0 };
+  const st = { n:0, be:null, beWidth:0, on: fixed.map(()=>true) };   // V53: untick fixed items you didn't get
   const finish = (groups)=>{
     rapidOvClose();
     const d = rapidPrevDay();
-    const specs = fixed.map(m => ({ mims:m, kdate:d, pdate:d }));
+    const specs = fixed.filter((m,i)=>st.on[i]).map(m => ({ mims:m, kdate:d, pdate:d }));
+    if(!specs.length && !st.n){ return; }
     for(let i = 1; i <= st.n; i++){
       const g = rapidGroupFor(groups || [], i);
       const sp = { mims:skinRow, kdate: g ? g.kill : rapidToday(), pdate: g ? g.pack : rapidToday() };
@@ -6640,11 +6641,22 @@ function rapidAmber(weekly){
     skipLabel: 'No BE', onSkip: ()=>{ st.be = null; askDates(); }
   });
   const askCount = ()=> rapidAskNumber({
-    title: `${title} · Amber Skin`, hint: `How many Amber Skin samples? (${fixed.length} fixed items are added too, dated ${rapidFmt(rapidPrevDay())})`,
-    placeholder: 'e.g. 4', allowZero: true, value: st.n || '',
+    title: `${title} · Amber Skin`, hint: `How many Amber Skin samples?`,
+    placeholder: 'e.g. 4', allowZero: true, value: st.n || '', back: askItems,
     onOk: (n)=>{ st.n = n; if(n === 0) finish([]); else askBe(); }
   });
-  askCount();
+  // V53: first step — all fixed items ticked; tap to untick any not received.
+  const askItems = ()=>{
+    rapidOvShow(title, '',
+      fixed.map((m,i)=>`<div class="rapid-toggle ${st.on[i]?'on':''}" data-raf="${i}"><span class="tick">${st.on[i]?'✓':''}</span><span>${esc(m.descrptn)}</span></div>`).join('') +
+      '<div class="sheet-actions" style="margin-top:8px;"><button class="btn primary" id="rapidAfNext">Next</button></div>');
+    document.querySelectorAll('#rapidOvBody [data-raf]').forEach(el => el.addEventListener('click', ()=>{
+      const i = +el.dataset.raf; st.on[i] = !st.on[i];
+      el.classList.toggle('on', st.on[i]); el.querySelector('.tick').textContent = st.on[i] ? '✓' : '';
+    }));
+    document.getElementById('rapidAfNext').addEventListener('click', askCount);
+  };
+  askItems();
 }
 
 /* ---------- Necks & Caeca (6 necks + N caeca, previous day) ---------- */
