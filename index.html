@@ -10207,7 +10207,12 @@ function entryDayCheck(){
   const old = entryRecords.filter(r => new Date(r.time || 0).getTime() < startOfToday);
   if(old.length){
     try{ localStorage.setItem(LS_ENTRY_DAYARCHIVE, JSON.stringify({ day: last, at: new Date().toISOString(), records: old, ticks: entryTicks })); }catch(_e){}
-    entryMarkDeleted(old.map(r => r.num));
+    // V54: date the clear-tombstones just before midnight, so they can only
+    // hide entries made before today — never today's entries with the same #
+    // made on another device before this one was opened.
+    const before = new Date(startOfToday - 1000).toISOString();
+    old.forEach(r => { const k = String(r.num); if(!entryDeleted[k] || entryDeleted[k] < before) entryDeleted[k] = before; });
+    entryPruneTombstones();
     const keep = new Set(old.map(r => r.num));
     entryRecords = entryRecords.filter(r => !keep.has(r.num));
     if(!entryRecords.length) entryTicks = {};
@@ -11371,13 +11376,17 @@ function entrySyncScheduleWrite(){
     // "Unsupported field value: undefined" error. This is the single most
     // common way sync silently breaks after a code change that adds a new
     // optional field to records.
+    // V54: read what is on the server first and merge it in, so a device
+    // with fewer entries (e.g. the desktop at #85) can never overwrite the
+    // server copy of a device that is ahead (the phone at #110).
+    const doWrite = ()=>{
     const payload = JSON.parse(JSON.stringify({records:entryRecords, ticks:entryTicks, deleted:entryDeleted}));
     const serialized = JSON.stringify(payload);
     if(serialized.length > 800000){
       console.warn('Entry snapshot is', serialized.length, 'bytes — kept locally, not synced (Firestore 1 MiB cap).');
       return;
     }
-    window.__fb.writeEntrySnapshot(syncCircleId, payload).then(()=>{
+    return window.__fb.writeEntrySnapshot(syncCircleId, payload).then(()=>{
       syncLastLocalWriteAt = Date.now();
     }).catch(err=>{
       // Surface the failure so pair-not-syncing complaints have a paper trail
@@ -11385,12 +11394,35 @@ function entrySyncScheduleWrite(){
       // Firestore rejection invisible.
       console.warn('Entry snapshot write failed:', err && (err.code || err.message) || err);
     });
+    };
+    const getter = window.__fb.getEntrySnapshot;
+    if(!getter){ doWrite(); return; }
+    let done = false;
+    const go = ()=>{ if(done) return; done = true; doWrite(); };
+    setTimeout(go, 4000);                           // offline / slow → write anyway (Firestore queues it)
+    getter(syncCircleId).then(remote => {
+      if(done) return;
+      if(remote){ try{ entrySyncMerge(remote); }catch(_e){} }
+      go();
+    }).catch(go);
   }, 700);
 }
+// V54: push again whenever the phone comes back online or the app is reopened.
+window.addEventListener('online', ()=>{ try{ entrySyncScheduleWrite(); }catch(_e){} });
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ try{ entrySyncScheduleWrite(); }catch(_e){} } });
 function entrySyncApplyRemote(snapshot){
   if(!snapshot) return;
   syncLastRemoteAt = Date.now();
   if(!syncLastLocalWriteAt || (Date.now() - syncLastLocalWriteAt) > 3000) syncMarkPaired();
+  const ahead = entrySyncMerge(snapshot);
+  // V54: this device has entries / deletions the server copy doesn't →
+  // send the merged list back, so the other devices catch up too.
+  if(ahead) setTimeout(()=>{ try{ entrySyncScheduleWrite(); }catch(_e){} }, 0);
+}
+// Merge a server snapshot into this device. Returns true if this device
+// still holds something the snapshot lacks (so it should write back).
+function entrySyncMerge(snapshot){
+  let ahead = false;
   entrySyncApplyingRemote=true;
   try{
     // MERGE by record.num — don't replace. This prevents the classic sync
@@ -11422,8 +11454,13 @@ function entrySyncApplyRemote(snapshot){
           const lt = new Date(existing.time||0).getTime();
           const rt = new Date(rr.time||0).getTime();
           if(rt > lt) byNum.set(rr.num, rr);
+          // V54: exact tie → same pick on every device (no back-and-forth)
+          else if(rt === lt && JSON.stringify(rr) > JSON.stringify(existing)) byNum.set(rr.num, rr);
         }
       });
+      // Anything kept from this device that the snapshot doesn't have as-is?
+      const remoteJson = new Map(snapshot.records.map(rr => [rr.num, JSON.stringify(rr)]));
+      byNum.forEach((r, n) => { if(!ahead && remoteJson.get(n) !== JSON.stringify(r)) ahead = true; });
       entryRecords = [...byNum.values()].sort((a,b)=>{
         // Insertion order — use time field. Shelf-life records have negative
         // synthetic nums, so sorting by num would put them at the top; sorting
@@ -11441,6 +11478,9 @@ function entrySyncApplyRemote(snapshot){
     // what makes Delete all actually propagate instead of the records
     // flowing straight back.
     if(snapshot.deleted && typeof snapshot.deleted === 'object'){
+      Object.keys(entryDeleted).forEach(k=>{
+        if(!snapshot.deleted[k] || new Date(entryDeleted[k]).getTime() > new Date(snapshot.deleted[k]).getTime()) ahead = true;
+      });
       Object.keys(snapshot.deleted).forEach(k=>{
         const remoteAt = new Date(snapshot.deleted[k]).getTime();
         const localAt = entryDeleted[k] ? new Date(entryDeleted[k]).getTime() : 0;
@@ -11460,6 +11500,7 @@ function entrySyncApplyRemote(snapshot){
     localStorage.setItem(LS_ENTRY_DELETED, JSON.stringify(entryDeleted));
     if(currentTab==='entry') renderEntryAll();
   } finally { entrySyncApplyingRemote=false; }
+  return ahead;
 }
 function entrySyncStartListening(circleId){
   if(entrySyncUnsubscribe) entrySyncUnsubscribe();
