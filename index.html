@@ -613,6 +613,14 @@
   .rapid-tile.rt-2line { line-height:1.55; }
   .rapid-tile.rt-2line .rapid-emo { font-size:1.3em; }
   .rapid-emo { font-size:1.55em; line-height:1; display:block; bottom:-0.05em !important; }
+  .rapid-rem-wrap { margin:2px 0 6px; }
+  .rapid-round.rapid-round-r { border-color:#f59e0b; color:#f59e0b; background:rgba(245,158,11,.18); font-size:22px; font-weight:900; font-family:inherit;
+    box-shadow:0 0 14px rgba(245,158,11,.55), inset 0 0 8px rgba(245,158,11,.25); position:relative; }
+  .rapid-round.rapid-round-r:active { background:#f59e0b; color:#1a1205; }
+  .rapid-round-wrap.rapid-rem-wrap > span { color:#f59e0b; }
+  .rapid-round-r .rapid-sc-plus { top:-6px; right:-10px; }
+  .rapid-rem-h { font-size:13px; font-weight:800; margin:6px 0 4px; }
+  .rapid-tesco { color:#5aa9ff; }
   .num-hi { color:var(--done); font-weight:800; text-shadow:0 0 8px rgba(56,191,138,.65); }
   .rapid-sc-grid { margin-bottom:8px; }
   .rapid-sc-grid .entry-picker-btn { min-height:58px; padding:8px 4px; }
@@ -6803,7 +6811,7 @@ async function rapidCamClose(){
 async function rapidScanStart(mode){
   if(typeof Html5Qrcode === 'undefined'){ alert('Scanner library failed to load — check your connection.'); return; }
   rapidScan = { mode, batches:[], pendCode:null, pendCount:0, handling:false };
-  rapidScCounts = {}; rapidScLast = '';   // V53: +N counts are per scan session
+  rapidScCounts = {}; rapidScLast = ''; rapidRemList = null;   // V53: +N counts are per scan session
   document.getElementById('rapidGrid').classList.add('hidden');
   document.getElementById('rapidUndoBtn').classList.add('hidden');
   document.getElementById('rapidScanCard').classList.remove('hidden');
@@ -7262,7 +7270,7 @@ function rapidScPlus(keys){
 }
 function rapidShortcuts(){
   // Fresh open outside a scan session → start the +N counts again.
-  if(!rapidScan && document.getElementById('rapidOverlay').classList.contains('hidden')){ rapidScCounts = {}; rapidScLast = ''; }
+  if(!rapidScan && document.getElementById('rapidOverlay').classList.contains('hidden')){ rapidScCounts = {}; rapidScLast = ''; rapidRemList = null; }
   const md = rapidScan ? RAPID_SCAN_MODES[rapidScan.mode] : null;
   // V53: one list, grouped — KFC · M&S BB + Piri · Aldi + Co-op · wizards.
   const grid = (cols, html) => `<div class="entry-picker-grid rapid-sc-grid" style="grid-template-columns:repeat(${cols},minmax(0,1fr));">${html}</div>`;
@@ -7273,9 +7281,53 @@ function rapidShortcuts(){
     grid(2, rapidScBtn('aldi600') + rapidScBtn('coop400')) +
     grid(2, '<button type="button" class="entry-picker-btn rapid-sc-btn" data-scx="raw"><span style="color:#b48cff">Raw Portions</span><span class="sub">wizard</span></button>' +
             '<button type="button" class="entry-picker-btn rapid-sc-btn" data-scx="pmd"><span style="color:#b48cff">PMD Wholebirds</span><span class="sub">wizard</span></button>') +
+    // V53: orange R = Remaining Co-op / Tesco weekly products
+    '<div class="rapid-round-wrap rapid-rem-wrap"><button type="button" class="rapid-round rapid-round-r" id="rapidRemBtn" title="Remaining">' +
+      (rapidScPlus(Object.keys(rapidScCounts).filter(k=>k.startsWith('rem:'))) ) + 'R</button><span>Remaining</span></div>' +
     `<div class="entry-hint rapid-sc-status" id="rapidScStatus">${esc(rapidScLast)}</div>`);
+  document.getElementById('rapidRemBtn').addEventListener('click', ()=> rapidRemaining());
   rapidScBind(rapidShortcuts);
   document.getElementById('rapidOvCancel').textContent = 'OK';
+}
+// V53: Remaining — Co-op & Tesco WEEKLY routine products not ticked yet.
+// Names as on the Routine tab; tap adds one Weekly entry (+N shows on it).
+// Dates: inside a scan session → that session's dates; otherwise Fresh
+// Kills (kill = pack = today).
+let rapidRemList = null;
+function rapidRemaining(){
+  if(!rapidRemList){
+    rapidRemList = state.products.filter(p => !p.delisted && /^(co-?op|tesco)$/i.test(p.customer||'') && !isDone(p.id, 'weekly'));
+  }
+  const md = rapidScan ? RAPID_SCAN_MODES[rapidScan.mode] : null;
+  const d = md ? { k: md.k(), p: md.p() } : { k: rapidToday(), p: rapidToday() };
+  const byCust = {};
+  rapidRemList.forEach(p => { (byCust[p.customer] = byCust[p.customer] || []).push(p); });
+  const body = Object.keys(byCust).length
+    ? Object.keys(byCust).map(c => `<div class="rapid-rem-h ${/co-?op/i.test(c) ? 'rapid-coop' : 'rapid-tesco'}">${esc(c)}</div>` +
+        `<div class="entry-picker-grid rapid-sc-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));">` +
+        byCust[c].map(p => `<button type="button" class="entry-picker-btn rapid-sc-btn" data-rem="${esc(p.id)}">${rapidScPlus(['rem:'+p.id])}<span>${esc(p.name)}</span><span class="sub">${p.barcode ? 'weekly' : 'no barcode'}</span></button>`).join('') +
+        '</div>').join('')
+    : '<div class="entry-hint">All Co-op and Tesco weekly products are ticked.</div>';
+  rapidOvShow('Remaining · weekly', `Co-op & Tesco not ticked yet · Kill ${rapidFmt(d.k)} · Pack ${rapidFmt(d.p)}`,
+    body + `<div class="entry-hint rapid-sc-status" id="rapidScStatus">${esc(rapidScLast)}</div>`, rapidShortcuts);
+  document.getElementById('rapidOvCancel').textContent = 'OK';
+  document.querySelectorAll('#rapidOvBody [data-rem]').forEach(b => b.addEventListener('click', ()=>{
+    const prod = rapidRemList.find(p => p.id === b.dataset.rem); if(!prod) return;
+    if(!prod.barcode){ alert('No barcode on "' + prod.name + '" in Routines.'); return; }
+    const rows = entryMims.filter(m => m.barcode === prod.barcode && !rapidNorm(m.descrptn).includes('shelf life'));
+    const m = rows.find(x => rapidNorm(x.shift) === 'weekly') || null;
+    let lk = m ? rapidLookupFor(m) : entryLookup.find(x => x.barcode === prod.barcode);
+    if(!lk){ alert(prod.customer + ' ' + prod.name + ' not found in the product list.'); return; }
+    const opts = { cat: 'Category 2', kdate: d.k, pdate: d.p };
+    if(m){ opts.mimsShift = m.shift; opts.mimsSuite = m.suite; }
+    const nums = rapidCommitPick(lk, opts);
+    if(nums && nums.length){
+      if(rapidScan) rapidScanTake(nums); else rapidRememberBatch(nums, `${prod.customer} ${prod.name} · Weekly`);
+      rapidScCount('rem:' + prod.id, nums.length);
+      rapidScLast = `✓ #${nums[0]} ${prod.customer} ${prod.name} · Weekly added`;
+    }
+    rapidRemaining();
+  }));
 }
 // Old sub-panels now all point at the single list.
 function rapidShortcutsBB(){ rapidShortcuts(); }
