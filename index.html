@@ -613,6 +613,18 @@
   .rapid-tile.rt-2line { line-height:1.55; }
   .rapid-tile.rt-2line .rapid-emo { font-size:1.3em; }
   .rapid-emo { font-size:1.55em; line-height:1; display:block; bottom:-0.05em !important; }
+  .rapid-sc-grid { margin-bottom:8px; }
+  .rapid-sc-grid .entry-picker-btn { min-height:58px; padding:8px 4px; }
+  .rapid-round-wrap { grid-column:1/-1; display:flex; flex-direction:column; align-items:center; gap:4px; margin-top:10px; }
+  .rapid-round-wrap span { font-size:12px; font-weight:700; color:var(--done); }
+  .rapid-round { width:52px; height:52px; border-radius:50%; border:2px solid var(--done); background:rgba(56,191,138,.22);
+    color:var(--done); display:flex; align-items:center; justify-content:center; cursor:pointer;
+    box-shadow:0 0 14px rgba(56,191,138,.55), inset 0 0 8px rgba(56,191,138,.25); }
+  .rapid-round:active { background:var(--done); color:#0b1a12; }
+  .rcal-g button.ub-sel { background:#e25555; color:#fff; font-weight:800; }
+  .rcal-g button .mo { display:block; font-size:9px; line-height:1; color:var(--ink-dim); font-weight:700; }
+  .rapid-ub { color:#ff6b6b; font-weight:800; }
+  .rapid-kd { color:var(--done); font-weight:800; }
   .rapid-sc-status { margin-top:8px; color:var(--done) !important; font-weight:700; font-size:14px; }
   .rapid-sc-btn { position:relative; }
   .rapid-sc-plus { position:absolute; top:6px; right:8px; background:var(--done); color:#0b1a12; font-size:12px;
@@ -6849,6 +6861,10 @@ document.getElementById('rapidScanExtra').addEventListener('click', async e=>{
   const k = b.dataset.rx;
   await rapidScanPause();
   if(k === 'sc'){ rapidShortcuts(); return; }
+  rapidScanRunWizard(k);
+});
+// V53: PMD / Raw from inside a scan session (also used by the Shortcuts list).
+function rapidScanRunWizard(k){
   // PMD / Raw: the wizard card opens in place of the scanner; when it is
   // finished (or closed) the scanner comes straight back.
   const card = k === 'pmd' ? 'entryConfirmCard' : 'entryRawPortionsCard';
@@ -6871,7 +6887,7 @@ document.getElementById('rapidScanExtra').addEventListener('click', async e=>{
       rapidScanResume(nums.length ? `✓ #${nums[0]}${nums.length>1?'–#'+nums[nums.length-1]:''} added — ${k==='pmd'?'PMD Wholebirds':'Raw Portions'}` : 'Nothing added', nums.length ? 'ok' : '');
     }
   }, 300);
-});
+}
 // V51: Search inside the session — same search as the regular Entry page.
 function rapidSearchList(q){
   q = String(q||'').trim().toLowerCase();
@@ -7071,34 +7087,83 @@ function rapidIsJoint(r){
   if(/salt\s*(&|and)\s*pepper\s*crown/i.test(t)) return true;     // V52: Ocado Salt & Pepper Crown
   return /joint/i.test(t) && /(rotisserie|butter\s*basted)/i.test(t);
 }
+function rapidIsUseByJoint(r){
+  const t = String((r && r.desc) || '');
+  return /joint/i.test(t) && /(rotisserie|butter\s*basted)/i.test(t);
+}
+function rapidUbDaysFor(r){
+  try{
+    const mr = entryMimsRowFor(r.mimsBarcode || r.barcode) || r.mimsRow || null;
+    return entryComputeUseByDays(Object.assign({}, r, { useByOverride: r.useByOverride }), mr);
+  }catch(_e){ return null; }
+}
+// V53: one question per PRODUCT (not per entry).
+//   Rotisserie / Butter Basted joints → pick the USE BY date (red); kill date
+//   = use-by − the product's use-by days (Butter Basted 8 D, Rotisserie 9 D).
+//   Salt & Pepper Crown → pick the KILL date (green).
 function rapidAskJointKills(nums, done){
-  const joints = nums.map(n => entryRecords.find(x=>x.num===n)).filter(rapidIsJoint);
-  if(!joints.length){ done(); return; }
+  const recs = nums.map(n => entryRecords.find(x=>x.num===n)).filter(rapidIsJoint);
+  if(!recs.length){ done(); return; }
+  const groups = [];
+  recs.forEach(r => { let g = groups.find(x => x.desc === r.desc); if(!g){ g = { desc:r.desc, recs:[] }; groups.push(g); } g.recs.push(r); });
   let i = 0;
   const end = ()=>{ rapidOvOnCancel = null; rapidOvClose(); entrySaveLocal(); renderEntryAll(); done(); };
   const step = ()=>{
-    if(i >= joints.length){ end(); return; }
-    const r = joints[i];
-    const cur = String(r.kdate||'').slice(0,10);
-    const pk = String(r.pdate||'').slice(0,10);
-    rapidOvShow(`Kill date · ${i+1} of ${joints.length}`, `${r.desc} · pack ${rapidFmt(pk)}`,
-      '<label style="margin-top:6px;">Tap the kill date</label><div id="rapidJkCal"></div>',
+    if(i >= groups.length){ end(); return; }
+    const g = groups[i];
+    const first = g.recs[0];
+    const pk = String(first.pdate||'').slice(0,10);
+    const ubDays = rapidIsUseByJoint(first) ? rapidUbDaysFor(first) : null;
+    const isUb = ubDays != null;
+    const numsHtml = `<b style="color:var(--done); font-size:1.15em;">#${g.recs.map(r=>r.num).join(', #')}</b>`;
+    rapidOvShow('', `${g.desc}${g.recs.length>1 ? ' ×' + g.recs.length : ''} · pack ${rapidFmt(pk)}` + (isUb ? ` · kill = use by − ${ubDays} days` : ''),
+      `<label style="margin-top:6px;">${isUb ? '<span class="rapid-ub">Tap the USE BY date</span>' : '<span class="rapid-kd">Tap the KILL date</span>'}</label><div id="rapidJkCal"></div>`,
       i ? ()=>{ i--; step(); } : null);
-    // V52: entry number in green, easy to see
     document.getElementById('rapidOvTitle').innerHTML =
-      `Kill date · ${i+1} of ${joints.length} · <b style="color:var(--done); font-size:1.25em;">#${r.num}</b>`;
-    rapidOvOnCancel = end;    // Cancel → keep the remaining kill dates as scanned
+      `${isUb ? '<span class="rapid-ub">Use by</span>' : '<span class="rapid-kd">Kill date</span>'} · ${i+1} of ${groups.length} · ${numsHtml}`;
+    rapidOvOnCancel = end;    // Cancel → keep the remaining dates as scanned
     let used = false;
-    rapidCalendar(document.getElementById('rapidJkCal'), {
-      value: cur || rapidPrevDay(),
-      onPick: iso => {
-        if(used) return; used = true;
-        r.kdate = iso + 'T00:00:00';
-        i++; step();
-      }
-    });
+    const apply = iso => {
+      if(used) return; used = true;
+      g.recs.forEach(r => {
+        if(isUb){
+          const n = rapidUbDaysFor(r); const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() - (n != null ? n : ubDays));
+          r.kdate = rapidISO(d) + 'T00:00:00';
+        } else r.kdate = iso + 'T00:00:00';
+      });
+      i++; step();
+    };
+    if(isUb) rapidUbCalendar(document.getElementById('rapidJkCal'), { onPick: apply });
+    else rapidCalendar(document.getElementById('rapidJkCal'), { value: String(first.kdate||'').slice(0,10) || rapidPrevDay(), onPick: apply });
   };
   step();
+}
+// V53: use-by calendar — one grid running from last week into the next
+// month (e.g. half November + half December), so no month flipping.
+function rapidUbCalendar(el, opts){
+  const t = new Date(); t.setHours(0,0,0,0);
+  const start = new Date(t); start.setDate(start.getDate() - 7);
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));     // back to Monday
+  const endD = new Date(t); endD.setDate(endD.getDate() + 21);
+  endD.setDate(endD.getDate() + (6 - ((endD.getDay() + 6) % 7)));   // on to Sunday
+  const today = rapidISO(t);
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const months = [];
+  let cells = '';
+  for(const d = new Date(start); d <= endD; d.setDate(d.getDate() + 1)){
+    const iso = rapidISO(d);
+    if(!months.includes(MON[d.getMonth()])) months.push(MON[d.getMonth()]);
+    const mo = (d.getDate() === 1 || iso === rapidISO(start)) ? `<span class="mo">${MON[d.getMonth()]}</span>` : '';
+    cells += `<button type="button" data-rcal="${iso}" class="${iso === today ? 'today' : ''}">${mo}${d.getDate()}</button>`;
+  }
+  el.innerHTML = `<div class="rcal"><div class="rcal-h" style="justify-content:center;"><b>${months.join(' – ')} ${endD.getFullYear()}</b></div>` +
+    '<div class="rcal-w">' + ['M','T','W','T','F','S','S'].map(x=>`<span>${x}</span>`).join('') + '</div>' +
+    `<div class="rcal-g">${cells}</div></div>`;
+  el.querySelectorAll('[data-rcal]').forEach(b => b.addEventListener('click', ()=>{
+    if(el._rcalBusy) return; el._rcalBusy = true;
+    b.classList.add('ub-sel');
+    setTimeout(()=>{ el._rcalBusy = false; opts.onPick(b.dataset.rcal); }, 220);
+  }));
 }
 
 /* ---------- Shortcuts ----------
@@ -7110,10 +7175,10 @@ function rapidAskJointKills(nums, done){
    Hot Wings: count → one kill-date calendar per pack → pack = previous day,
    times 1800, 1900, 2000 … */
 const RAPID_SC = {
-  nine:    { label:'9 Piece',          color:'',                 match: m => rapidNorm(m.retailer)==='kfc' && rapidNorm(m.descrptn)==='9 piece' },
+  nine:    { label:'9 Piece',          color:'#5ab4ff',                 match: m => rapidNorm(m.retailer)==='kfc' && rapidNorm(m.descrptn)==='9 piece' },
   dark:    { label:'Dark Meat',        color:'#4cd38f',          match: m => rapidNorm(m.retailer)==='kfc' && rapidNorm(m.descrptn)==='dark meat' },
   wings:   { label:'Hot Wings',        color:'#f2c94c',          match: m => rapidNorm(m.retailer)==='kfc' && rapidNorm(m.descrptn)==='hot wings' },
-  aldi600: { label:'Aldi 600',         color:'',                 match: m => rapidNorm(m.retailer)==='aldi'  && rapidNorm(m.descrptn).includes('drum fillet') && rapidNorm(m.size).replace(/\s/g,'')==='600g' },
+  aldi600: { label:'Aldi 600',         color:'#4a74e0',                 match: m => rapidNorm(m.retailer)==='aldi'  && rapidNorm(m.descrptn).includes('drum fillet') && rapidNorm(m.size).replace(/\s/g,'')==='600g' },
   coop400: { label:'Co-op 400',        color:'coop',             match: m => rapidNorm(m.retailer)==='co-op' && rapidNorm(m.descrptn).includes('drum fillet') && rapidNorm(m.size).replace(/\s/g,'')==='400g' },
   bb11:    { label:'M&S BB 1.1',       color:'#5aa9f2',          match: m => m.barcode === 'MSBUTTER11' },
   bb18:    { label:'M&S BB 1.8',       color:'#5aa9f2',          match: m => m.barcode === 'MSBUTTER18' },
@@ -7189,40 +7254,23 @@ function rapidShortcuts(){
   // Fresh open outside a scan session → start the +N counts again.
   if(!rapidScan && document.getElementById('rapidOverlay').classList.contains('hidden')){ rapidScCounts = {}; rapidScLast = ''; }
   const md = rapidScan ? RAPID_SCAN_MODES[rapidScan.mode] : null;
+  // V53: one list, grouped — KFC · M&S BB + Piri · Aldi + Co-op · wizards.
+  const grid = (cols, html) => `<div class="entry-picker-grid rapid-sc-grid" style="grid-template-columns:repeat(${cols},minmax(0,1fr));">${html}</div>`;
   rapidOvShow(md ? `Shortcuts · ${md.title}` : 'Shortcuts', md ? `One tap adds one entry · Kill ${rapidFmt(md.k())} · Pack ${rapidFmt(md.p())}` : 'One tap adds one entry · before 08:00 kill = prev day',
-    '<div class="entry-picker-grid" style="grid-template-columns:repeat(2,1fr);">' +
-      rapidScBtn('nine') + rapidScBtn('aldi600') +
-      '<button type="button" class="entry-picker-btn rapid-sc-btn" data-scg="bb">' + rapidScPlus(['bb11','bb18']) + '<span style="color:#5aa9f2">M&amp;S BB</span><span class="sub">1.1 · 1.8</span></button>' +
-      '<button type="button" class="entry-picker-btn rapid-sc-btn" data-scg="others">' + rapidScPlus(['dark','wings','piri11','piri18','coop400']) + 'Others<span class="sub">Dark · Wings · Piri · Co-op</span></button>' +
-    '</div>' + `<div class="entry-hint rapid-sc-status" id="rapidScStatus">${esc(rapidScLast)}</div>`);
+    grid(3, rapidScBtn('nine') + rapidScBtn('dark') +
+      '<button type="button" class="entry-picker-btn rapid-sc-btn" data-scg="wings">' + rapidScPlus(['wings']) + '<span style="color:#f2c94c">Hot Wings</span><span class="sub">count → dates</span></button>') +
+    grid(2, rapidScBtn('bb11') + rapidScBtn('bb18') + rapidScBtn('piri11') + rapidScBtn('piri18')) +
+    grid(2, rapidScBtn('aldi600') + rapidScBtn('coop400')) +
+    grid(2, '<button type="button" class="entry-picker-btn rapid-sc-btn" data-scx="raw"><span style="color:#b48cff">Raw Portions</span><span class="sub">wizard</span></button>' +
+            '<button type="button" class="entry-picker-btn rapid-sc-btn" data-scx="pmd"><span style="color:#b48cff">PMD Wholebirds</span><span class="sub">wizard</span></button>') +
+    `<div class="entry-hint rapid-sc-status" id="rapidScStatus">${esc(rapidScLast)}</div>`);
   rapidScBind(rapidShortcuts);
   document.getElementById('rapidOvCancel').textContent = 'OK';
 }
-function rapidShortcutsBB(){
-  rapidOvShow('M&S Butter Basted', 'Tap adds one entry',
-    '<div class="entry-picker-grid" style="grid-template-columns:repeat(2,1fr);">' + rapidScBtn('bb11') + rapidScBtn('bb18') + '</div>' +
-    `<div class="entry-hint rapid-sc-status" id="rapidScStatus">${esc(rapidScLast)}</div>`, rapidShortcuts);
-  rapidScBind(rapidShortcutsBB);
-  document.getElementById('rapidOvCancel').textContent = 'OK';
-}
-function rapidShortcutsPiri(){
-  rapidOvShow('M&S Piri Piri', 'Tap adds one entry',
-    '<div class="entry-picker-grid" style="grid-template-columns:repeat(2,1fr);">' + rapidScBtn('piri11') + rapidScBtn('piri18') + '</div>' +
-    `<div class="entry-hint rapid-sc-status" id="rapidScStatus">${esc(rapidScLast)}</div>`, rapidShortcutsOthers);
-  rapidScBind(rapidShortcutsPiri);
-  document.getElementById('rapidOvCancel').textContent = 'OK';
-}
-function rapidShortcutsOthers(){
-  rapidOvShow('Others', 'Tap adds one entry · Hot Wings asks how many',
-    '<div class="entry-picker-grid" style="grid-template-columns:repeat(2,1fr);">' +
-      rapidScBtn('dark') +
-      '<button type="button" class="entry-picker-btn rapid-sc-btn" data-scg="wings">' + rapidScPlus(['wings']) + '<span style="color:#f2c94c">Hot Wings</span><span class="sub">how many → kill dates</span></button>' +
-      '<button type="button" class="entry-picker-btn rapid-sc-btn" data-scg="piri">' + rapidScPlus(['piri11','piri18']) + '<span style="color:#c08a5b">M&amp;S Piri Piri</span><span class="sub">1.1 · 1.8</span></button>' +
-      rapidScBtn('coop400') +
-    '</div>' + `<div class="entry-hint rapid-sc-status" id="rapidScStatus">${esc(rapidScLast)}</div>`, rapidShortcuts);
-  rapidScBind(rapidShortcutsOthers);
-  document.getElementById('rapidOvCancel').textContent = 'OK';
-}
+// Old sub-panels now all point at the single list.
+function rapidShortcutsBB(){ rapidShortcuts(); }
+function rapidShortcutsPiri(){ rapidShortcuts(); }
+function rapidShortcutsOthers(){ rapidShortcuts(); }
 function rapidScBind(redraw){
   document.querySelectorAll('#rapidOvBody [data-sc]').forEach(b => b.addEventListener('click', ()=>{
     const key = b.dataset.sc;
@@ -7259,6 +7307,16 @@ function rapidScBind(redraw){
     else if(g === 'others') rapidShortcutsOthers();
     else if(g === 'piri') rapidShortcutsPiri();
     else if(g === 'wings') rapidHotWings();
+  }));
+  // V53: Raw Portions / PMD Wholebirds from the Shortcuts list.
+  document.querySelectorAll('#rapidOvBody [data-scx]').forEach(b => b.addEventListener('click', ()=>{
+    const k = b.dataset.scx;
+    rapidOvOnCancel = null;
+    rapidOvClose();
+    if(rapidScan){ rapidScan.sub = true; rapidScanRunWizard(k); return; }
+    const fn = k === 'pmd' ? entryPmdWholeBirdOpen : entryRawPortionsOpen;
+    if(entrySubTab === 'rapid') rapidImport(fn, [k === 'pmd' ? 'entryConfirmCard' : 'entryRawPortionsCard']);
+    else fn();
   }));
 }
 // Hot Wings: count → kill date per pack (calendar after calendar) → add.
@@ -7345,10 +7403,15 @@ function rapidRenderGrid(){
         '</div></div>';
     }
     return `<button type="button" class="rapid-tile ${t.cls||''}" data-rt="${i}"><span class="${t.icon ? 'rapid-lbl-ico' : ''}" style="white-space:nowrap">${rapidTileLabel(t.label)}${t.icon ? ('<span class="rapid-ico-w">' + (t.icon.startsWith('<') ? t.icon : '<span class="rapid-emo">' + t.icon + '</span>') + '</span>') : ''}</span></button>`;
-  }).join('');
+  }).join('') +
+  // V53: round green Shortcuts button, centred under the kills row
+  '<div class="rapid-round-wrap"><button type="button" class="rapid-round" id="rapidRoundSc" title="Shortcuts">' +
+    '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/></svg>' +
+  '</button><span>Shortcuts</span></div>';
   rapidRenderUndo();
 }
 document.getElementById('rapidGrid').addEventListener('click', e=>{
+  if(e.target.closest('#rapidRoundSc')){ rapidShortcuts(); return; }
   const b = e.target.closest('[data-rt]'); if(!b) return;
   const t = RAPID_TILES[+b.dataset.rt];
   const fn = (b.dataset.rsp != null && t.split) ? t.split[+b.dataset.rsp].run : t.run;
