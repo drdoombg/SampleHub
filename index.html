@@ -620,6 +620,7 @@
   .rapid-round.rapid-round-r:active { background:rgba(245,158,11,.25); }
   .rapid-round-wrap.rapid-rem-wrap > span { color:#f59e0b; }
   .rapid-round-r .rapid-sc-plus { top:-6px; right:-10px; }
+  .rapid-sc-btn .chip-name { flex:none; font-size:inherit; font-weight:700; }
   .rapid-rem-h { font-size:13px; font-weight:800; margin:6px 0 4px; }
   .rapid-tesco { color:#5aa9ff; }
   .num-hi { color:var(--done); font-weight:800; text-shadow:0 0 8px rgba(56,191,138,.65); }
@@ -7306,7 +7307,7 @@ function rapidRemaining(){
   const body = Object.keys(byCust).length
     ? Object.keys(byCust).map(c => `<div class="rapid-rem-h ${/co-?op/i.test(c) ? 'rapid-coop' : 'rapid-tesco'}">${esc(c)}</div>` +
         `<div class="entry-picker-grid rapid-sc-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));">` +
-        byCust[c].map(p => `<button type="button" class="entry-picker-btn rapid-sc-btn" data-rem="${esc(p.id)}">${rapidScPlus(['rem:'+p.id])}<span>${esc(p.name)}</span><span class="sub">${p.barcode ? 'weekly' : 'no barcode'}</span></button>`).join('') +
+        byCust[c].map(p => `<button type="button" class="entry-picker-btn rapid-sc-btn" data-rem="${esc(p.id)}">${rapidScPlus(['rem:'+p.id])}<span class="chip-name ${p.room ? (roomInfo(p.room)?.cls || '') : ''}">${esc(p.name)}</span><span class="sub">${p.barcode ? 'weekly' : 'no barcode'}</span></button>`).join('') +
         '</div>').join('')
     : '<div class="entry-hint">All Co-op and Tesco weekly products are ticked.</div>';
   rapidOvShow('Remaining · weekly', `Co-op & Tesco not ticked yet · Kill ${rapidFmt(d.k)} · Pack ${rapidFmt(d.p)}`,
